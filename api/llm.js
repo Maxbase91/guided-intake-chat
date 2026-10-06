@@ -23,16 +23,24 @@ function pickProvider() {
 
 class LlmError extends Error { constructor(msg, status) { super(msg); this.status = status; } }
 const isQuota = (e) => e && (e.status === 429 || /quota|rate limit|resource_exhausted/i.test(e.message || ""));
+const isTimeout = (e) => e && (e.name === "TimeoutError" || e.name === "AbortError" || e.status === 408);
+const CALL_TIMEOUT_MS = 20000; // per model call; then the next fallback is tried
 
 async function callGemini(system, history, model = process.env.GEMINI_MODEL || "gemini-2.5-flash") {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const r = await fetch(url, {
     method: "POST",
+    signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
     headers: { "Content-Type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
       contents: history.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
-      generationConfig: { temperature: 0.3, responseMimeType: "application/json" },
+      generationConfig: {
+        temperature: 0.3,
+        responseMimeType: "application/json",
+        // Flash models think before answering by default, which makes chat replies slow. Turn it off.
+        ...(/flash/i.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+      },
     }),
   });
   const d = await r.json();
@@ -44,6 +52,7 @@ async function callGroq(system, history) {
   const model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
   const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
+    signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
     body: JSON.stringify({
       model,
@@ -105,9 +114,9 @@ module.exports = async (req, res) => {
       return res.status(200).json({ text, provider: name });
     } catch (e) {
       last = e;
-      if (!isQuota(e)) break;
+      if (!isQuota(e) && !isTimeout(e)) break;
     }
   }
-  const quota = isQuota(last);
-  return res.status(quota ? 429 : 502).json({ error: last?.message || "AI call failed", quota });
+  const quota = isQuota(last), slow = isTimeout(last);
+  return res.status(quota ? 429 : slow ? 504 : 502).json({ error: slow ? "The AI took too long to answer" : last?.message || "AI call failed", quota });
 };

@@ -332,7 +332,7 @@ async function callLLM(system, history){
   const p=CONFIG.provider, key=CONFIG.keys[p], model=CONFIG.models[p];
   if(p==="server"){
     const r=await fetch("/api/llm",{method:"POST",headers:{"Content-Type":"application/json","x-access-code":CONFIG.accessCode||""},
-      body:JSON.stringify({system,history})});
+      body:JSON.stringify({system,history}),signal:AbortSignal.timeout(50000)});
     const d=await r.json().catch(()=>({}));
     if(r.status===401) throw new Error("Access code missing or wrong. Enter it in Settings.");
     if(!r.ok){ const e=new Error(d.error||`Server error ${r.status}`); e.quota = r.status===429 || !!d.quota; throw e; }
@@ -340,16 +340,16 @@ async function callLLM(system, history){
   }
   if(p==="gemini"){
     const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
-    const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+    const r=await fetch(url,{method:"POST",signal:AbortSignal.timeout(30000),headers:{"Content-Type":"application/json"},body:JSON.stringify({
       systemInstruction:{parts:[{text:system}]},
       contents:history.map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]})),
-      generationConfig:{temperature:0.3,responseMimeType:"application/json"}
+      generationConfig:{temperature:0.3,responseMimeType:"application/json",...(/flash/i.test(model)?{thinkingConfig:{thinkingBudget:0}}:{})}
     })});
     const d=await r.json();
     if(!r.ok) throw new Error(d?.error?.message||`Gemini error ${r.status}`);
     return parseJSON((d.candidates?.[0]?.content?.parts||[]).filter(x=>x.text&&!x.thought).map(x=>x.text).join(""));
   }
-  const r=await fetch("https://api.groq.com/openai/v1/chat/completions",{method:"POST",
+  const r=await fetch("https://api.groq.com/openai/v1/chat/completions",{method:"POST",signal:AbortSignal.timeout(30000),
     headers:{"Content-Type":"application/json","Authorization":`Bearer ${key}`},
     body:JSON.stringify({model,temperature:0.3,response_format:{type:"json_object"},
       messages:[{role:"system",content:system},...history.map(m=>({role:m.role,content:m.content}))]})});
@@ -381,6 +381,8 @@ How to talk:
 - Active contracts you may mention: ${CONTRACTS.map(c=>`${c.title} with ${c.supplier} (category ${c.category}, to ${c.expires})`).join("; ")}.
 - Preferred suppliers: ${Object.entries(PREFERRED).map(([k,v])=>`${k}: ${v.join(", ")}`).join("; ")}.
 - If the user corrects something, update it without fuss.
+- Never ask the same question twice. Any answer counts, including "yes", "no" or "not sure". Record it in the fields (for example personal_data true or false) and drop it from "missing".
+- After about 4 answers, stop asking optional things. Estimate what is still unknown, say so, and set ready true.
 
 What you need before "ready" is true:
 - Always: category, demand type, an estimated value (the user may say "don't know"; then estimate it yourself and say so).
@@ -424,7 +426,8 @@ async function handleUser(text){
     applyTurn(out);
   }catch(e){
     const quota = e.quota || /quota|rate limit|429/i.test(e.message||"");
-    S.aiDown = quota ? "The AI has hit its usage limit for now" : "The AI is not reachable right now";
+    const slow = e.name==="TimeoutError"||e.name==="AbortError"||/too long|timed? ?out/i.test(e.message||"");
+    S.aiDown = quota ? "The AI has hit its usage limit for now" : slow ? "The AI took too long to answer" : "The AI is not reachable right now";
     S.msgs.push({role:"assistant",kind:"err",text:`${S.aiDown}, so I'll carry on with standard questions.`});
     try{ applyTurn(offlineTurn(text)); }catch(e2){}
   }
@@ -446,6 +449,11 @@ function applyTurn(out){
   if(out.reply) S.msgs.push({role:"assistant",text:out.reply,proposals:props,hint:out.hint||null});
   else if(props.length||out.hint) S.msgs.push({role:"assistant",text:"Here are some suggestions.",proposals:props,hint:out.hint||null});
   S.ready=!!out.ready && !!S.f.category;
+  const userTurns=S.msgs.filter(m=>m.role==="user").length;
+  if(!S.ready && S.f.category && userTurns>=6){  // safety net: the AI keeps asking, so decide with what we have
+    if(S.f.value==null){ S.f.value=defaultEstimate(); S.f.value_is_estimate=true; }
+    S.ready=true; S.msgs.push({role:"assistant",text:"I have enough to recommend a route. Anything still open is noted in the summary, and you can add it later."});
+  }
   if(S.ready){
     const R=determine(); const key=R.channel+"|"+S.f.category+"|"+S.f.value+"|"+JSON.stringify(S.f.risk_flags)+"|"+S.f.supplier;
     if(key!==S.lastRecKey){ S.result=R; S.lastRecKey=key; S.override=""; S.msgs.push({role:"assistant",kind:"rec"}); }
