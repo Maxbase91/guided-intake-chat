@@ -1,0 +1,773 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Guided Intake Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* =========================================================
+   Guided Intake Chat (prototype)
+   AI: understands the need, asks for what is missing, writes the service description.
+   Rules: decide the buying channel (deterministic, visible, editable).
+   ========================================================= */
+:root{
+  --navy:#0f2147; --navy-2:#1b3266; --navy-3:#2c4a8a;
+  --amber:#f2a900; --amber-soft:#fff4d6; --amber-ink:#8a5d00;
+  --bg:#f5f6fa; --card:#fff; --line:#e4e7ef; --line-2:#eef0f5;
+  --ink:#141b2d; --ink-2:#4a5470; --ink-3:#7c859e;
+  --ok:#11845b; --ok-soft:#e5f5ee; --warn:#b4570b; --warn-soft:#fdf0e3;
+  --bad:#b42318; --bad-soft:#fdecea; --info:#2c4a8a; --info-soft:#eaf0fb;
+  --shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px -12px rgba(16,24,40,.14);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;height:100dvh}
+h1,h2,h3{font-family:"Inter Tight",Inter,sans-serif;letter-spacing:-.01em;margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+
+/* top bar */
+.top{background:var(--navy);color:#fff;flex:none}
+.top-in{max-width:1280px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;gap:12px}
+.logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--amber),#ffcf5c);display:grid;place-items:center;color:var(--navy);font-weight:800;flex:none}
+.brand b{display:block;font-family:"Inter Tight";font-size:16px}
+.brand span{font-size:12px;color:#aab6d3}
+.sp{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:5px 10px;border-radius:99px;background:rgba(255,255,255,.1);color:#dfe6f7;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:#7c859e}
+.dot.on{background:#3ad29f;box-shadow:0 0 0 3px rgba(58,210,159,.2)}
+.tb{background:rgba(255,255,255,.1);border:0;color:#fff;border-radius:10px;padding:8px 12px;cursor:pointer;font-size:13px;display:inline-flex;gap:6px;align-items:center}
+.tb:hover{background:rgba(255,255,255,.18)}
+.only-m{display:none}
+@media(max-width:900px){.only-m{display:inline-flex}.brand span,.pill{display:none}}
+
+/* layout */
+.app{flex:1;min-height:0;max-width:1280px;width:100%;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;padding:18px}
+@media(max-width:900px){.app{grid-template-columns:1fr;padding:0}}
+.chat{display:flex;flex-direction:column;min-height:0;background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
+@media(max-width:900px){.chat{border-radius:0;border:0}}
+.msgs{flex:1;overflow-y:auto;padding:24px 22px 12px;scroll-behavior:smooth}
+@media(max-width:600px){.msgs{padding:16px 12px 8px}}
+
+/* welcome */
+.welcome{max-width:620px;margin:20px auto 10px;text-align:center}
+.welcome .big{width:56px;height:56px;border-radius:16px;margin:0 auto 14px;background:linear-gradient(135deg,var(--navy),var(--navy-3));display:grid;place-items:center;color:var(--amber)}
+.welcome h1{font-size:26px}
+.welcome p{color:var(--ink-2);margin:8px 0 18px}
+.ex{display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:left}
+@media(max-width:600px){.ex{grid-template-columns:1fr}}
+.ex button{border:1px solid var(--line);background:#fafbfd;border-radius:14px;padding:12px 14px;cursor:pointer;font-size:14px;color:var(--ink-2);text-align:left;transition:.15s}
+.ex button:hover{border-color:var(--navy-3);background:#fff;color:var(--ink)}
+.ex b{display:block;color:var(--ink);font-size:13px;margin-bottom:2px}
+
+/* messages */
+.m{display:flex;gap:10px;margin:0 0 16px;animation:fd .3s ease}
+@keyframes fd{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.m.u{justify-content:flex-end}
+.av{width:30px;height:30px;border-radius:9px;background:var(--navy);color:var(--amber);display:grid;place-items:center;flex:none;font-weight:700;font-size:13px}
+.bub{max-width:min(620px,85%);padding:11px 15px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word}
+.m.u .bub{background:var(--navy);color:#fff;border-bottom-right-radius:5px}
+.m.a .bub{background:#f3f5fa;border-bottom-left-radius:5px}
+.m.a .bub b{color:var(--navy)}
+.m .wide{flex:1;min-width:0;max-width:720px}
+.note{font-size:12px;color:var(--ink-3);margin:4px 0 0}
+.typing{display:inline-flex;gap:4px;padding:14px 16px}
+.typing i{width:7px;height:7px;border-radius:50%;background:var(--ink-3);animation:bl 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
+@keyframes bl{0%,60%,100%{opacity:.25}30%{opacity:1}}
+.errm{background:var(--bad-soft)!important;color:var(--bad)}
+
+/* composer */
+.qr{display:flex;gap:8px;flex-wrap:wrap;padding:0 18px 10px}
+.qr button{border:1px solid var(--navy-3);color:var(--navy);background:#fff;border-radius:99px;padding:7px 13px;font-size:13.5px;cursor:pointer;font-weight:500}
+.qr button:hover{background:var(--navy);color:#fff}
+.comp{border-top:1px solid var(--line);padding:12px 14px calc(12px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:flex-end;background:#fff}
+.comp textarea{flex:1;border:1px solid var(--line);border-radius:14px;padding:12px 14px;resize:none;max-height:160px;min-height:48px;outline:none;line-height:1.45}
+.comp textarea:focus{border-color:var(--navy-3);box-shadow:0 0 0 4px rgba(44,74,138,.12)}
+.send{width:48px;height:48px;border-radius:14px;border:0;background:var(--navy);color:#fff;cursor:pointer;display:grid;place-items:center;flex:none}
+.send:hover{background:var(--navy-2)}
+.send[disabled]{opacity:.45;cursor:not-allowed}
+
+/* cards inside chat */
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+.rec-h{padding:20px 20px 18px;background:radial-gradient(120% 140% at 100% 0%,#2c4a8a 0%,var(--navy) 60%);color:#fff;position:relative;overflow:hidden}
+.rec-h:after{content:"";position:absolute;right:-50px;top:-50px;width:180px;height:180px;border-radius:50%;background:rgba(242,169,0,.18)}
+.eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--amber-ink)}
+.rec-h .eyebrow{color:#ffd36b}
+.rec-h h2{font-size:24px;margin:4px 0}
+.rec-h p{color:#c9d3ea;margin:0;font-size:14px;position:relative;z-index:1}
+.kpis{display:flex;gap:24px;margin-top:14px;flex-wrap:wrap;position:relative;z-index:1}
+.kpi b{display:block;font-family:"Inter Tight";font-size:18px}
+.kpi span{font-size:11.5px;color:#aab6d3}
+.sec{padding:14px 20px;border-top:1px solid var(--line-2)}
+.sec h4{margin:0 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+details.sec summary{cursor:pointer;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:600;list-style:none}
+details.sec summary::-webkit-details-marker{display:none}
+details.sec summary:after{content:" +";}
+details[open].sec summary:after{content:" –"}
+.trace{list-style:none;padding:0;margin:8px 0 0}
+.trace li{display:flex;gap:10px;padding:7px 0;font-size:13.5px}
+.tick{width:20px;height:20px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:11px;font-weight:700}
+.tick.n{background:var(--line-2);color:var(--ink-3)}
+.tick.s{background:var(--amber);color:var(--navy)}
+.r{color:var(--ink-3);font-size:12.5px}
+.ctrl{display:flex;gap:10px;padding:6px 0;font-size:13.5px}
+.ctrl .ic{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;flex:none;background:var(--info-soft);color:var(--info)}
+.ctrl .ic.warn{background:var(--warn-soft);color:var(--warn)}
+.ctrl .ic.bad{background:var(--bad-soft);color:var(--bad)}
+ol.ns{margin:0;padding-left:20px;font-size:14px}
+ol.ns li{margin:3px 0}
+.acts{display:flex;gap:8px;flex-wrap:wrap;padding:14px 20px;border-top:1px solid var(--line-2);background:#fafbfd}
+.btn{border:0;border-radius:11px;padding:9px 14px;font-weight:600;cursor:pointer;font-size:13.5px;display:inline-flex;align-items:center;gap:6px}
+.btn-p{background:var(--navy);color:#fff}
+.btn-a{background:var(--amber);color:var(--navy)}
+.btn-g{background:#fff;border:1px solid var(--line);color:var(--ink-2)}
+.btn-g:hover{border-color:var(--ink-3)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+select.inp,input.inp,textarea.inp{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:#fff;outline:none}
+.ovr{border:1px dashed var(--warn);background:var(--warn-soft);border-radius:12px;padding:10px 12px;font-size:13.5px;color:#6b3a06;margin-top:10px}
+
+/* service description */
+.sd-h{background:var(--navy);color:#fff;padding:14px 20px}
+.sd-h .t{font-family:"Inter Tight";font-size:17px;font-weight:700;outline:none;margin-top:2px}
+.sd-h small{font-size:11.5px;color:#aab6d3;letter-spacing:.06em;text-transform:uppercase}
+.sd [contenteditable]{outline:none;border-radius:6px}
+.sd [contenteditable]:focus{background:#f6f8fd;box-shadow:0 0 0 2px rgba(44,74,138,.15)}
+.sd ul{margin:0;padding-left:18px;font-size:14px}
+.sd .sec div{font-size:14px}
+
+/* side panel */
+.side{min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+@media(max-width:900px){.side{position:fixed;inset:0 0 0 auto;width:min(360px,92%);background:var(--bg);z-index:30;padding:16px;transform:translateX(100%);transition:.25s;box-shadow:-20px 0 40px rgba(0,0,0,.15)}.side.open{transform:none}}
+.panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+.prog{height:6px;background:var(--line-2);border-radius:99px;overflow:hidden;margin:10px 0 4px}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--amber),#f6c544);transition:width .4s}
+.row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line-2);font-size:13.5px}
+.row:first-of-type{border-top:0}
+.row span:first-child{color:var(--ink-3)}
+.row span:last-child{text-align:right;font-weight:500}
+.row.empty span:last-child{color:var(--line);font-weight:400}
+.miss{display:flex;gap:8px;align-items:center;font-size:13.5px;padding:4px 0;color:var(--ink-2)}
+.miss:before{content:"";width:7px;height:7px;border-radius:50%;border:1.5px solid var(--amber);flex:none}
+.badge{display:inline-flex;font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:99px;background:var(--warn-soft);color:var(--warn);margin:2px 4px 0 0}
+.muted{color:var(--ink-3);font-size:12.5px}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(10,18,40,.4);z-index:40}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:#fff;z-index:41;display:flex;flex-direction:column;box-shadow:-20px 0 40px rgba(0,0,0,.15);animation:fd .25s}
+.drawer header{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.drawer .body{padding:18px 20px;overflow:auto;flex:1}
+.drawer section+section{margin-top:20px;padding-top:18px;border-top:1px solid var(--line-2)}
+.drawer label{display:block;font-size:13px;font-weight:600;color:var(--ink-2);margin:12px 0 6px}
+.seg{display:flex;background:var(--line-2);border-radius:12px;padding:4px;margin-top:10px}
+.seg button{flex:1;border:0;background:transparent;padding:8px;border-radius:9px;cursor:pointer;font-weight:600;color:var(--ink-3)}
+.seg button.on{background:#fff;color:var(--navy);box-shadow:var(--shadow)}
+.alert{padding:10px 12px;border-radius:10px;font-size:13.5px;margin-top:10px}
+.alert.info{background:var(--info-soft);color:var(--info)}
+.alert.err{background:var(--bad-soft);color:var(--bad)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="logo">G</div>
+    <div class="brand"><b>Guided Intake</b><span>Tell us what you need. We find the right way to buy it.</span></div>
+    <div class="sp"></div>
+    <span class="pill"><span class="dot" id="aiDot"></span><span id="aiLabel">Offline</span></span>
+    <button class="tb only-m" id="sumBtn">Summary</button>
+    <button class="tb" id="newBtn">New</button>
+    <button class="tb" id="cfgBtn">Settings</button>
+  </div>
+</header>
+
+<div class="app">
+  <section class="chat">
+    <div class="msgs" id="msgs"></div>
+    <div class="qr" id="qr"></div>
+    <form class="comp" id="comp">
+      <textarea id="inp" rows="1" placeholder="Describe what you need…"></textarea>
+      <button class="send" id="send" type="submit" aria-label="Send">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+    </form>
+  </section>
+  <aside class="side" id="side"></aside>
+</div>
+<div id="drawerRoot"></div>
+
+<script>
+/* =========================================================
+   1. CONFIGURATION
+   -----------------------------------------------------------
+   Hosted on Vercel: the key lives in Vercel environment variables
+   (GEMINI_API_KEY or GROQ_API_KEY) and never reaches the browser.
+   The page detects the server automatically ("server" provider).
+
+   Opened as a local file: paste a key below instead.
+   Gemini key: https://aistudio.google.com/apikey   (starts with "AIza")
+   Groq key:   https://console.groq.com/keys        (starts with "gsk_")
+   Warning: anyone who opens this file can read the key.
+   Use only for personal prototyping with dummy data.
+   ========================================================= */
+const CONFIG = {
+  provider: "auto",                             // "auto" | "server" | "gemini" | "groq" | "offline"
+  keys: {
+    gemini: "",                                 // <-- paste Gemini key between the quotes
+    groq:   ""                                  // <-- or paste Groq key here and set provider: "groq"
+  },
+  models: { gemini: "gemini-2.5-flash", groq: "llama-3.3-70b-versatile" },
+  accessCode: "",                               // only if ACCESS_CODE is set on Vercel
+  currency: "EUR",
+  thresholds: { pcardMax: 2500, quickQuoteMax: 50000, materialityMin: 1000000 }
+};
+
+/* =========================================================
+   2. REFERENCE DATA (mock — replace with your own)
+   ========================================================= */
+const CATEGORIES = [
+  {id:"it-hardware", name:"IT hardware",                   type:"goods",    kw:["laptop","notebook","monitor","headset","keyboard","phone","printer","hardware","dock","screen"]},
+  {id:"software",    name:"Software and SaaS",             type:"software", kw:["licence","license","software","saas","subscription","seats"]},
+  {id:"it-services", name:"IT services and development",   type:"services", kw:["develop","implementation","integration","migration","testing","build an app"]},
+  {id:"cloud",       name:"Cloud and hosting",             type:"services", kw:["cloud","hosting","aws","azure","gcp","data centre"]},
+  {id:"consulting",  name:"Management consulting",         type:"services", kw:["consult","advisory","strategy","redesign","transformation","assessment","operating model"]},
+  {id:"legal",       name:"Legal services",                type:"services", kw:["legal","lawyer","counsel","litigation","law firm"]},
+  {id:"marketing",   name:"Marketing and events",          type:"services", kw:["event","marketing","campaign","conference","agency","offsite","sponsorship"]},
+  {id:"facilities",  name:"Facilities and real estate",    type:"services", kw:["cleaning","facility","facilities","office move","maintenance","catering","security guard"]},
+  {id:"contingent",  name:"Contingent labour",             type:"contingent_labour", kw:["contractor","temp ","temporary staff","freelance","interim","day rate"]},
+  {id:"market-data", name:"Market data",                   type:"software", kw:["market data","data feed","terminal","ratings data"]},
+  {id:"training",    name:"Training and learning",         type:"services", kw:["training","course","workshop","coaching","certification"]},
+  {id:"office",      name:"Office supplies and furniture", type:"goods",    kw:["paper","stationery","toner","chair","desk","supplies","furniture"]},
+  {id:"telecom",     name:"Telecom",                       type:"services", kw:["mobile contract","telecom","network","sim card","connectivity"]}
+];
+const DEMAND_TYPES = {goods:"Goods", services:"Services", software:"Software", contingent_labour:"Contingent labour", mixed:"Mixed"};
+
+const CATALOGUE = [
+  {id:"CAT-1001", name:"Standard laptop 14\"",          supplier:"Northwind IT",    price:1150, kw:["laptop","notebook"]},
+  {id:"CAT-1002", name:"27\" monitor",                  supplier:"Northwind IT",    price:240,  kw:["monitor","screen"]},
+  {id:"CAT-1003", name:"Noise-cancelling headset",      supplier:"Northwind IT",    price:180,  kw:["headset","headphones"]},
+  {id:"CAT-1004", name:"Smartphone, standard",          supplier:"Fabrikam Mobile", price:690,  kw:["smartphone","mobile phone","iphone"]},
+  {id:"CAT-1005", name:"Docking station",               supplier:"Northwind IT",    price:210,  kw:["dock","docking"]},
+  {id:"CAT-2001", name:"Ergonomic office chair",        supplier:"Contoso Office",  price:420,  kw:["chair"]},
+  {id:"CAT-2002", name:"Stationery bundle",             supplier:"Contoso Office",  price:35,   kw:["stationery","pens","toner"]},
+  {id:"CAT-3001", name:"Collaboration suite licence",   supplier:"Adatum Software", price:280,  kw:["collaboration licence","microsoft 365","m365"]}
+];
+const CONTRACTS = [
+  {id:"CTR-4410", supplier:"Contoso Cloud",      category:"cloud",       title:"Cloud hosting framework",           expires:"2028-03-31", remaining:2400000},
+  {id:"CTR-3122", supplier:"Lakeshore Advisory", category:"consulting",  title:"Operations consulting framework",   expires:"2027-06-30", remaining:600000},
+  {id:"CTR-2087", supplier:"BrightClean",        category:"facilities",  title:"Facilities cleaning, EMEA",         expires:"2027-12-31", remaining:900000},
+  {id:"CTR-5590", supplier:"Tailspin Talent",    category:"contingent",  title:"Contingent labour MSP",             expires:"2028-01-31", remaining:5000000},
+  {id:"CTR-6013", supplier:"Wingtip Legal",      category:"legal",       title:"Legal panel, commercial",           expires:"2027-09-30", remaining:350000},
+  {id:"CTR-7120", supplier:"Litware Learning",   category:"training",    title:"Learning services framework",       expires:"2026-11-30", remaining:80000},
+  {id:"CTR-8801", supplier:"Proseware Digital",  category:"it-services", title:"Application development framework", expires:"2027-10-31", remaining:1200000}
+];
+const PREFERRED = {
+  "it-hardware":["Northwind IT"],"software":["Adatum Software"],"it-services":["Proseware Digital","Fourth Coffee Tech"],
+  "cloud":["Contoso Cloud"],"consulting":["Lakeshore Advisory","Blue Yonder Partners"],"legal":["Wingtip Legal"],
+  "marketing":["Coho Creative"],"facilities":["BrightClean"],"contingent":["Tailspin Talent"],
+  "market-data":["Datum Feeds"],"training":["Litware Learning"],"office":["Contoso Office"],"telecom":["Fabrikam Mobile"]
+};
+const CHANNELS = {
+  catalogue: {name:"Catalogue order",           days:"1–3",   blurb:"The item is in the catalogue. Order it directly. Standard items need no extra approval."},
+  contract:  {name:"Contract call-off",         days:"3–7",   blurb:"An active contract already covers this. Raise a call-off with the contracted supplier."},
+  pcard:     {name:"P-card purchase",           days:"1–2",   blurb:"Low value and low risk. Buy with a purchasing card and keep the receipt."},
+  quote:     {name:"Quick quote",               days:"7–15",  blurb:"Below the sourcing threshold. Get competitive quotes, ideally from preferred suppliers."},
+  sourcing:  {name:"Sourcing project",          days:"30–60", blurb:"Value or risk needs a competitive sourcing event. Procurement runs it with you."},
+  contingent:{name:"Contingent labour request", days:"10–20", blurb:"External workers go through the contingent labour channel and the managed service provider."}
+};
+
+/* =========================================================
+   3. STATE
+   ========================================================= */
+const S = fresh();
+function fresh(){
+  return {
+    msgs:[],            // {role:"user"|"assistant", text, kind?:"rec"|"sd"|"err"}
+    f:{ summary:null, category:null, demand_type:null, value:null, needed_by:null, location:null,
+        supplier:null, quantity:null, duration:null, deliverables:null,
+        risk_flags:{personal_data:false,ict_outsourcing:false,critical_service:false,offshore:false} },
+    missing:[], quick:[], ready:false, confidence:0,
+    result:null, lastRecKey:"", sd:null, override:"", busy:false, offlineAsk:null
+  };
+}
+
+/* =========================================================
+   4. LLM CLIENT
+   ========================================================= */
+let SERVER = null;   // {providers:{gemini,groq}, provider, accessRequired} when /api/llm is available
+const aiReady = () => CONFIG.provider==="server" ? !!SERVER : (CONFIG.provider!=="offline" && CONFIG.provider!=="auto" && !!CONFIG.keys[CONFIG.provider]);
+const providerLabel = () => CONFIG.provider==="server" ? `Server · ${SERVER&&SERVER.provider==="groq"?"Groq":"Gemini"}` : CONFIG.provider==="gemini" ? "Gemini" : "Groq";
+
+async function detectServer(){
+  if(!/^https?:$/.test(location.protocol)) return;
+  try{
+    const r = await fetch("/api/llm",{method:"GET"});
+    if(!r.ok) return;
+    const d = await r.json();
+    if(d && d.ok && (d.providers.gemini||d.providers.groq)) SERVER = d;
+  }catch(e){}
+}
+function resolveProvider(){
+  if(CONFIG.provider!=="auto") return;
+  if(SERVER) CONFIG.provider="server";
+  else if(CONFIG.keys.gemini) CONFIG.provider="gemini";
+  else if(CONFIG.keys.groq) CONFIG.provider="groq";
+  else CONFIG.provider="offline";
+}
+
+async function callLLM(system, history){
+  const p=CONFIG.provider, key=CONFIG.keys[p], model=CONFIG.models[p];
+  if(p==="server"){
+    const r=await fetch("/api/llm",{method:"POST",headers:{"Content-Type":"application/json","x-access-code":CONFIG.accessCode||""},
+      body:JSON.stringify({system,history})});
+    const d=await r.json().catch(()=>({}));
+    if(r.status===401) throw new Error("Access code missing or wrong. Enter it in Settings.");
+    if(!r.ok) throw new Error(d.error||`Server error ${r.status}`);
+    return parseJSON(d.text);
+  }
+  if(p==="gemini"){
+    const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+    const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+      systemInstruction:{parts:[{text:system}]},
+      contents:history.map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]})),
+      generationConfig:{temperature:0.3,responseMimeType:"application/json"}
+    })});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d?.error?.message||`Gemini error ${r.status}`);
+    return parseJSON((d.candidates?.[0]?.content?.parts||[]).filter(x=>x.text&&!x.thought).map(x=>x.text).join(""));
+  }
+  const r=await fetch("https://api.groq.com/openai/v1/chat/completions",{method:"POST",
+    headers:{"Content-Type":"application/json","Authorization":`Bearer ${key}`},
+    body:JSON.stringify({model,temperature:0.3,response_format:{type:"json_object"},
+      messages:[{role:"system",content:system},...history.map(m=>({role:m.role,content:m.content}))]})});
+  const d=await r.json();
+  if(!r.ok) throw new Error(d?.error?.message||`Groq error ${r.status}`);
+  return parseJSON(d.choices?.[0]?.message?.content);
+}
+function parseJSON(t){
+  t=String(t||"").trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
+  try{return JSON.parse(t);}catch(e){const m=t.match(/\{[\s\S]*\}/);if(m)return JSON.parse(m[0]);throw new Error("The AI answer was not valid JSON.");}
+}
+
+/* ---------- conversation prompt ---------- */
+function chatSystem(){
+  return `You are the intake assistant of a corporate procurement team. Business users describe what they want to buy in their own words.
+Your job: understand the need, collect only what is missing, then hand over to the rules engine that picks the buying channel.
+
+How to talk:
+- Short, friendly, plain English. No procurement jargon (say "external workers", not "contingent labour"; "approval", not "PR").
+- Ask at most 2 questions per turn. Never ask for something the user already said.
+- Briefly confirm what you understood when it helps, in one sentence.
+- Offer 2-5 quick reply options when the answer is a choice.
+- If the user corrects something, update it without fuss.
+
+What you need before "ready" is true:
+- Always: category, demand type, an estimated value (the user may say "don't know"; then estimate it yourself and say so).
+- Goods or software: what item and how many. Catalogue items are fast: ${CATALOGUE.map(c=>c.name).join("; ")}. For these, set ready true right away when quantity is known.
+- Services: what the supplier should deliver, how long it runs, whether the supplier sees personal or client data, where the work happens.
+- External workers: role, number of people, duration, and on site or remote.
+- Supplier in mind and needed-by date are useful but optional; ask once at most.
+
+Categories (use the id): ${CATEGORIES.map(c=>`${c.id}=${c.name}`).join(", ")}.
+Demand types: goods, services, software, contingent_labour, mixed.
+Currency: ${CONFIG.currency}. Values are numbers, no symbols.
+Risk flags are true only with a reason: personal_data (supplier handles personal or client data), ict_outsourcing (supplier runs or hosts IT or a process for us), critical_service (an outage hurts clients or regulated activity), offshore (work done outside the requester's country).
+
+When ready becomes true, the reply says in one sentence that you have what you need and the recommendation follows below. Do not name a buying channel yourself.
+
+Each turn you get the user's message plus the current known fields. Return JSON only:
+{"reply":"text shown to the user","fields":{"summary":"one-sentence plain description of the need","category":null,"demand_type":null,"value":null,"value_is_estimate":false,"needed_by":null,"location":null,"supplier":null,"quantity":null,"duration":null,"deliverables":null,"risk_flags":{"personal_data":false,"ict_outsourcing":false,"critical_service":false,"offshore":false}},"missing":["short label of what is still needed"],"quick_replies":["option"],"ready":false,"confidence":0.0}
+Use null for unknown fields. Keep fields you already know.`;
+}
+
+const SD_SYSTEM = `You write service descriptions (statements of requirement) for a corporate procurement team.
+Use the conversation and the known fields. Plain, direct English, short bullet points, no marketing words.
+Do not invent names, numbers or dates. Put unknowns under "open_points".
+Return JSON only:
+{"title":"","objective":"2-3 sentences","scope_in":[""],"scope_out":[""],"deliverables":[""],"requirements":[""],
+ "timeline":"","location":"","acceptance_criteria":[""],"supplier_requirements":[""],"evaluation_criteria":[""],"open_points":[""]}`;
+
+/* =========================================================
+   5. CONVERSATION LOOP
+   ========================================================= */
+async function handleUser(text){
+  text=text.trim(); if(!text||S.busy) return;
+  S.msgs.push({role:"user",text}); S.quick=[]; S.busy=true; render();
+  try{
+    let out;
+    if(aiReady()){
+      const hist = S.msgs.filter(m=>!m.kind).map(m=>({role:m.role,content:m.text}));
+      hist[hist.length-1].content = `${text}\n\n[Known fields so far: ${JSON.stringify(S.f)}]`;
+      out = await callLLM(chatSystem(), hist);
+    } else out = offlineTurn(text);
+    applyTurn(out);
+  }catch(e){
+    S.msgs.push({role:"assistant",kind:"err",text:"The AI call failed: "+e.message+"\nCheck the key and model in Settings, or switch to Offline."});
+  }
+  S.busy=false; render();
+}
+
+function applyTurn(out){
+  const nf=out.fields||{};
+  for(const k of Object.keys(S.f)){
+    if(k==="risk_flags"){ if(nf.risk_flags) S.f.risk_flags={...S.f.risk_flags,...nf.risk_flags}; }
+    else if(nf[k]!==null && nf[k]!==undefined && nf[k]!=="") S.f[k]=nf[k];
+  }
+  if(nf.value!=null) S.f.value=Number(String(nf.value).replace(/[^\d.]/g,""))||S.f.value;
+  if(nf.value_is_estimate!==undefined && nf.value!=null) S.f.value_is_estimate=!!nf.value_is_estimate;
+  if(S.f.category && !CATEGORIES.some(c=>c.id===S.f.category)) S.f.category=null;
+  S.missing=out.missing||[]; S.quick=(out.quick_replies||[]).slice(0,5);
+  S.confidence=out.confidence||S.confidence;
+  if(out.reply) S.msgs.push({role:"assistant",text:out.reply});
+  S.ready=!!out.ready && !!S.f.category;
+  if(S.ready){
+    const R=determine(); const key=R.channel+"|"+S.f.category+"|"+S.f.value+"|"+JSON.stringify(S.f.risk_flags)+"|"+S.f.supplier;
+    if(key!==S.lastRecKey){ S.result=R; S.lastRecKey=key; S.override=""; S.msgs.push({role:"assistant",kind:"rec"}); }
+    if(!S.quick.length) S.quick = R.channel==="catalogue" ? ["Change quantity","Start a new request"] : ["Draft the service description","Change something"];
+  }
+}
+
+/* ---------- offline fallback: simple slot filling ---------- */
+function offlineTurn(text){
+  const t=" "+S.msgs.filter(m=>m.role==="user").map(m=>m.text).join(" ").toLowerCase()+" ";
+  const f={};
+  if(S.offlineAsk){ // store answer to the question asked last turn
+    const a=text.trim();
+    if(S.offlineAsk==="value"){ const v=parseMoney(a); f.value=v; f.value_is_estimate=false; if(v==null) f.value=defaultEstimate(); f.value_is_estimate = v==null; }
+    if(S.offlineAsk==="quantity") f.quantity=parseInt(a)||a;
+    if(S.offlineAsk==="duration") f.duration=a;
+    if(S.offlineAsk==="deliverables") f.deliverables=a;
+    if(S.offlineAsk==="data") f.risk_flags={...S.f.risk_flags,personal_data:/^y/i.test(a)};
+    if(S.offlineAsk==="location"){ f.location=a; if(/other country/i.test(a)) f.risk_flags={...S.f.risk_flags,...(f.risk_flags||{}),offshore:true}; }
+  }
+  if(!S.f.category){
+    let best=null,score=0; for(const c of CATEGORIES){const s=c.kw.filter(k=>t.includes(k)).length; if(s>score){score=s;best=c;}}
+    if(/contractor|freelance|temporary staff|interim|day rate/.test(t)) best=CATEGORIES.find(c=>c.id==="contingent");
+    best=best||CATEGORIES.find(c=>c.id==="consulting");
+    f.category=best.id; f.demand_type=best.type; f.summary=text.slice(0,160);
+    const v=parseMoney(text); if(v!=null){f.value=v;f.value_is_estimate=false;}
+    const q=text.match(/\b(\d{1,4})\s+(?:x\s+)?[a-z]/i); if(q && best.type==="goods") f.quantity=parseInt(q[1]);
+    f.risk_flags={personal_data:/personal|customer data|client data|hr data/.test(t),ict_outsourcing:/host|cloud|outsourc|managed service/.test(t),critical_service:/critical|payments|trading/.test(t),offshore:/offshore|india|nearshore/.test(t)};
+  }
+  const merged={...S.f,...f};
+  const type=merged.demand_type;
+  const slots = type==="goods"||type==="software" ? ["quantity","value"]
+              : type==="contingent_labour" ? ["duration","location","value"]
+              : ["deliverables","duration","data","location","value"];
+  const have={quantity:merged.quantity!=null,value:merged.value!=null,duration:!!merged.duration,deliverables:!!merged.deliverables,location:!!merged.location,data:S.offlineAsk==="data"||S.f._askedData};
+  if(S.offlineAsk==="data") S.f._askedData=true;
+  // catalogue goods with quantity: value from catalogue price
+  const cat=catalogueMatches(t);
+  if((type==="goods"||type==="software") && cat.length && merged.quantity!=null && merged.value==null){ f.value=cat[0].price*merged.quantity; f.value_is_estimate=true; have.value=true; }
+  const next=slots.find(s=>!have[s]);
+  const Q={quantity:["How many do you need?",["1","5","10","25"]],
+           value:["Roughly what budget do you expect?",["Under 2,500","Around 20,000","Around 100,000","Don't know"]],
+           duration:["How long will it run?",["Under 3 months","3–6 months","6–12 months","Over 12 months"]],
+           deliverables:["What should the supplier deliver at the end?",[]],
+           data:["Will the supplier see personal or client data?",["Yes","No","Not sure"]],
+           location:["Where will the work happen?",["On site","Remote, same country","Remote, other country"]]};
+  const catName=catById(merged.category).name.toLowerCase();
+  S.offlineAsk=next||null;
+  if(!next) return {reply:"Thanks, that's everything I need. Here is the recommendation.",fields:f,missing:[],quick_replies:[],ready:true,confidence:.6};
+  const first = !S.f.category ? `Got it. This looks like ${catName}. ` : "";
+  return {reply:first+Q[next][0],fields:f,missing:slots.filter(s=>!have[s]).map(s=>({quantity:"Quantity",value:"Budget",duration:"Duration",deliverables:"Deliverables",data:"Data access",location:"Work location"})[s]),quick_replies:Q[next][1],ready:false,confidence:.5};
+}
+function parseMoney(s){
+  const m=String(s).toLowerCase().replace(/,/g,"").match(/(\d+(?:\.\d+)?)\s*(k|m|thousand|million)?\b/); if(!m) return null;
+  if(!m[2] && !/(eur|€|£|\$|budget|around|under|about|\d{4,})/.test(String(s).toLowerCase().replace(/,/g,""))) return null;
+  let v=parseFloat(m[1]); if(/^(k|thousand)$/.test(m[2]||"")) v*=1e3; if(/^(m|million)$/.test(m[2]||"")) v*=1e6; return v;
+}
+function defaultEstimate(){ return {goods:5000,software:20000,services:100000,contingent_labour:150000,mixed:100000}[S.f.demand_type]||100000; }
+function offlineSD(){
+  const f=S.f, c=catById(f.category);
+  return {title:`${c.name}: ${(f.summary||"").slice(0,70)}`, objective:f.summary||"",
+    scope_in:[f.deliverables||"To be confirmed with the requester"], scope_out:["Anything not listed in scope"],
+    deliverables:[f.deliverables||"To be confirmed"], requirements:["Supplier passes standard onboarding and risk checks"],
+    timeline:f.duration||f.needed_by||"To be confirmed", location:f.location||"To be confirmed",
+    acceptance_criteria:["Deliverables accepted in writing by the requester"], supplier_requirements:["Proven experience in "+c.name.toLowerCase()],
+    evaluation_criteria:["Price","Quality of approach","Relevant experience"], open_points:["Drafted offline. Add an API key for an AI-written description."]};
+}
+
+/* =========================================================
+   6. RULES ENGINE (deterministic)
+   ========================================================= */
+const catById=id=>CATEGORIES.find(c=>c.id===id)||{id,name:id||"–",type:"services"};
+const allUserText=()=>" "+S.msgs.filter(m=>m.role==="user").map(m=>m.text).join(" ").toLowerCase()+" ";
+function catalogueMatches(t=allUserText()){ return CATALOGUE.filter(i=>i.kw.some(k=>t.includes(k))); }
+function contractMatch(){
+  const sup=(S.f.supplier||"").toLowerCase(), v=S.f.value, today=new Date();
+  const list=CONTRACTS.filter(c=>c.category===S.f.category&&new Date(c.expires)>today&&(v==null||c.remaining>=v));
+  if(!sup) return list[0]||null;
+  return list.find(c=>c.supplier.toLowerCase().includes(sup)||sup.includes(c.supplier.toLowerCase()))||null;
+}
+const isPreferred=(sup,cat)=>(PREFERRED[cat]||[]).some(p=>p.toLowerCase()===String(sup).toLowerCase());
+
+function determine(){
+  const f=S.f,T=CONFIG.thresholds,fl=f.risk_flags||{},v=f.value;
+  const anyRisk=fl.personal_data||fl.ict_outsourcing||fl.critical_service||fl.offshore;
+  const cat=catalogueMatches(), ctr=contractMatch(), trace=[]; let ch=null;
+  const step=(rule,hit,why)=>{trace.push({rule,hit:!!hit&&!ch,why}); if(hit&&!ch) ch=hit;};
+  step("External workers?", f.demand_type==="contingent_labour"&&"contingent", f.demand_type==="contingent_labour"?"You need external workers.":"No external workers needed.");
+  if(!ch) step("Standard catalogue item?", cat.length&&(f.demand_type==="goods"||f.demand_type==="software")&&"catalogue", cat.length?`Matches: ${cat.map(i=>i.name).join(", ")}.`:"No catalogue item matches.");
+  if(!ch) step("Active contract covers it?", ctr&&"contract", ctr?`${ctr.title} with ${ctr.supplier} (${ctr.id}), valid to ${fmtDate(ctr.expires)}.`:"No active contract for this"+(f.supplier?` with ${f.supplier}`:"")+".");
+  if(!ch) step(`Up to ${money(T.pcardMax)} and low risk?`, v!=null&&v<=T.pcardMax&&!anyRisk&&f.demand_type!=="services"&&"pcard", v==null?"Value unknown.":`Value ${money(v)}${anyRisk?", but risk flags are set":""}.`);
+  if(!ch) step(`Up to ${money(T.quickQuoteMax)}?`, v!=null&&v<=T.quickQuoteMax&&"quote", v==null?"Value unknown, treated as above the limit.":`Value ${money(v)}.`);
+  if(!ch) step("Otherwise","sourcing","Value or risk needs competitive sourcing.");
+  return {channel:ch,trace,catalogue:cat,contract:ctr,controls:controlsFor(ch),steps:nextSteps(ch,cat,ctr)};
+}
+function controlsFor(ch){
+  const f=S.f,fl=f.risk_flags||{},T=CONFIG.thresholds,out=[];
+  if(ch==="sourcing") out.push({t:"Approval to source",d:"Budget owner confirms need and budget before sourcing starts.",k:""});
+  if(ch==="contract") out.push({t:"Confirm contract use",d:"Contract owner confirms scope and remaining value.",k:""});
+  if(fl.personal_data) out.push({t:"Data protection review",d:"Supplier will handle personal or client data.",k:"warn"});
+  if(fl.ict_outsourcing||fl.critical_service) out.push({t:"ICT and outsourcing assessment",d:"Supplier runs IT or a process, or the service is critical.",k:"warn"});
+  if(fl.offshore) out.push({t:"Offshoring check",d:"Work happens outside your country.",k:"warn"});
+  if(f.value!=null&&f.value>=T.materialityMin) out.push({t:"Material spend review",d:`Value is ${money(T.materialityMin)} or more.`,k:"warn"});
+  if(f.supplier&&ch!=="contract"&&ch!=="catalogue"&&!isPreferred(f.supplier,f.category)) out.push({t:"Non-preferred supplier exception",d:`${f.supplier} is not preferred for this category. Preferred: ${(PREFERRED[f.category]||["none"]).join(", ")}.`,k:"bad"});
+  if(["services","contingent_labour","mixed"].includes(f.demand_type)&&ch!=="catalogue") out.push({t:"Risk questionnaire, pre-filled",d:"Answers come from this conversation. You only confirm them.",k:""});
+  return out;
+}
+function nextSteps(ch,cat,ctr){
+  switch(ch){
+    case "catalogue": return [`Add ${cat.map(i=>i.name).join(", ")} to your basket${S.f.quantity?` (${S.f.quantity})`:""}.`,"Confirm the delivery address.","Submit. Standard items go straight through."];
+    case "contract":  return [`Raise a call-off against ${ctr.id} with ${ctr.supplier}.`,"Attach the service description as the scope.","Contract owner confirms, then the order goes out."];
+    case "pcard":     return ["Check the supplier takes card payment.","Pay with your purchasing card.","Upload the receipt within 5 working days."];
+    case "quote":     return [`Get at least 3 quotes, ideally from ${(PREFERRED[S.f.category]||["approved suppliers"]).join(", ")}.`,"Compare them against the service description.","Raise the request with the chosen quote."];
+    case "sourcing":  return ["Submit. A sourcing project is created with the service description attached.","A buyer contacts you to agree timeline and evaluation team.","Risk and supplier checks run in parallel."];
+    case "contingent":return ["Submit the role profile to the external workers channel.","The managed service provider shortlists candidates.","Onboarding and system access follow after selection."];
+  }
+  return [];
+}
+function overrideImpact(from,to){
+  if(!to||to===from) return null;
+  const rank={catalogue:0,pcard:1,contract:2,quote:3,contingent:3,sourcing:4};
+  if(rank[to]>rank[from]) return {msg:`A stricter route than needed. Allowed, but slower (${CHANNELS[to].days} working days).`};
+  return {msg:`This skips the standard route. It adds an exception approval and a procurement review, about 7 to 12 extra working days.`};
+}
+
+/* =========================================================
+   7. HELPERS
+   ========================================================= */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const money=v=>v==null?"Unknown":new Intl.NumberFormat("en-GB",{style:"currency",currency:CONFIG.currency,maximumFractionDigits:0}).format(v);
+const fmtDate=d=>{const x=new Date(d);return isNaN(x)?d:x.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});};
+const md=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+const SHIELD='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>';
+
+/* =========================================================
+   8. RENDER
+   ========================================================= */
+const EXAMPLES=[
+  ["Hardware","We need 15 laptops for new joiners in Frankfurt."],
+  ["Consulting","Consultants to redesign our supplier onboarding process."],
+  ["External workers","Two Java developers for the payments migration."],
+  ["Event","A two-day leadership offsite in Lisbon for 40 people."]
+];
+function render(){
+  $("#aiDot").className="dot"+(aiReady()?" on":"");
+  $("#aiLabel").textContent=aiReady()?`AI on · ${providerLabel()}`:"Offline rules";
+  const box=$("#msgs");
+  if(!S.msgs.length){
+    box.innerHTML=`<div class="welcome">
+      <div class="big"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <h1>What do you need to buy?</h1>
+      <p>Describe it in your own words. I'll ask only what's missing and tell you the fastest way to get it.</p>
+      <div class="ex">${EXAMPLES.map(([h,t],i)=>`<button data-ex="${i}"><b>${h}</b>${esc(t)}</button>`).join("")}</div>
+      ${aiReady()?"":`<p class="muted" style="margin-top:16px">No AI connected. Offline rules are running. Set GEMINI_API_KEY on Vercel, or add a key in Settings.</p>`}
+    </div>`;
+    box.querySelectorAll("[data-ex]").forEach(b=>b.onclick=()=>handleUser(EXAMPLES[b.dataset.ex][1]));
+  } else {
+    box.innerHTML=S.msgs.map((m,i)=>msgHTML(m,i)).join("")+(S.busy?`<div class="m a"><div class="av">G</div><div class="bub"><span class="typing"><i></i><i></i><i></i></span></div></div>`:"");
+    bindCards();
+  }
+  $("#qr").innerHTML=S.busy?"":S.quick.map(q=>`<button>${esc(q)}</button>`).join("");
+  $("#qr").querySelectorAll("button").forEach(b=>b.onclick=()=>quickAction(b.textContent));
+  $("#send").disabled=S.busy;
+  renderSide();
+  requestAnimationFrame(()=>box.scrollTop=box.scrollHeight);
+}
+function quickAction(t){
+  if(/^draft the service description/i.test(t)) return draftSD();
+  if(/^start a new request/i.test(t)) return reset();
+  handleUser(t);
+}
+function msgHTML(m,i){
+  if(m.role==="user") return `<div class="m u"><div class="bub">${esc(m.text)}</div></div>`;
+  if(m.kind==="err") return `<div class="m a"><div class="av">G</div><div class="bub errm">${esc(m.text)}</div></div>`;
+  if(m.kind==="rec") return `<div class="m a"><div class="av">G</div><div class="wide">${recHTML(i)}</div></div>`;
+  if(m.kind==="sd")  return `<div class="m a"><div class="av">G</div><div class="wide">${sdHTML()}</div></div>`;
+  return `<div class="m a"><div class="av">G</div><div class="bub">${md(m.text)}</div></div>`;
+}
+function recHTML(i){
+  const latest = S.msgs.map((m,j)=>m.kind==="rec"?j:-1).filter(j=>j>=0).pop()===i;
+  const R=S.result, c=CHANNELS[R.channel];
+  if(!latest) return `<div class="card"><div class="sec" style="border:0"><span class="muted">Earlier recommendation, replaced by the one below.</span></div></div>`;
+  const imp=overrideImpact(R.channel,S.override);
+  return `<div class="card">
+    <div class="rec-h"><div class="eyebrow">Recommended buying channel</div><h2>${c.name}</h2><p>${c.blurb}</p>
+      <div class="kpis"><div class="kpi"><b>${c.days}</b><span>working days, typical</span></div>
+      <div class="kpi"><b>${money(S.f.value)}</b><span>${S.f.value_is_estimate?"estimated value":"value"}</span></div>
+      <div class="kpi"><b>${R.controls.length}</b><span>checks</span></div></div></div>
+    ${R.controls.length?`<div class="sec"><h4>Checks and approvals</h4>${R.controls.map(x=>`<div class="ctrl"><span class="ic ${x.k}">${SHIELD}</span><div><b style="font-weight:600">${esc(x.t)}</b><div class="r">${esc(x.d)}</div></div></div>`).join("")}</div>`:`<div class="sec"><h4>Checks and approvals</h4><span class="muted">None. This goes straight through.</span></div>`}
+    <div class="sec"><h4>What happens next</h4><ol class="ns">${R.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol></div>
+    <details class="sec"><summary>Why this channel</summary><ul class="trace">${R.trace.map(t=>`<li><span class="tick ${t.hit?"s":"n"}">${t.hit?"✓":"–"}</span><div><b style="font-weight:600">${esc(t.rule)}</b><div class="r">${esc(t.why)}</div></div></li>`).join("")}</ul></details>
+    <details class="sec" ${S.override?"open":""}><summary>Use a different route</summary>
+      <select class="inp" id="ovr" style="margin-top:10px"><option value="">Keep the recommendation</option>${Object.entries(CHANNELS).filter(([k])=>k!==R.channel).map(([k,v])=>`<option value="${k}" ${S.override===k?"selected":""}>${v.name}</option>`).join("")}</select>
+      ${imp?`<div class="ovr">${esc(imp.msg)}<textarea class="inp" id="just" rows="2" style="margin-top:8px" placeholder="Why does the standard route not work?"></textarea></div>`:""}
+    </details>
+    <div class="acts">
+      ${R.channel!=="catalogue"?`<button class="btn btn-a" data-act="sd">${S.sd?"Redraft":"Draft"} service description</button>`:""}
+      <button class="btn btn-p" data-act="submit">Submit request</button>
+      <button class="btn btn-g" data-act="json">Download JSON</button>
+    </div>
+    <div id="doneMsg"></div>
+  </div>`;
+}
+const SD_SEC=[["objective","Objective",0],["scope_in","In scope",1],["scope_out","Out of scope",1],["deliverables","Deliverables",1],["requirements","Requirements",1],["timeline","Timeline",0],["location","Location",0],["acceptance_criteria","Acceptance criteria",1],["supplier_requirements","Supplier requirements",1],["evaluation_criteria","How offers are compared",1],["open_points","Open points",1]];
+function sdHTML(){
+  const d=S.sd;
+  return `<div class="card sd">
+    <div class="sd-h"><small>Service description · click any text to edit</small><div class="t" contenteditable data-sd="title">${esc(d.title||"Untitled")}</div></div>
+    ${SD_SEC.filter(([k])=>d[k]&&(Array.isArray(d[k])?d[k].length:String(d[k]).trim())).map(([k,l,list])=>`<div class="sec"><h4>${l}</h4>${list?`<ul contenteditable data-sd="${k}" data-list="1">${d[k].map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<div contenteditable data-sd="${k}">${esc(d[k])}</div>`}</div>`).join("")}
+    <div class="acts"><button class="btn btn-g" data-act="copy">Copy text</button><button class="btn btn-g" data-act="json">Download JSON</button></div>
+  </div>`;
+}
+function bindCards(){
+  const o=$("#ovr"); if(o) o.onchange=e=>{S.override=e.target.value;render();};
+  document.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>{
+    const a=b.dataset.act;
+    if(a==="sd") draftSD();
+    if(a==="json") download();
+    if(a==="copy") navigator.clipboard?.writeText(sdText()).then(()=>{b.textContent="Copied";});
+    if(a==="submit"){ const id="REQ-"+Math.floor(1e5+Math.random()*9e5);
+      S.msgs.push({role:"assistant",text:`Done. Request **${id}** is created and routed to **${CHANNELS[S.override||S.result.channel].name}**. You'll get updates on each step.\n(Prototype: nothing was sent anywhere.)`}); S.quick=["Start a new request"]; render(); }
+  });
+  document.querySelectorAll("[data-sd]").forEach(el=>el.addEventListener("blur",()=>{
+    const k=el.dataset.sd; S.sd[k]=el.dataset.list?[...el.querySelectorAll("li")].map(li=>li.textContent.trim()).filter(Boolean):el.textContent.trim();
+  }));
+}
+function renderSide(){
+  const f=S.f, R=S.ready?S.result:null;
+  const rows=[["Need",f.summary],["Category",f.category?catById(f.category).name:null],["Type",f.demand_type?DEMAND_TYPES[f.demand_type]:null],
+    ["Value",f.value!=null?money(f.value)+(f.value_is_estimate?" (est.)":""):null],["Quantity",f.quantity],["Duration",f.duration],
+    ["Location",f.location],["Supplier",f.supplier],["Needed by",f.needed_by?fmtDate(f.needed_by):null]];
+  const filled=rows.filter(r=>r[1]!=null&&r[1]!=="").length;
+  const pct=S.ready?100:Math.min(90,Math.round(filled/6*90));
+  const flags=Object.entries(f.risk_flags||{}).filter(([,v])=>v).map(([k])=>({personal_data:"Personal data",ict_outsourcing:"ICT / outsourcing",critical_service:"Critical service",offshore:"Offshore"})[k]);
+  $("#side").innerHTML=`
+    <div class="panel">
+      <div class="eyebrow">Your request</div>
+      <div class="prog"><i style="width:${pct}%"></i></div>
+      <div class="muted" style="margin-bottom:10px">${S.ready?"Ready for a decision":S.msgs.length?"Collecting details":"Waiting for your first message"}</div>
+      ${rows.map(([k,v])=>`<div class="row ${v==null||v===""?"empty":""}"><span>${k}</span><span>${v==null||v===""?"—":esc(String(v).length>60?String(v).slice(0,58)+"…":v)}</span></div>`).join("")}
+      ${flags.length?`<div style="margin-top:10px">${flags.map(x=>`<span class="badge">${x}</span>`).join("")}</div>`:""}
+    </div>
+    ${S.missing.length&&!S.ready?`<div class="panel"><div class="eyebrow" style="margin-bottom:8px">Still needed</div>${S.missing.map(x=>`<div class="miss">${esc(typeof x==="string"?x:JSON.stringify(x))}</div>`).join("")}</div>`:""}
+    ${R?`<div class="panel"><div class="eyebrow" style="margin-bottom:6px">Channel</div><b style="font-family:'Inter Tight';font-size:18px;color:var(--navy)">${CHANNELS[S.override||R.channel].name}</b>${S.override?`<div class="muted">Override. Standard: ${CHANNELS[R.channel].name}</div>`:""}</div>`:""}
+    <div class="panel muted">AI understands your need and writes the service description. The buying channel comes from fixed rules, visible under "Why this channel" and editable in Settings.</div>`;
+}
+
+/* ---------- service description ---------- */
+async function draftSD(){
+  if(S.busy) return;
+  S.busy=true; S.quick=[]; render();
+  try{
+    if(aiReady()){
+      const convo=S.msgs.filter(m=>!m.kind).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
+      S.sd=await callLLM(SD_SYSTEM,[{role:"user",content:`Conversation:\n${convo}\n\nKnown fields: ${JSON.stringify({...S.f,category_name:catById(S.f.category).name,currency:CONFIG.currency})}`}]);
+    } else S.sd=offlineSD();
+    S.msgs.push({role:"assistant",text:"Here's a draft service description. Click any text to change it. This is what suppliers will see."});
+    S.msgs.push({role:"assistant",kind:"sd"});
+    S.quick=["Make it shorter","Add more detail on deliverables"];
+  }catch(e){ S.msgs.push({role:"assistant",kind:"err",text:"Could not draft the description: "+e.message}); }
+  S.busy=false; render();
+}
+function sdText(){ const d=S.sd; return [d.title,"",...SD_SEC.filter(([k])=>d[k]).map(([k,l,list])=>`${l}\n${list?d[k].map(x=>"- "+x).join("\n"):d[k]}\n`)].join("\n"); }
+function payload(){
+  return {created:new Date().toISOString(),fields:S.f,category_name:catById(S.f.category).name,
+    conversation:S.msgs.filter(m=>!m.kind).map(m=>({role:m.role,text:m.text})),
+    decision:S.result?{recommended:S.result.channel,chosen:S.override||S.result.channel,override:!!S.override,justification:($("#just")||{}).value||null,
+      trace:S.result.trace,controls:S.result.controls,next_steps:S.result.steps,contract:S.result.contract?.id||null,catalogue_items:S.result.catalogue.map(i=>i.id),thresholds:CONFIG.thresholds}:null,
+    service_description:S.sd, source:aiReady()?CONFIG.provider:"offline"};
+}
+function download(){ const b=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=`intake-${Date.now()}.json`; a.click(); }
+
+/* refinement requests on the SD go back through the LLM */
+const _handle=handleUser;
+handleUser=async function(text){
+  if(S.sd && /^(make it shorter|add more detail|shorten|rewrite)/i.test(text.trim()) && aiReady()){
+    S.msgs.push({role:"user",text}); S.busy=true; S.quick=[]; render();
+    try{ S.sd=await callLLM(SD_SYSTEM,[{role:"user",content:`Current service description: ${JSON.stringify(S.sd)}\n\nChange request: ${text}\nReturn the full updated JSON.`}]);
+      S.msgs.push({role:"assistant",text:"Updated."}); S.msgs.push({role:"assistant",kind:"sd"}); }
+    catch(e){ S.msgs.push({role:"assistant",kind:"err",text:e.message}); }
+    S.busy=false; render(); return;
+  }
+  return _handle(text);
+};
+
+/* =========================================================
+   9. SETTINGS DRAWER
+   ========================================================= */
+function openSettings(){
+  const T=CONFIG.thresholds;
+  $("#drawerRoot").innerHTML=`<div class="scrim" id="scrim"></div><div class="drawer">
+    <header><h3>Settings</h3><button class="btn btn-g" id="close">Close</button></header>
+    <div class="body">
+      <section><div class="eyebrow">AI provider</div>
+        <div class="muted" style="margin-top:4px">A key entered here lasts until you reload the page. To keep it, paste it into CONFIG at the top of the file.</div>
+        <div class="seg" id="prov">${[...(SERVER?["server"]:[]),"gemini","groq","offline"].map(p=>`<button data-p="${p}" class="${CONFIG.provider===p?"on":""}">${({server:"Server",gemini:"Gemini key",groq:"Groq key",offline:"Offline"})[p]}</button>`).join("")}</div>
+        <div id="pf"></div><div id="test"></div></section>
+      <section><div class="eyebrow">Channel rules</div>
+        <label>P-card limit (${CONFIG.currency})</label><input class="inp" type="number" id="t1" value="${T.pcardMax}">
+        <label>Quick-quote limit (${CONFIG.currency})</label><input class="inp" type="number" id="t2" value="${T.quickQuoteMax}">
+        <label>Material spend review from (${CONFIG.currency})</label><input class="inp" type="number" id="t3" value="${T.materialityMin}"></section>
+    </div></div>`;
+  const pf=()=>{const p=CONFIG.provider;
+    if(p==="server"){
+      $("#pf").innerHTML=`<div class="alert info">The key is stored on the server. Nothing secret is in this page.</div>${SERVER.accessRequired?`<label>Access code</label><input class="inp" type="password" id="ac" value="${esc(CONFIG.accessCode)}">`:""}`;
+      const ac=$("#ac"); if(ac) ac.oninput=e=>CONFIG.accessCode=e.target.value.trim();
+      return;
+    }
+    $("#pf").innerHTML=p==="offline"?`<div class="alert info">Keyword rules and fixed questions. Nothing leaves the browser.</div>`:
+      `<label>${p==="gemini"?"Gemini":"Groq"} API key</label><input class="inp" type="password" id="key" placeholder="${p==="gemini"?"AIza…":"gsk_…"}" value="${esc(CONFIG.keys[p])}">
+       <label>Model</label><input class="inp" id="model" value="${esc(CONFIG.models[p])}">
+       <button class="btn btn-g" id="tbtn" style="margin-top:12px">Test connection</button>`;
+    if(p!=="offline"){
+      $("#key").oninput=e=>{CONFIG.keys[p]=e.target.value.trim();render();};
+      $("#model").oninput=e=>CONFIG.models[p]=e.target.value.trim();
+      $("#tbtn").onclick=async()=>{$("#test").innerHTML=`<div class="alert info">Testing…</div>`;
+        try{await callLLM('Return JSON {"ok":true}',[{role:"user",content:"ping, reply in json"}]);$("#test").innerHTML=`<div class="alert info">Connected. The model answered.</div>`;}
+        catch(e){$("#test").innerHTML=`<div class="alert err">${esc(e.message)}</div>`;}};
+    }};
+  pf();
+  document.querySelectorAll("#prov button").forEach(b=>b.onclick=()=>{CONFIG.provider=b.dataset.p;document.querySelectorAll("#prov button").forEach(x=>x.classList.toggle("on",x===b));pf();render();});
+  [["#t1","pcardMax"],["#t2","quickQuoteMax"],["#t3","materialityMin"]].forEach(([id,k])=>$(id).oninput=e=>{const v=parseFloat(e.target.value);if(!isNaN(v))CONFIG.thresholds[k]=v;});
+  const close=()=>{$("#drawerRoot").innerHTML=""; if(S.ready){S.result=determine();} render();};
+  $("#close").onclick=close; $("#scrim").onclick=close;
+}
+
+/* =========================================================
+   10. WIRING
+   ========================================================= */
+function reset(){ Object.assign(S,fresh()); render(); $("#inp").focus(); }
+const inp=$("#inp");
+inp.addEventListener("input",()=>{inp.style.height="auto";inp.style.height=Math.min(inp.scrollHeight,160)+"px";});
+inp.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("#comp").requestSubmit();}});
+$("#comp").onsubmit=e=>{e.preventDefault();const t=inp.value;inp.value="";inp.style.height="auto";handleUser(t);};
+$("#cfgBtn").onclick=openSettings;
+$("#newBtn").onclick=reset;
+$("#sumBtn").onclick=()=>$("#side").classList.toggle("open");
+(async()=>{
+  render();
+  await detectServer(); resolveProvider();
+  if(CONFIG.provider==="server" && SERVER.accessRequired && !CONFIG.accessCode){
+    try{ CONFIG.accessCode = sessionStorage.getItem("ac")||""; }catch(e){}
+    if(!CONFIG.accessCode){ const c=prompt("Enter the access code for this demo:"); if(c){ CONFIG.accessCode=c.trim(); try{sessionStorage.setItem("ac",CONFIG.accessCode);}catch(e){} } }
+  }
+  render();
+})();
+</script>
+</body>
+</html>
