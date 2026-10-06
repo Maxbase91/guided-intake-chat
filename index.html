@@ -515,7 +515,8 @@ async function handleUser(text){
       reply=out.reply||null; choices=out.choices||[]; complete=!!out.complete;
     }catch(e){
       const quota=e.quota||/quota|rate limit|429/i.test(e.message||""), slow=e.name==="TimeoutError"||e.name==="AbortError";
-      note = quota ? "The AI has reached its usage limit, so I'm using standard questions for now." : slow ? "The AI took too long, so I'm using standard questions for now." : "The AI isn't reachable, so I'm using standard questions for now.";
+      const auth=/access code/i.test(e.message||"");
+      note = auth ? "This demo needs an access code for the AI. Open Settings and enter it. Until then I'm using standard questions." : quota ? "The AI has reached its usage limit, so I'm using standard questions for now." : slow ? "The AI took too long, so I'm using standard questions for now." : "The AI isn't reachable, so I'm using standard questions for now.";
       offlineRead(text, asked);
     }
   } else offlineRead(text, asked);
