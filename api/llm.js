@@ -5,6 +5,7 @@
 //   GROQ_API_KEY     Groq key
 //   LLM_PROVIDER     optional: "gemini" or "groq" (default: whichever key is set, Gemini first)
 //   GEMINI_MODEL     optional, default "gemini-2.5-flash"
+//   GEMINI_FALLBACK_MODEL optional, used when the main model hits its quota (default "gemini-2.5-flash-lite")
 //   GROQ_MODEL       optional, default "llama-3.3-70b-versatile"
 //   ACCESS_CODE      optional: if set, callers must send it in the x-access-code header
 
@@ -20,8 +21,10 @@ function pickProvider() {
   return null;
 }
 
-async function callGemini(system, history) {
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+class LlmError extends Error { constructor(msg, status) { super(msg); this.status = status; } }
+const isQuota = (e) => e && (e.status === 429 || /quota|rate limit|resource_exhausted/i.test(e.message || ""));
+
+async function callGemini(system, history, model = process.env.GEMINI_MODEL || "gemini-2.5-flash") {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const r = await fetch(url, {
     method: "POST",
@@ -33,7 +36,7 @@ async function callGemini(system, history) {
     }),
   });
   const d = await r.json();
-  if (!r.ok) throw new Error(d?.error?.message || `Gemini error ${r.status}`);
+  if (!r.ok) throw new LlmError(d?.error?.message || `Gemini error ${r.status}`, r.status);
   return (d.candidates?.[0]?.content?.parts || []).filter((p) => p.text && !p.thought).map((p) => p.text).join("");
 }
 
@@ -50,7 +53,7 @@ async function callGroq(system, history) {
     }),
   });
   const d = await r.json();
-  if (!r.ok) throw new Error(d?.error?.message || `Groq error ${r.status}`);
+  if (!r.ok) throw new LlmError(d?.error?.message || `Groq error ${r.status}`, r.status);
   return d.choices?.[0]?.message?.content || "";
 }
 
@@ -83,10 +86,28 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: "Invalid or oversized request" });
   }
 
-  try {
-    const text = provider === "groq" ? await callGroq(system, history) : await callGemini(system, history);
-    return res.status(200).json({ text, provider });
-  } catch (e) {
-    return res.status(502).json({ error: e.message });
+  // Try the main provider, then fall back on quota or rate-limit errors:
+  // Gemini main model -> Gemini fallback model -> Groq (if key set), or Groq -> Gemini.
+  const attempts = [];
+  if (provider === "gemini") {
+    attempts.push(["gemini", () => callGemini(system, history)]);
+    const fb = process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash-lite";
+    if (fb !== (process.env.GEMINI_MODEL || "gemini-2.5-flash")) attempts.push(["gemini", () => callGemini(system, history, fb)]);
+    if (process.env.GROQ_API_KEY) attempts.push(["groq", () => callGroq(system, history)]);
+  } else {
+    attempts.push(["groq", () => callGroq(system, history)]);
+    if (process.env.GEMINI_API_KEY) attempts.push(["gemini", () => callGemini(system, history)]);
   }
+  let last;
+  for (const [name, run] of attempts) {
+    try {
+      const text = await run();
+      return res.status(200).json({ text, provider: name });
+    } catch (e) {
+      last = e;
+      if (!isQuota(e)) break;
+    }
+  }
+  const quota = isQuota(last);
+  return res.status(quota ? 429 : 502).json({ error: last?.message || "AI call failed", quota });
 };

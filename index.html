@@ -323,7 +323,7 @@ async function callLLM(system, history){
       body:JSON.stringify({system,history})});
     const d=await r.json().catch(()=>({}));
     if(r.status===401) throw new Error("Access code missing or wrong. Enter it in Settings.");
-    if(!r.ok) throw new Error(d.error||`Server error ${r.status}`);
+    if(!r.ok){ const e=new Error(d.error||`Server error ${r.status}`); e.quota = r.status===429 || !!d.quota; throw e; }
     return parseJSON(d.text);
   }
   if(p==="gemini"){
@@ -403,7 +403,10 @@ async function handleUser(text){
     } else out = offlineTurn(text);
     applyTurn(out);
   }catch(e){
-    S.msgs.push({role:"assistant",kind:"err",text:"The AI call failed: "+e.message+"\nCheck the key and model in Settings, or switch to Offline."});
+    const quota = e.quota || /quota|rate limit|429/i.test(e.message||"");
+    S.aiDown = quota ? "The AI has hit its usage limit for now" : "The AI is not reachable right now";
+    S.msgs.push({role:"assistant",kind:"err",text:`${S.aiDown}, so I'll carry on with standard questions.`});
+    try{ applyTurn(offlineTurn(text)); }catch(e2){}
   }
   S.busy=false; render();
 }
