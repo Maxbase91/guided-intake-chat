@@ -1,6 +1,6 @@
 # Guided Intake Chat
 
-A conversational procurement intake prototype. The user describes a need in plain language. The AI asks only for what is missing and drafts a service description. Fixed rules then pick the buying channel: catalogue, contract call-off, P-card, quick quote, sourcing project or external workers.
+A conversational procurement intake prototype. The user describes a need in plain language. Fixed rules pick one of seven buying routes (catalogue, card purchase, contract call-off, contract renewal, quick quote, sourcing project, external workers) and define exactly which details each route needs. The AI runs the conversation: one question at a time, with a concrete example, reading the answers. It never decides the route.
 
 All reference data (catalogue, contracts, preferred suppliers) is mock data. Use dummy requests only.
 

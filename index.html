@@ -9,8 +9,8 @@
 <style>
 /* =========================================================
    Guided Intake Chat (prototype)
-   AI: understands the need, asks for what is missing, writes the service description.
-   Rules: decide the buying channel (deterministic, visible, editable).
+   - Rules decide the buying route AND what must be known for that route.
+   - The AI only talks: it phrases one question at a time and reads the answers.
    ========================================================= */
 :root{
   --navy:#0f2147; --navy-2:#1b3266; --navy-3:#2c4a8a;
@@ -23,7 +23,7 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
-body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;height:100dvh}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;height:100dvh}
 h1,h2,h3{font-family:"Inter Tight",Inter,sans-serif;letter-spacing:-.01em;margin:0}
 button,input,select,textarea{font:inherit;color:inherit}
 
@@ -37,137 +37,110 @@ button,input,select,textarea{font:inherit;color:inherit}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:5px 10px;border-radius:99px;background:rgba(255,255,255,.1);color:#dfe6f7;white-space:nowrap}
 .dot{width:8px;height:8px;border-radius:50%;background:#7c859e}
 .dot.on{background:#3ad29f;box-shadow:0 0 0 3px rgba(58,210,159,.2)}
-.tb{background:rgba(255,255,255,.1);border:0;color:#fff;border-radius:10px;padding:8px 12px;cursor:pointer;font-size:13px;display:inline-flex;gap:6px;align-items:center}
+.tb{background:rgba(255,255,255,.1);border:0;color:#fff;border-radius:10px;padding:8px 12px;cursor:pointer;font-size:13px}
 .tb:hover{background:rgba(255,255,255,.18)}
 .only-m{display:none}
 @media(max-width:900px){.only-m{display:inline-flex}.brand span,.pill{display:none}}
 
 /* layout */
-.app{flex:1;min-height:0;max-width:1280px;width:100%;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;padding:18px}
+.app{flex:1;min-height:0;max-width:1280px;width:100%;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:20px;padding:18px}
 @media(max-width:900px){.app{grid-template-columns:1fr;padding:0}}
 .chat{display:flex;flex-direction:column;min-height:0;background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
 @media(max-width:900px){.chat{border-radius:0;border:0}}
-.msgs{flex:1;overflow-y:auto;padding:24px 22px 12px;scroll-behavior:smooth}
+.msgs{flex:1;overflow-y:auto;padding:26px 24px 12px}
 @media(max-width:600px){.msgs{padding:16px 12px 8px}}
 
 /* welcome */
-.welcome{max-width:620px;margin:20px auto 10px;text-align:center}
-.welcome .big{width:56px;height:56px;border-radius:16px;margin:0 auto 14px;background:linear-gradient(135deg,var(--navy),var(--navy-3));display:grid;place-items:center;color:var(--amber)}
+.welcome{max-width:600px;margin:24px auto 10px}
 .welcome h1{font-size:26px}
 .welcome p{color:var(--ink-2);margin:8px 0 18px}
-.ex{display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:left}
-@media(max-width:600px){.ex{grid-template-columns:1fr}}
-.ex button{border:1px solid var(--line);background:#fafbfd;border-radius:14px;padding:12px 14px;cursor:pointer;font-size:14px;color:var(--ink-2);text-align:left;transition:.15s}
-.ex button:hover{border-color:var(--navy-3);background:#fff;color:var(--ink)}
-.ex b{display:block;color:var(--ink);font-size:13px;margin-bottom:2px}
+.tries{border-top:1px solid var(--line-2)}
+.tries button{display:flex;gap:12px;align-items:baseline;width:100%;border:0;border-bottom:1px solid var(--line-2);background:none;padding:11px 4px;text-align:left;cursor:pointer;color:var(--ink-2);font-size:14.5px}
+.tries button:hover{color:var(--navy);background:#fafbfd}
+.tries small{flex:none;width:118px;font-size:11.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--amber-ink)}
+@media(max-width:600px){.tries small{width:90px}}
 
 /* messages */
 .m{display:flex;gap:10px;margin:0 0 16px;animation:fd .3s ease}
 @keyframes fd{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .m.u{justify-content:flex-end}
 .av{width:30px;height:30px;border-radius:9px;background:var(--navy);color:var(--amber);display:grid;place-items:center;flex:none;font-weight:700;font-size:13px}
-.bub{max-width:min(620px,85%);padding:11px 15px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word}
+.bub{max-width:min(600px,85%);padding:11px 15px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word}
 .m.u .bub{background:var(--navy);color:#fff;border-bottom-right-radius:5px}
 .m.a .bub{background:#f3f5fa;border-bottom-left-radius:5px}
 .m.a .bub b{color:var(--navy)}
-.m .wide{flex:1;min-width:0;max-width:720px}
-.note{font-size:12px;color:var(--ink-3);margin:4px 0 0}
-.typing{display:inline-flex;gap:4px;padding:14px 16px}
+.m .wide{flex:1;min-width:0;max-width:680px}
+.typing{display:inline-flex;gap:4px;padding:4px 2px}
 .typing i{width:7px;height:7px;border-radius:50%;background:var(--ink-3);animation:bl 1.2s infinite}
 .typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
 @keyframes bl{0%,60%,100%{opacity:.25}30%{opacity:1}}
-.props{margin:8px 0 0 40px;max-width:min(640px,85%)}
-.props-h{font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--amber-ink);margin-bottom:6px;display:flex;align-items:center;gap:6px}
-.props-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
-.prop{border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 12px;text-align:left;cursor:pointer;font-size:13.5px;line-height:1.4;transition:.15s;position:relative}
-.prop b{display:block;font-size:13.5px;color:var(--ink);margin-bottom:2px;padding-right:18px}
-.prop span{color:var(--ink-3);font-size:12.5px}
-.prop:hover{border-color:var(--navy-3)}
-.prop.sel{border-color:var(--navy);background:#f4f7fd;box-shadow:0 0 0 2px rgba(44,74,138,.15)}
-.prop.sel:after{content:"✓";position:absolute;top:8px;right:10px;font-weight:700;color:var(--navy)}
-.props .muted{margin-top:6px}
-.hint{display:flex;gap:10px;align-items:flex-start;margin:8px 0 0 40px;max-width:min(640px,85%);background:var(--amber-soft);border-radius:12px;padding:10px 12px;font-size:13.5px;color:#5c4100}
-@media(max-width:600px){.props,.hint{margin-left:0;max-width:100%}}
-.errm{background:var(--bad-soft)!important;color:var(--bad)}
+.sys{font-size:12.5px;color:var(--ink-3);text-align:center;margin:-4px 0 14px}
+
+/* answer shortcuts: small, quiet, only for closed questions */
+.qr{display:flex;gap:6px;flex-wrap:wrap;padding:0 18px 8px}
+.qr button{border:1px solid var(--line);color:var(--ink-2);background:#fff;border-radius:99px;padding:5px 12px;font-size:13px;cursor:pointer}
+.qr button:hover{border-color:var(--navy-3);color:var(--navy)}
 
 /* composer */
-.qr{display:flex;gap:8px;flex-wrap:wrap;padding:0 18px 10px}
-.qr button{border:1px solid var(--navy-3);color:var(--navy);background:#fff;border-radius:99px;padding:7px 13px;font-size:13.5px;cursor:pointer;font-weight:500}
-.qr button:hover{background:var(--navy);color:#fff}
 .comp{border-top:1px solid var(--line);padding:12px 14px calc(12px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:flex-end;background:#fff}
 .comp textarea{flex:1;border:1px solid var(--line);border-radius:14px;padding:12px 14px;resize:none;max-height:160px;min-height:48px;outline:none;line-height:1.45}
 .comp textarea:focus{border-color:var(--navy-3);box-shadow:0 0 0 4px rgba(44,74,138,.12)}
 .send{width:48px;height:48px;border-radius:14px;border:0;background:var(--navy);color:#fff;cursor:pointer;display:grid;place-items:center;flex:none}
-.send:hover{background:var(--navy-2)}
 .send[disabled]{opacity:.45;cursor:not-allowed}
 
-/* cards inside chat */
+/* recommendation + description cards */
 .card{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
-.rec-h{padding:20px 20px 18px;background:radial-gradient(120% 140% at 100% 0%,#2c4a8a 0%,var(--navy) 60%);color:#fff;position:relative;overflow:hidden}
-.rec-h:after{content:"";position:absolute;right:-50px;top:-50px;width:180px;height:180px;border-radius:50%;background:rgba(242,169,0,.18)}
+.rec-h{padding:18px 20px;background:radial-gradient(120% 140% at 100% 0%,#2c4a8a 0%,var(--navy) 60%);color:#fff}
 .eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--amber-ink)}
 .rec-h .eyebrow{color:#ffd36b}
-.rec-h h2{font-size:24px;margin:4px 0}
-.rec-h p{color:#c9d3ea;margin:0;font-size:14px;position:relative;z-index:1}
-.kpis{display:flex;gap:24px;margin-top:14px;flex-wrap:wrap;position:relative;z-index:1}
-.kpi b{display:block;font-family:"Inter Tight";font-size:18px}
-.kpi span{font-size:11.5px;color:#aab6d3}
-.sec{padding:14px 20px;border-top:1px solid var(--line-2)}
-.sec h4{margin:0 0 8px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
-details.sec summary{cursor:pointer;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:600;list-style:none}
-details.sec summary::-webkit-details-marker{display:none}
-details.sec summary:after{content:" +";}
-details[open].sec summary:after{content:" –"}
-.trace{list-style:none;padding:0;margin:8px 0 0}
-.trace li{display:flex;gap:10px;padding:7px 0;font-size:13.5px}
-.tick{width:20px;height:20px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:11px;font-weight:700}
-.tick.n{background:var(--line-2);color:var(--ink-3)}
-.tick.s{background:var(--amber);color:var(--navy)}
-.r{color:var(--ink-3);font-size:12.5px}
-.ctrl{display:flex;gap:10px;padding:6px 0;font-size:13.5px}
-.ctrl .ic{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;flex:none;background:var(--info-soft);color:var(--info)}
-.ctrl .ic.warn{background:var(--warn-soft);color:var(--warn)}
-.ctrl .ic.bad{background:var(--bad-soft);color:var(--bad)}
-ol.ns{margin:0;padding-left:20px;font-size:14px}
-ol.ns li{margin:3px 0}
-.acts{display:flex;gap:8px;flex-wrap:wrap;padding:14px 20px;border-top:1px solid var(--line-2);background:#fafbfd}
-.btn{border:0;border-radius:11px;padding:9px 14px;font-weight:600;cursor:pointer;font-size:13.5px;display:inline-flex;align-items:center;gap:6px}
+.rec-h h2{font-size:23px;margin:3px 0 2px}
+.rec-h .meta{font-size:13px;color:#c9d3ea}
+.sec{padding:14px 20px;border-top:1px solid var(--line-2);font-size:14px}
+.sec:first-of-type{border-top:0}
+.sec h4{margin:0 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.sec ol,.sec ul{margin:0;padding-left:20px}
+.sec li{margin:3px 0}
+.chk{display:flex;gap:8px;padding:3px 0}
+.chk i{font-style:normal;flex:none;width:20px;height:20px;border-radius:6px;display:grid;place-items:center;font-size:11px;background:var(--info-soft);color:var(--info)}
+.chk i.w{background:var(--warn-soft);color:var(--warn)} .chk i.b{background:var(--bad-soft);color:var(--bad)}
+.chk span{color:var(--ink-3);font-size:13px}
+.acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 20px;border-top:1px solid var(--line-2);background:#fafbfd}
+.btn{border:0;border-radius:10px;padding:9px 14px;font-weight:600;cursor:pointer;font-size:13.5px}
 .btn-p{background:var(--navy);color:#fff}
 .btn-a{background:var(--amber);color:var(--navy)}
 .btn-g{background:#fff;border:1px solid var(--line);color:var(--ink-2)}
-.btn-g:hover{border-color:var(--ink-3)}
-.btn[disabled]{opacity:.5;cursor:not-allowed}
-select.inp,input.inp,textarea.inp{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:#fff;outline:none}
-.ovr{border:1px dashed var(--warn);background:var(--warn-soft);border-radius:12px;padding:10px 12px;font-size:13.5px;color:#6b3a06;margin-top:10px}
-
-/* service description */
+.lnk{background:none;border:0;color:var(--ink-3);font-size:13px;cursor:pointer;text-decoration:underline;padding:4px}
+.more{padding:12px 20px;border-top:1px solid var(--line-2);font-size:13.5px;background:#fafbfd}
+.inp{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:#fff;outline:none}
+.ovr{border:1px dashed var(--warn);background:var(--warn-soft);border-radius:10px;padding:10px 12px;color:#6b3a06;margin-top:8px}
+.old{opacity:.6;font-size:13px;padding:10px 14px}
 .sd-h{background:var(--navy);color:#fff;padding:14px 20px}
-.sd-h .t{font-family:"Inter Tight";font-size:17px;font-weight:700;outline:none;margin-top:2px}
 .sd-h small{font-size:11.5px;color:#aab6d3;letter-spacing:.06em;text-transform:uppercase}
+.sd-h .t{font-family:"Inter Tight";font-size:17px;font-weight:700;outline:none;margin-top:2px}
 .sd [contenteditable]{outline:none;border-radius:6px}
 .sd [contenteditable]:focus{background:#f6f8fd;box-shadow:0 0 0 2px rgba(44,74,138,.15)}
-.sd ul{margin:0;padding-left:18px;font-size:14px}
-.sd .sec div{font-size:14px}
 
 /* side panel */
 .side{min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
 @media(max-width:900px){.side{position:fixed;inset:0 0 0 auto;width:min(360px,92%);background:var(--bg);z-index:30;padding:16px;transform:translateX(100%);transition:.25s;box-shadow:-20px 0 40px rgba(0,0,0,.15)}.side.open{transform:none}}
 .panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
-.prog{height:6px;background:var(--line-2);border-radius:99px;overflow:hidden;margin:10px 0 4px}
+.route{font-family:"Inter Tight";font-size:18px;color:var(--navy);font-weight:700;margin-top:4px}
+.prov{font-size:12px;color:var(--ink-3)}
+.prog{height:6px;background:var(--line-2);border-radius:99px;overflow:hidden;margin:12px 0 6px}
 .prog i{display:block;height:100%;background:linear-gradient(90deg,var(--amber),#f6c544);transition:width .4s}
-.row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line-2);font-size:13.5px}
-.row:first-of-type{border-top:0}
-.row span:first-child{color:var(--ink-3)}
-.row span:last-child{text-align:right;font-weight:500}
-.row.empty span:last-child{color:var(--line);font-weight:400}
-.miss{display:flex;gap:8px;align-items:center;font-size:13.5px;padding:4px 0;color:var(--ink-2)}
-.miss:before{content:"";width:7px;height:7px;border-radius:50%;border:1.5px solid var(--amber);flex:none}
-.badge{display:inline-flex;font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:99px;background:var(--warn-soft);color:var(--warn);margin:2px 4px 0 0}
+.fact{display:flex;gap:10px;padding:7px 0;border-top:1px solid var(--line-2);font-size:13.5px;align-items:flex-start}
+.fact:first-of-type{border-top:0}
+.fact .ic{flex:none;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--line);margin-top:2px;display:grid;place-items:center;font-size:10px;color:#fff}
+.fact.ok .ic{background:var(--ok);border-color:var(--ok)}
+.fact.next .ic{border-color:var(--amber);box-shadow:0 0 0 3px var(--amber-soft)}
+.fact .k{color:var(--ink-3);flex:none;width:112px}
+.fact .v{flex:1;text-align:right;font-weight:500;word-break:break-word}
+.fact:not(.ok) .v{color:var(--ink-3);font-weight:400}
 .muted{color:var(--ink-3);font-size:12.5px}
 
 /* drawer */
 .scrim{position:fixed;inset:0;background:rgba(10,18,40,.4);z-index:40}
-.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:#fff;z-index:41;display:flex;flex-direction:column;box-shadow:-20px 0 40px rgba(0,0,0,.15);animation:fd .25s}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:#fff;z-index:41;display:flex;flex-direction:column;box-shadow:-20px 0 40px rgba(0,0,0,.15)}
 .drawer header{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
 .drawer .body{padding:18px 20px;overflow:auto;flex:1}
 .drawer section+section{margin-top:20px;padding-top:18px;border-top:1px solid var(--line-2)}
@@ -212,64 +185,54 @@ select.inp,input.inp,textarea.inp{width:100%;border:1px solid var(--line);border
 <script>
 /* =========================================================
    1. CONFIGURATION
-   -----------------------------------------------------------
    Hosted on Vercel: the key lives in Vercel environment variables
    (GEMINI_API_KEY or GROQ_API_KEY) and never reaches the browser.
-   The page detects the server automatically ("server" provider).
-
-   Opened as a local file: paste a key below instead.
-   Gemini key: https://aistudio.google.com/apikey   (starts with "AIza")
-   Groq key:   https://console.groq.com/keys        (starts with "gsk_")
-   Warning: anyone who opens this file can read the key.
-   Use only for personal prototyping with dummy data.
+   Opened as a local file: paste a key into keys below instead.
    ========================================================= */
 const CONFIG = {
-  provider: "auto",                             // "auto" | "server" | "gemini" | "groq" | "offline"
-  keys: {
-    gemini: "",                                 // <-- paste Gemini key between the quotes
-    groq:   ""                                  // <-- or paste Groq key here and set provider: "groq"
-  },
+  provider: "auto",                       // "auto" | "server" | "gemini" | "groq" | "offline"
+  keys: { gemini: "", groq: "" },
   models: { gemini: "gemini-2.5-flash", groq: "llama-3.3-70b-versatile" },
-  accessCode: "",                               // only if ACCESS_CODE is set on Vercel
+  accessCode: "",                         // only if ACCESS_CODE is set on Vercel
   currency: "EUR",
-  thresholds: { pcardMax: 2500, quickQuoteMax: 50000, materialityMin: 1000000 }
+  thresholds: { pcardMax: 2500, quickQuoteMax: 50000, materialityMin: 1000000, renewalWindowDays: 180 }
 };
 
 /* =========================================================
    2. REFERENCE DATA (mock — replace with your own)
    ========================================================= */
 const CATEGORIES = [
-  {id:"it-hardware", name:"IT hardware",                   type:"goods",    kw:["laptop","notebook","monitor","headset","keyboard","phone","printer","hardware","dock","screen"]},
-  {id:"software",    name:"Software and SaaS",             type:"software", kw:["licence","license","software","saas","subscription","seats"]},
+  {id:"it-hardware", name:"IT hardware",                   type:"goods",    kw:["laptop","notebook","monitor","headset","keyboard","printer","hardware","docking","screen","smartphone"]},
+  {id:"software",    name:"Software and SaaS",             type:"software", kw:["licence","license","software","saas","subscription","seats","system","platform","tool"]},
   {id:"it-services", name:"IT services and development",   type:"services", kw:["develop","implementation","integration","migration","testing","build an app"]},
-  {id:"cloud",       name:"Cloud and hosting",             type:"services", kw:["cloud","hosting","aws","azure","gcp","data centre"]},
+  {id:"cloud",       name:"Cloud and hosting",             type:"services", kw:["cloud","hosting","aws","azure","data centre"]},
   {id:"consulting",  name:"Management consulting",         type:"services", kw:["consult","advisory","strategy","redesign","transformation","assessment","operating model"]},
   {id:"legal",       name:"Legal services",                type:"services", kw:["legal","lawyer","counsel","litigation","law firm"]},
-  {id:"marketing",   name:"Marketing and events",          type:"services", kw:["event","marketing","campaign","conference","agency","offsite","sponsorship"]},
+  {id:"marketing",   name:"Marketing and events",          type:"services", kw:["event","marketing","campaign","conference","agency","offsite","dinner","sponsorship","ticket"]},
   {id:"facilities",  name:"Facilities and real estate",    type:"services", kw:["cleaning","facility","facilities","office move","maintenance","catering","security guard"]},
-  {id:"contingent",  name:"Contingent labour",             type:"contingent_labour", kw:["contractor","temp ","temporary staff","freelance","interim","day rate"]},
+  {id:"contingent",  name:"External workers",             type:"contingent_labour", kw:["contractor","temp ","temporary staff","freelance","interim","day rate"]},
   {id:"market-data", name:"Market data",                   type:"software", kw:["market data","data feed","terminal","ratings data"]},
   {id:"training",    name:"Training and learning",         type:"services", kw:["training","course","workshop","coaching","certification"]},
   {id:"office",      name:"Office supplies and furniture", type:"goods",    kw:["paper","stationery","toner","chair","desk","supplies","furniture"]},
   {id:"telecom",     name:"Telecom",                       type:"services", kw:["mobile contract","telecom","network","sim card","connectivity"]}
 ];
-const DEMAND_TYPES = {goods:"Goods", services:"Services", software:"Software", contingent_labour:"Contingent labour", mixed:"Mixed"};
+const DEMAND_TYPES = {goods:"Goods", services:"Services", software:"Software", contingent_labour:"External workers"};
 
 const CATALOGUE = [
-  {id:"CAT-1001", name:"Standard laptop 14\"",          supplier:"Northwind IT",    price:1150, kw:["laptop","notebook"]},
-  {id:"CAT-1002", name:"27\" monitor",                  supplier:"Northwind IT",    price:240,  kw:["monitor","screen"]},
-  {id:"CAT-1003", name:"Noise-cancelling headset",      supplier:"Northwind IT",    price:180,  kw:["headset","headphones"]},
-  {id:"CAT-1004", name:"Smartphone, standard",          supplier:"Fabrikam Mobile", price:690,  kw:["smartphone","mobile phone","iphone"]},
-  {id:"CAT-1005", name:"Docking station",               supplier:"Northwind IT",    price:210,  kw:["dock","docking"]},
-  {id:"CAT-2001", name:"Ergonomic office chair",        supplier:"Contoso Office",  price:420,  kw:["chair"]},
-  {id:"CAT-2002", name:"Stationery bundle",             supplier:"Contoso Office",  price:35,   kw:["stationery","pens","toner"]},
-  {id:"CAT-3001", name:"Collaboration suite licence",   supplier:"Adatum Software", price:280,  kw:["collaboration licence","microsoft 365","m365"]}
+  {id:"CAT-1001", name:"Standard laptop 14\"",        supplier:"Northwind IT",    price:1150, kw:["laptop","notebook"]},
+  {id:"CAT-1002", name:"27\" monitor",                supplier:"Northwind IT",    price:240,  kw:["monitor","screen"]},
+  {id:"CAT-1003", name:"Noise-cancelling headset",    supplier:"Northwind IT",    price:180,  kw:["headset","headphones"]},
+  {id:"CAT-1004", name:"Smartphone, standard",        supplier:"Fabrikam Mobile", price:690,  kw:["smartphone","mobile phone","iphone"]},
+  {id:"CAT-1005", name:"Docking station",             supplier:"Northwind IT",    price:210,  kw:["docking"]},
+  {id:"CAT-2001", name:"Ergonomic office chair",      supplier:"Contoso Office",  price:420,  kw:["chair"]},
+  {id:"CAT-2002", name:"Stationery bundle",           supplier:"Contoso Office",  price:35,   kw:["stationery","pens","toner"]},
+  {id:"CAT-3001", name:"Collaboration suite licence", supplier:"Adatum Software", price:280,  kw:["collaboration licence","microsoft 365","m365"]}
 ];
 const CONTRACTS = [
   {id:"CTR-4410", supplier:"Contoso Cloud",      category:"cloud",       title:"Cloud hosting framework",           expires:"2028-03-31", remaining:2400000},
   {id:"CTR-3122", supplier:"Lakeshore Advisory", category:"consulting",  title:"Operations consulting framework",   expires:"2027-06-30", remaining:600000},
   {id:"CTR-2087", supplier:"BrightClean",        category:"facilities",  title:"Facilities cleaning, EMEA",         expires:"2027-12-31", remaining:900000},
-  {id:"CTR-5590", supplier:"Tailspin Talent",    category:"contingent",  title:"Contingent labour MSP",             expires:"2028-01-31", remaining:5000000},
+  {id:"CTR-5590", supplier:"Tailspin Talent",    category:"contingent",  title:"External workers MSP",              expires:"2028-01-31", remaining:5000000},
   {id:"CTR-6013", supplier:"Wingtip Legal",      category:"legal",       title:"Legal panel, commercial",           expires:"2027-09-30", remaining:350000},
   {id:"CTR-7120", supplier:"Litware Learning",   category:"training",    title:"Learning services framework",       expires:"2026-11-30", remaining:80000},
   {id:"CTR-8801", supplier:"Proseware Digital",  category:"it-services", title:"Application development framework", expires:"2027-10-31", remaining:1200000}
@@ -280,571 +243,612 @@ const PREFERRED = {
   "marketing":["Coho Creative"],"facilities":["BrightClean"],"contingent":["Tailspin Talent"],
   "market-data":["Datum Feeds"],"training":["Litware Learning"],"office":["Contoso Office"],"telecom":["Fabrikam Mobile"]
 };
-const CHANNELS = {
-  catalogue: {name:"Catalogue order",           days:"1–3",   blurb:"The item is in the catalogue. Order it directly. Standard items need no extra approval."},
-  contract:  {name:"Contract call-off",         days:"3–7",   blurb:"An active contract already covers this. Raise a call-off with the contracted supplier."},
-  pcard:     {name:"P-card purchase",           days:"1–2",   blurb:"Low value and low risk. Buy with a purchasing card and keep the receipt."},
-  quote:     {name:"Quick quote",               days:"7–15",  blurb:"Below the sourcing threshold. Get competitive quotes, ideally from preferred suppliers."},
-  sourcing:  {name:"Sourcing project",          days:"30–60", blurb:"Value or risk needs a competitive sourcing event. Procurement runs it with you."},
-  contingent:{name:"Contingent labour request", days:"10–20", blurb:"External workers go through the contingent labour channel and the managed service provider."}
-};
+const ALL_SUPPLIERS = [...new Set([...CONTRACTS.map(c=>c.supplier),...Object.values(PREFERRED).flat(),...CATALOGUE.map(c=>c.supplier)])];
 
 /* =========================================================
-   3. STATE
+   3. ROUTES — what each one is, and what must be known for it
    ========================================================= */
-const S = fresh();
-function fresh(){
-  return {
-    msgs:[],            // {role:"user"|"assistant", text, kind?:"rec"|"sd"|"err"}
-    f:{ summary:null, category:null, demand_type:null, value:null, needed_by:null, location:null,
-        supplier:null, quantity:null, duration:null, deliverables:null,
-        risk_flags:{personal_data:false,ict_outsourcing:false,critical_service:false,offshore:false} },
-    missing:[], quick:[], ready:false, confidence:0,
-    result:null, lastRecKey:"", sd:null, override:"", busy:false, offlineAsk:null
-  };
+const CHANNELS = {
+  catalogue: {name:"Catalogue order",            days:"1–3",   doc:null},
+  pcard:     {name:"P-card purchase",            days:"1–2",   doc:null},
+  contract:  {name:"Contract call-off",          days:"3–7",   doc:"Scope of work"},
+  renewal:   {name:"Contract renewal",           days:"10–20", doc:"Renewal brief"},
+  quote:     {name:"Quick quote",                days:"7–15",  doc:"Service description"},
+  sourcing:  {name:"Sourcing project",           days:"30–60", doc:"Service description"},
+  contingent:{name:"External workers request",   days:"10–20", doc:"Role profile"}
+};
+
+// Facts the chat can collect. q = plain question, ex = example, why = optional reason, choices = shortcuts for closed questions.
+const DELIV_EX = {
+  "consulting":"a current-state process map, a target process design and a rollout plan",
+  "it-services":"a tested software release, technical documentation and a handover to support",
+  "marketing":"venue and catering, the agenda and guest management",
+  "facilities":"a cleaning schedule, monthly service reports and a named site contact",
+  "legal":"a written legal opinion and draft contract wording",
+  "training":"three course sessions for 20 people, course materials and attendance records",
+  "cloud":"a hosting environment with 99.9% uptime and migration support",
+  "telecom":"50 mobile contracts with data bundles and a support line",
+  "software":"user licences, set-up and training for the admin team",
+  "market-data":"a real-time data feed for two desks with an API",
+  "_":"the main result you expect, for example a report, a working system or a delivered service"
+};
+const FACTS = {
+  need:           {label:"What you need",   q:()=>"Could you tell me a bit more about what you need?", ex:()=>"For example: \"an agency to run a client dinner for 40 people in March\"."},
+  item:           {label:"Item",            q:f=>f.demand_type==="services"?"What exactly are you buying?":"Which item or product do you need?", ex:f=>f.demand_type==="software"?"For example: \"a project-tracking tool for 25 users\".":f.demand_type==="services"?"For example: \"one ticket for the Procurement Leaders conference\".":"For example: \"a 27-inch monitor\" or a product link."},
+  quantity:       {label:"Quantity",        q:f=>f.demand_type==="software"?"How many users or licences?":"How many do you need?", ex:()=>""},
+  value:          {label:"Budget",          q:()=>"Roughly what will this cost in total?", ex:f=>`A rough figure is fine${f.duration?`, for the full ${f.duration}`:""}. If you don't know, just say so and I'll estimate it.`, why:()=>"The amount decides how much competition is needed."},
+  deliverables:   {label:"Deliverables",    q:()=>"What should the supplier deliver?", ex:f=>`For example: ${DELIV_EX[f.category]||DELIV_EX._}.`},
+  duration:       {label:"Duration",        q:f=>f.wants_renewal?"How long should the renewed contract run?":"How long will the work run?", ex:()=>"", choices:["Under 3 months","3–6 months","6–12 months","Over a year"]},
+  needed_by:      {label:"Start / delivery",q:f=>["goods","software"].includes(f.demand_type)?"When do you need it?":"When should it start?", ex:()=>"A date or \"as soon as possible\" is fine."},
+  location:       {label:"Location",        q:f=>["goods","software"].includes(f.demand_type)?"Where should it be delivered?":"Where will the work happen?", ex:f=>["goods","software"].includes(f.demand_type)?"An office or building is enough.":"", choices:f=>["goods","software"].includes(f.demand_type)?null:["On site","Remote, same country","Remote, other country"]},
+  supplier:       {label:"Supplier",        q:f=>S.det&&S.det.route==="contract"&&S.det.contract&&!hasSupplier(f)?`We already have the ${S.det.contract.title} with ${S.det.contract.supplier} for this kind of work. Are you happy to use them?`:"Do you already have a supplier in mind?", ex:f=>S.det&&S.det.route==="contract"&&!hasSupplier(f)?"That's usually the quickest way, because no new competition is needed.":`It's fine to say no.${(PREFERRED[f.category]||[]).length?` Our preferred ones for this are ${PREFERRED[f.category].join(" and ")}.`:""}`, choices:f=>S.det&&S.det.route==="contract"&&!hasSupplier(f)?["Yes, use them","No, someone else"]:["No preference"]},
+  supplier_reason:{label:"Why this supplier",q:f=>`Why ${f.supplier} in particular?`, ex:()=>"For example: they built the current system, or nobody else offers it.", why:()=>"Without a reason, a purchase this size needs competing offers."},
+  personal_data:  {label:"Personal data",   q:()=>"Will the supplier see personal or client data?", ex:()=>"", why:()=>"If so, a data protection review is added.", choices:["Yes","No","Not sure"]},
+  ict_outsourcing:{label:"Runs IT for us",  q:()=>"Will the supplier run or host any IT system or business process for us?", ex:()=>"For example, hosting an application or running payroll.", choices:["Yes","No","Not sure"]},
+  budget_approved:{label:"Budget approved", q:()=>"Is the budget already approved?", ex:()=>"", why:()=>"Sourcing only starts once the budget is confirmed.", choices:["Yes","Not yet","Partly"]},
+  role:           {label:"Role",            q:()=>"What role do you need to fill?", ex:()=>"For example: \"senior Java developer\" or \"interim project manager\"."},
+  headcount:      {label:"People",          q:()=>"How many people?", ex:()=>"", choices:["1","2","3","More"]},
+  skills:         {label:"Key skills",      q:()=>"What skills or experience must they have?", ex:()=>"For example: \"Java 17, Spring Boot, payments experience\"."},
+  day_rate:       {label:"Rate or budget",  q:()=>"Do you have a day rate or total budget in mind?", ex:()=>"For example: \"around €700 a day\" or \"€150k in total\". \"Not sure\" is fine."},
+  system_access:  {label:"System access",   q:()=>"Will they need access to our systems or client data?", ex:()=>"", choices:["Yes","No","Not sure"]},
+  renewal_change: {label:"Changes",         q:()=>"Does anything change compared with the current contract?", ex:()=>"For example: \"same scope, 20% more volume\" or \"no changes\"."}
+};
+const GOODSLIKE = f => f.demand_type==="goods" || f.demand_type==="software";
+function requiredFor(route, f){
+  const g = GOODSLIKE(f), sw = f.demand_type==="software";
+  switch(route){
+    case "catalogue":  return ["item","quantity","needed_by","location"];
+    case "pcard":      return ["item","value","supplier","needed_by"];
+    case "contract":   return [...(hasSupplier(f)?[]:["supplier"]), ...(g ? ["item","quantity","value","needed_by"] : ["deliverables","value","duration","needed_by","personal_data"])];
+    case "renewal":    return ["value","duration","renewal_change","personal_data"];
+    case "quote":      return g ? ["item","quantity","value","needed_by","location",...(sw?["personal_data"]:[]),"supplier"]
+                                : ["deliverables","value","duration","needed_by","location","personal_data","supplier"];
+    case "sourcing":   return [...(g ? ["item","quantity"] : ["deliverables","duration"]),"value","needed_by","location",
+                               ...(sw||!g ? ["personal_data","ict_outsourcing"] : []),"supplier",...(hasSupplier(f)?["supplier_reason"]:[]),"budget_approved"];
+    case "contingent": return ["role","headcount","skills","duration","needed_by","location","day_rate","system_access"];
+  }
+  return [];
 }
 
 /* =========================================================
-   4. LLM CLIENT
+   4. STATE
    ========================================================= */
-let SERVER = null;   // {providers:{gemini,groq}, provider, accessRequired} when /api/llm is available
-const aiReady = () => CONFIG.provider==="server" ? !!SERVER : (CONFIG.provider!=="offline" && CONFIG.provider!=="auto" && !!CONFIG.keys[CONFIG.provider]);
-const providerLabel = () => CONFIG.provider==="server" ? `Server · ${SERVER&&SERVER.provider==="groq"?"Groq":"Gemini"}` : CONFIG.provider==="gemini" ? "Gemini" : "Groq";
+const BLANK_FACTS = {summary:null,category:null,demand_type:null,item:null,quantity:null,value:null,value_is_estimate:false,deliverables:null,duration:null,
+  needed_by:null,location:null,supplier:null,supplier_reason:null,personal_data:null,ict_outsourcing:null,critical_service:null,offshore:null,
+  budget_approved:null,decline_contract:null,role:null,headcount:null,skills:null,day_rate:null,system_access:null,renewal_change:null,wants_renewal:null};
+const S = fresh();
+function fresh(){ return {msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
 
+/* =========================================================
+   5. RULES ENGINE (deterministic)
+   ========================================================= */
+const catById = id => CATEGORIES.find(c=>c.id===id) || {id, name:id||"–", type:"services"};
+const known = v => v!==null && v!==undefined && v!=="";
+const hasSupplier = f => known(f.supplier) && !/^(none|no|no preference|not sure|n\/a)$/i.test(String(f.supplier).trim());
+const yes = v => v===true || /^y/i.test(String(v));
+const userText = () => " "+S.msgs.filter(m=>m.role==="user").map(m=>m.text).join(" ").toLowerCase()+" ";
+const catalogueMatches = () => { const t=userText(); return CATALOGUE.filter(i=>i.kw.some(k=>t.includes(k))); };
+const daysTo = d => (new Date(d) - new Date())/864e5;
+
+function contractFor(f){
+  if(f.decline_contract) return null;
+  const today=new Date(), list=CONTRACTS.filter(c=>c.category===f.category && new Date(c.expires)>today);
+  if(!hasSupplier(f)) return list[0]||null;
+  const s=String(f.supplier).toLowerCase();
+  return list.find(c=>c.supplier.toLowerCase().includes(s)||s.includes(c.supplier.toLowerCase()))||null;
+}
+
+function determine(){
+  const f=S.f, T=CONFIG.thresholds, v=known(f.value)?Number(f.value):null;
+  const risk = yes(f.personal_data)||yes(f.ict_outsourcing)||yes(f.critical_service)||yes(f.offshore)||yes(f.system_access);
+  const cat = catalogueMatches(), ctr = contractFor(f);
+  let route, why;
+  if(f.demand_type==="contingent_labour"){ route="contingent"; why="You need external people, so this goes through the external workers channel and our managed service provider."; }
+  else if(cat.length && GOODSLIKE(f)){ route="catalogue"; why=`${cat.map(i=>i.name).join(" and ")} ${cat.length>1?"are":"is"} in the catalogue, so you can order directly at the agreed price.`; }
+  else if(ctr && hasSupplier(f) && (f.wants_renewal || daysTo(ctr.expires)<T.renewalWindowDays || (v!=null && v>ctr.remaining))){
+    route="renewal";
+    why = daysTo(ctr.expires)<T.renewalWindowDays ? `Your ${ctr.title} with ${ctr.supplier} ends on ${fmtDate(ctr.expires)}, so this needs a renewal rather than a new purchase.`
+        : v!=null && v>ctr.remaining ? `The ${ctr.title} with ${ctr.supplier} has only ${money(ctr.remaining)} left, so it needs to be extended.`
+        : `You want to continue with ${ctr.supplier} under the ${ctr.title}, so the contract is renewed or extended.`;
+  }
+  else if(ctr){ route="contract"; why=`The ${ctr.title} with ${ctr.supplier} already covers this, with ${money(ctr.remaining)} left until ${fmtDate(ctr.expires)}. No new competition is needed.`; }
+  else if(v!=null && v<=T.pcardMax && !risk){ route="pcard"; why=`At ${money(v)} it is under the ${money(T.pcardMax)} card limit and carries no data or IT risk.`; }
+  else if(v!=null && v<=T.quickQuoteMax){ route="quote"; why=`At ${money(v)}${f.value_is_estimate?" (estimated)":""} it is under the ${money(T.quickQuoteMax)} limit for a full sourcing event, and no contract covers it. Three quotes are enough.`; }
+  else { route="sourcing"; why = v==null ? "The value is not known yet, so I assume a full sourcing event until it is." : `At ${money(v)}${f.value_is_estimate?" (estimated)":""} it is above the ${money(T.quickQuoteMax)} quick-quote limit and no contract covers it, so suppliers compete in a sourcing event.`; }
+  return {route, why, contract:ctr, catalogue:cat, controls:controlsFor(route,ctr), steps:nextSteps(route,cat,ctr)};
+}
+
+function controlsFor(route, ctr){
+  const f=S.f, T=CONFIG.thresholds, v=known(f.value)?Number(f.value):null, out=[];
+  if(route==="sourcing") out.push(["i","Approval to source","Budget owner confirms need and budget before the event starts."]);
+  if(route==="contract") out.push(["i","Confirm contract use","Contract owner confirms the scope fits."]);
+  if(route==="renewal")  out.push(["i","Renewal review","Contract owner and procurement agree terms before expiry."]);
+  if(yes(f.personal_data)||yes(f.system_access)) out.push(["w","Data protection review","The supplier will see personal or client data."]);
+  if(yes(f.ict_outsourcing)||yes(f.critical_service)) out.push(["w","ICT and outsourcing assessment","The supplier runs IT or a process for us."]);
+  if(yes(f.offshore)||/other country/i.test(f.location||"")) out.push(["w","Offshoring check","Work happens outside your country."]);
+  if(v!=null && v>=T.materialityMin) out.push(["w","Material spend review",`Value is ${money(T.materialityMin)} or more.`]);
+  if(hasSupplier(f) && ["quote","sourcing","pcard"].includes(route) && !(PREFERRED[f.category]||[]).some(p=>p.toLowerCase()===String(f.supplier).toLowerCase()))
+    out.push(["b","Non-preferred supplier",`${f.supplier} is not a preferred supplier for this category.`]);
+  if(route==="sourcing" && known(f.supplier_reason) && hasSupplier(f)) out.push(["b","Single-source justification","You asked for one named supplier. Procurement checks the reason."]);
+  if(["contract","renewal","quote","sourcing","contingent"].includes(route) && f.demand_type!=="goods") out.push(["i","Risk questionnaire, pre-filled","Answers come from this conversation. You only confirm them."]);
+  return out;
+}
+function nextSteps(route, cat, ctr){
+  const f=S.f;
+  switch(route){
+    case "catalogue": return [`Add ${cat.map(i=>i.name).join(" and ")} to your basket${known(f.quantity)?` (${f.quantity})`:""}.`, `Delivery to ${f.location||"your office"}${known(f.needed_by)?`, needed ${f.needed_by}`:""}.`, "Submit. Standard items go straight through."];
+    case "pcard":     return [`Check that ${hasSupplier(f)?f.supplier:"the supplier"} accepts card payment.`, "Pay with your purchasing card.", "Upload the receipt within 5 working days."];
+    case "contract":  return [`A call-off is raised against ${ctr.id} with ${ctr.supplier}.`, "The scope of work from this conversation is attached.", "The contract owner confirms, then the order goes out."];
+    case "renewal":   return [`Procurement contacts ${ctr.supplier} and the contract owner to agree terms.`, "If scope or price change a lot, a short market check may be added.", `The extension is signed before ${fmtDate(ctr.expires)}.`];
+    case "quote":     return [`Ask at least 3 suppliers for a quote${(PREFERRED[f.category]||[]).length?`, ideally including ${PREFERRED[f.category].join(" and ")}`:""}.`, "Send them the service description so the quotes compare like for like.", "Raise the request with the chosen quote attached."];
+    case "sourcing":  return ["Submit. A sourcing project is created with the service description attached.", "A buyer contacts you within 2 working days to agree timeline and evaluation team.", "Risk and supplier checks run in parallel with the event."];
+    case "contingent":return ["The role profile goes to our managed service provider.", "They shortlist candidates for you to interview.", "Onboarding and system access follow after selection."];
+  }
+  return [];
+}
+
+function refresh(){
+  const f=S.f;
+  if(!known(f.category)){ S.det=null; S.missing=["need"]; return; }
+  // catalogue items: fill item and an estimated value automatically
+  S.det = determine();
+  if(S.det.route==="catalogue"){
+    if(!known(f.item)) f.item = S.det.catalogue.map(i=>i.name).join(", ");
+    if(known(f.quantity) && !known(f.value)){ f.value = S.det.catalogue[0].price*(parseInt(f.quantity)||1); f.value_is_estimate=true; }
+  }
+  if(S.det.route==="contingent" && !known(f.value) && known(f.day_rate)){ const v=parseMoney(f.day_rate); if(v) f.value = v<5000 ? v*20*monthsOf(f.duration) * (parseInt(f.headcount)||1) : v; if(v) f.value_is_estimate=v<5000; }
+  S.det = determine();
+  const req = requiredFor(S.det.route, f);
+  const needsValue = !["catalogue","contingent"].includes(S.det.route);
+  const order = needsValue && !known(f.value) ? ["value",...req.filter(k=>k!=="value")] : req;
+  S.missing = order.filter(k=>!known(f[k]));
+}
+const monthsOf = d => { const m=String(d||"").match(/(\d+)\s*(?:-|–|to)?\s*(\d+)?\s*(month|week|year)/i); if(!m) return 6; const n=Number(m[2]||m[1]); return /week/i.test(m[3])?n/4.3:/year/i.test(m[3])?n*12:n; };
+
+/* =========================================================
+   6. AI CLIENT
+   ========================================================= */
+let SERVER=null;
+const aiReady = () => CONFIG.provider==="server" ? !!SERVER : (["gemini","groq"].includes(CONFIG.provider) && !!CONFIG.keys[CONFIG.provider]);
+const providerLabel = () => CONFIG.provider==="server" ? `Server · ${SERVER&&SERVER.provider==="groq"?"Groq":"Gemini"}` : CONFIG.provider==="gemini"?"Gemini":"Groq";
 async function detectServer(){
   if(!/^https?:$/.test(location.protocol)) return;
-  try{
-    const r = await fetch("/api/llm",{method:"GET"});
-    if(!r.ok) return;
-    const d = await r.json();
-    if(d && d.ok && (d.providers.gemini||d.providers.groq)) SERVER = d;
-  }catch(e){}
+  try{ const r=await fetch("/api/llm"); if(!r.ok) return; const d=await r.json(); if(d&&d.ok) SERVER=d; }catch(e){}
 }
 function resolveProvider(){
   if(CONFIG.provider!=="auto") return;
-  if(SERVER) CONFIG.provider="server";
-  else if(CONFIG.keys.gemini) CONFIG.provider="gemini";
-  else if(CONFIG.keys.groq) CONFIG.provider="groq";
-  else CONFIG.provider="offline";
+  CONFIG.provider = SERVER ? "server" : CONFIG.keys.gemini ? "gemini" : CONFIG.keys.groq ? "groq" : "offline";
 }
-
 async function callLLM(system, history){
   const p=CONFIG.provider, key=CONFIG.keys[p], model=CONFIG.models[p];
   if(p==="server"){
-    const r=await fetch("/api/llm",{method:"POST",headers:{"Content-Type":"application/json","x-access-code":CONFIG.accessCode||""},
-      body:JSON.stringify({system,history}),signal:AbortSignal.timeout(50000)});
+    const r=await fetch("/api/llm",{method:"POST",signal:AbortSignal.timeout(50000),headers:{"Content-Type":"application/json","x-access-code":CONFIG.accessCode||""},body:JSON.stringify({system,history})});
     const d=await r.json().catch(()=>({}));
     if(r.status===401) throw new Error("Access code missing or wrong. Enter it in Settings.");
-    if(!r.ok){ const e=new Error(d.error||`Server error ${r.status}`); e.quota = r.status===429 || !!d.quota; throw e; }
+    if(!r.ok){ const e=new Error(d.error||`Server error ${r.status}`); e.quota=r.status===429||!!d.quota; throw e; }
     return parseJSON(d.text);
   }
   if(p==="gemini"){
-    const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
-    const r=await fetch(url,{method:"POST",signal:AbortSignal.timeout(30000),headers:{"Content-Type":"application/json"},body:JSON.stringify({
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,{method:"POST",signal:AbortSignal.timeout(30000),headers:{"Content-Type":"application/json"},body:JSON.stringify({
       systemInstruction:{parts:[{text:system}]},
       contents:history.map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content}]})),
-      generationConfig:{temperature:0.3,responseMimeType:"application/json",...(/flash/i.test(model)?{thinkingConfig:{thinkingBudget:0}}:{})}
-    })});
-    const d=await r.json();
-    if(!r.ok) throw new Error(d?.error?.message||`Gemini error ${r.status}`);
+      generationConfig:{temperature:0.4,responseMimeType:"application/json",...(/flash/i.test(model)?{thinkingConfig:{thinkingBudget:0}}:{})}})});
+    const d=await r.json(); if(!r.ok) throw new Error(d?.error?.message||`Gemini error ${r.status}`);
     return parseJSON((d.candidates?.[0]?.content?.parts||[]).filter(x=>x.text&&!x.thought).map(x=>x.text).join(""));
   }
-  const r=await fetch("https://api.groq.com/openai/v1/chat/completions",{method:"POST",signal:AbortSignal.timeout(30000),
-    headers:{"Content-Type":"application/json","Authorization":`Bearer ${key}`},
-    body:JSON.stringify({model,temperature:0.3,response_format:{type:"json_object"},
-      messages:[{role:"system",content:system},...history.map(m=>({role:m.role,content:m.content}))]})});
-  const d=await r.json();
-  if(!r.ok) throw new Error(d?.error?.message||`Groq error ${r.status}`);
+  const r=await fetch("https://api.groq.com/openai/v1/chat/completions",{method:"POST",signal:AbortSignal.timeout(30000),headers:{"Content-Type":"application/json","Authorization":`Bearer ${key}`},
+    body:JSON.stringify({model,temperature:0.4,response_format:{type:"json_object"},messages:[{role:"system",content:system},...history]})});
+  const d=await r.json(); if(!r.ok) throw new Error(d?.error?.message||`Groq error ${r.status}`);
   return parseJSON(d.choices?.[0]?.message?.content);
 }
-function parseJSON(t){
-  t=String(t||"").trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
-  try{return JSON.parse(t);}catch(e){const m=t.match(/\{[\s\S]*\}/);if(m)return JSON.parse(m[0]);throw new Error("The AI answer was not valid JSON.");}
-}
+function parseJSON(t){ t=String(t||"").trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim(); try{return JSON.parse(t);}catch(e){const m=t.match(/\{[\s\S]*\}/); if(m) return JSON.parse(m[0]); throw new Error("The AI answer was not valid JSON.");} }
 
 /* ---------- conversation prompt ---------- */
 function chatSystem(){
-  return `You are the intake assistant of a corporate procurement team. Business users describe what they want to buy in their own words.
-Your job: understand the need, collect only what is missing, then hand over to the rules engine that picks the buying channel.
+  return `You are the intake assistant of a corporate procurement team. You talk with business colleagues who want to buy something.
+You only have a conversation. Fixed rules decide the buying route and which facts are needed. Each turn you get the current state, including the ordered list "still_needed".
 
-How to talk:
-- Short, friendly, plain English. No procurement jargon (say "external workers", not "contingent labour"; "approval", not "PR").
-- Ask at most 2 questions per turn. Never ask for something the user already said.
-- Briefly confirm what you understood when it helps, in one sentence.
-- Offer 2-5 quick reply options when the answer is a short single choice.
-- Make answering easy. With every question, propose concrete answers tailored to THIS need in "proposals" (2-5 items). The user can pick several, then edit before sending. Examples:
-  - deliverables for a process redesign: "Current-state process map", "Target process and controls design", "Implementation roadmap with quick wins", "Training and handover"
-  - budget: ranges with a one-line basis, e.g. label "€150–250k", text "Budget around €200k (2 consultants for 4 months)". Base it on what you know (duration, team size, type of work).
-  - scope: typical in-scope and out-of-scope items for this kind of work
-  Each proposal: "label" (short, max 6 words), "detail" (one short line explaining it), "text" (the full answer sentence that is sent if picked).
-- Use "hint" for one short, useful tip when you have one: an existing contract or preferred supplier for this category, a typical price range, or a common pitfall. Otherwise null.
-- Active contracts you may mention: ${CONTRACTS.map(c=>`${c.title} with ${c.supplier} (category ${c.category}, to ${c.expires})`).join("; ")}.
-- Preferred suppliers: ${Object.entries(PREFERRED).map(([k,v])=>`${k}: ${v.join(", ")}`).join("; ")}.
-- If the user corrects something, update it without fuss.
-- Never ask the same question twice. Any answer counts, including "yes", "no" or "not sure". Record it in the fields (for example personal_data true or false) and drop it from "missing".
-- After about 4 answers, stop asking optional things. Estimate what is still unknown, say so, and set ready true.
+Your job each turn:
+1. Read the user's latest message and update "facts" with anything they said or clearly meant. Use null for unknown. Never invent facts.
+   If they say they don't know the value, estimate a realistic total in ${CONFIG.currency}, set value_is_estimate true, and tell them your estimate and its basis.
+   Any answer counts, including "no", "not sure" or "none". Record it.
+2. Write "reply":
+   - Start with a short, natural reaction to what they said (vary it; do not start with "Got it" every time). Show you understood, using their words.
+   - Where it helps, add one useful remark in plain words: an existing contract or preferred supplier for this, a typical price, or why the next question matters.
+   - Then ask about the FIRST item in still_needed that is still unknown after your update. One question at a time. Include a short, concrete example that fits their need, written into the sentence (for example "such as a current-state process map and a rollout plan").
+   - 2 to 4 sentences. Warm, direct, plain English. No procurement jargon, no bullet lists, no headings.
+   - Never name or decide the buying route yourself. Never ask about something not in still_needed.
+3. If nothing in still_needed is unknown after your update, set "complete" true and reply with one sentence saying you have what you need.
+4. "choices": up to 4 very short answers only when your question is a closed one (yes/no, a duration band, a number of people). Otherwise [].
 
-What you need before "ready" is true:
-- Always: category, demand type, an estimated value (the user may say "don't know"; then estimate it yourself and say so).
-- Goods or software: what item and how many. Catalogue items are fast: ${CATALOGUE.map(c=>c.name).join("; ")}. For these, set ready true right away when quantity is known.
-- Services: what the supplier should deliver, how long it runs, whether the supplier sees personal or client data, where the work happens.
-- External workers: role, number of people, duration, and on site or remote.
-- Supplier in mind and needed-by date are useful but optional; ask once at most.
+Fact keys:
+summary (one plain sentence describing the need), category (one of: ${CATEGORIES.map(c=>c.id).join(", ")}), demand_type (goods | services | software | contingent_labour),
+item, quantity (number), value (total ${CONFIG.currency}, number), value_is_estimate (bool), deliverables (one string), duration, needed_by (as they said it),
+location (delivery place or where the work happens), supplier (name, or "None"), supplier_reason, personal_data (true | false | "unsure"),
+ict_outsourcing (true | false | "unsure"), critical_service (bool), offshore (bool), budget_approved ("yes" | "no" | "partly"),
+role, headcount (number), skills, day_rate, system_access (true | false | "unsure"), renewal_change, wants_renewal (true if they want to renew or extend an existing contract),
+decline_contract (true if they do not want to use the existing contract supplier you asked about; if they agree, set supplier to that supplier's name).
+External workers or contractors are demand_type contingent_labour.
 
-Categories (use the id): ${CATEGORIES.map(c=>`${c.id}=${c.name}`).join(", ")}.
-Demand types: goods, services, software, contingent_labour, mixed.
-Currency: ${CONFIG.currency}. Values are numbers, no symbols.
-Risk flags are true only with a reason: personal_data (supplier handles personal or client data), ict_outsourcing (supplier runs or hosts IT or a process for us), critical_service (an outage hurts clients or regulated activity), offshore (work done outside the requester's country).
+Context you may use in remarks:
+Active contracts: ${CONTRACTS.map(c=>`${c.title} with ${c.supplier} (${c.category}, ends ${c.expires})`).join("; ")}.
+Preferred suppliers: ${Object.entries(PREFERRED).map(([k,v])=>`${k}: ${v.join(", ")}`).join("; ")}.
+Catalogue: ${CATALOGUE.map(c=>`${c.name} ${money(c.price)}`).join("; ")}.
 
-When ready becomes true, the reply says in one sentence that you have what you need and the recommendation follows below. Do not name a buying channel yourself.
-
-Each turn you get the user's message plus the current known fields. Return JSON only:
-{"reply":"text shown to the user","fields":{"summary":"one-sentence plain description of the need","category":null,"demand_type":null,"value":null,"value_is_estimate":false,"needed_by":null,"location":null,"supplier":null,"quantity":null,"duration":null,"deliverables":null,"risk_flags":{"personal_data":false,"ict_outsourcing":false,"critical_service":false,"offshore":false}},"missing":["short label of what is still needed"],"quick_replies":["option"],"proposals":[{"label":"","detail":"","text":""}],"hint":null,"ready":false,"confidence":0.0}
-Use null for unknown fields. Keep fields you already know.`;
+Return JSON only: {"facts":{...only keys you are setting...},"reply":"","choices":[],"complete":false}`;
+}
+function stateBlock(){
+  const f=S.f, still=S.missing.map(k=>({key:k,label:FACTS[k].label,ask:FACTS[k].q(f),example:(FACTS[k].ex(f)||"")}));
+  return `\n\n[STATE]\nknown_facts: ${JSON.stringify(Object.fromEntries(Object.entries(f).filter(([k,v])=>known(v)&&v!==false)))}\n`+
+    (S.det?`route_so_far: ${CHANNELS[S.det.route].name}\n`:"")+
+    `still_needed (ask the first unknown one): ${JSON.stringify(still)}`;
+}
+function chatHistory(){
+  const out=[];
+  for(const m of S.msgs){
+    if(m.kind) continue;
+    const role=m.role==="user"?"user":"assistant";
+    if(out.length && out[out.length-1].role===role) out[out.length-1].content+="\n"+m.text;
+    else out.push({role,content:m.text});
+  }
+  if(out[0]&&out[0].role!=="user") out.shift();
+  return out;
 }
 
-const SD_SYSTEM = `You write service descriptions (statements of requirement) for a corporate procurement team.
-Use the conversation and the known fields. Plain, direct English, short bullet points, no marketing words.
-Do not invent names, numbers or dates. Put unknowns under "open_points".
-Return JSON only:
-{"title":"","objective":"2-3 sentences","scope_in":[""],"scope_out":[""],"deliverables":[""],"requirements":[""],
- "timeline":"","location":"","acceptance_criteria":[""],"supplier_requirements":[""],"evaluation_criteria":[""],"open_points":[""]}`;
-
 /* =========================================================
-   5. CONVERSATION LOOP
+   7. CONVERSATION LOOP
    ========================================================= */
 async function handleUser(text){
   text=text.trim(); if(!text||S.busy) return;
-  S.msgs.push({role:"user",text}); S.quick=[]; S.busy=true; render();
-  try{
-    let out;
-    if(aiReady()){
-      const hist = S.msgs.filter(m=>!m.kind).map(m=>({role:m.role,content:m.text}));
-      hist[hist.length-1].content = `${text}\n\n[Known fields so far: ${JSON.stringify(S.f)}]`;
-      out = await callLLM(chatSystem(), hist);
-    } else out = offlineTurn(text);
-    applyTurn(out);
-  }catch(e){
-    const quota = e.quota || /quota|rate limit|429/i.test(e.message||"");
-    const slow = e.name==="TimeoutError"||e.name==="AbortError"||/too long|timed? ?out/i.test(e.message||"");
-    S.aiDown = quota ? "The AI has hit its usage limit for now" : slow ? "The AI took too long to answer" : "The AI is not reachable right now";
-    S.msgs.push({role:"assistant",kind:"err",text:`${S.aiDown}, so I'll carry on with standard questions.`});
-    try{ applyTurn(offlineTurn(text)); }catch(e2){}
+  if(S.sd && /^(make it|shorten|shorter|add more|rewrite)/i.test(text) && aiReady()) return refineSD(text);
+  const asked=S.lastAsked; if(asked) S.asked[asked]=(S.asked[asked]||0)+1;
+  S.msgs.push({role:"user",text}); S.choices=[]; S.busy=true; render();
+  let reply=null, choices=[], complete=false, note=null;
+  if(aiReady()){
+    try{
+      const h=chatHistory(); h[h.length-1].content += stateBlock();
+      const out = await callLLM(chatSystem(), h);
+      mergeFacts(out.facts||{});
+      // backup: closed answers the AI did not record are read directly
+      if(asked && !known(S.f[asked]) && CLOSED.includes(asked)){ const v=readAnswer(asked,text); if(known(v) && v!=="unsure"||/sure|know/i.test(text)) S.f[asked]=v; }
+      if(asked==="duration" && !known(S.f.duration)) Object.assign(S.f, guessExtras(text, asked));
+      reply=out.reply||null; choices=out.choices||[]; complete=!!out.complete;
+    }catch(e){
+      const quota=e.quota||/quota|rate limit|429/i.test(e.message||""), slow=e.name==="TimeoutError"||e.name==="AbortError";
+      note = quota ? "The AI has reached its usage limit, so I'm using standard questions for now." : slow ? "The AI took too long, so I'm using standard questions for now." : "The AI isn't reachable, so I'm using standard questions for now.";
+      offlineRead(text, asked);
+    }
+  } else offlineRead(text, asked);
+
+  // never loop: if the same thing was asked twice and is still unknown, move on
+  if(asked && !known(S.f[asked]) && (S.asked[asked]||0)>=2) giveUp(asked);
+  const prevRoute=S.det&&S.det.route;
+  refresh();
+  if(note) S.msgs.push({role:"assistant",kind:"sys",text:note});
+
+  if(!S.missing.length){
+    S.msgs.push({role:"assistant",text: complete && reply ? reply : wrapUp()});
+    showRecommendation();
+    S.lastAsked=null;
+  } else {
+    const next=S.missing[0];
+    const aiAskedOk = reply && !complete;
+    let msg = aiAskedOk ? reply : offlineQuestion(next, prevRoute);
+    S.msgs.push({role:"assistant",text:msg});
+    const fc=FACTS[next].choices; const fcs=typeof fc==="function"?fc(S.f):fc;
+    S.choices = aiAskedOk && choices.length ? choices.slice(0,4) : (fcs||[]);
+    S.lastAsked=next;
   }
   S.busy=false; render();
 }
 
-function applyTurn(out){
-  const nf=out.fields||{};
-  for(const k of Object.keys(S.f)){
-    if(k==="risk_flags"){ if(nf.risk_flags) S.f.risk_flags={...S.f.risk_flags,...nf.risk_flags}; }
-    else if(nf[k]!==null && nf[k]!==undefined && nf[k]!=="") S.f[k]=nf[k];
+function mergeFacts(nf){
+  for(const k of Object.keys(BLANK_FACTS)){
+    const v=nf[k]; if(v===null||v===undefined||v==="") continue;
+    if(k==="value"){ const n=Number(String(v).replace(/[^\d.]/g,"")); if(n) S.f.value=n; continue; }
+    S.f[k]=v;
   }
-  if(nf.value!=null) S.f.value=Number(String(nf.value).replace(/[^\d.]/g,""))||S.f.value;
-  if(nf.value_is_estimate!==undefined && nf.value!=null) S.f.value_is_estimate=!!nf.value_is_estimate;
+  if(nf.value_is_estimate!==undefined && known(nf.value)) S.f.value_is_estimate=!!nf.value_is_estimate;
   if(S.f.category && !CATEGORIES.some(c=>c.id===S.f.category)) S.f.category=null;
-  S.missing=out.missing||[]; S.quick=(out.quick_replies||[]).slice(0,5);
-  S.confidence=out.confidence||S.confidence;
-  const props=(out.proposals||[]).filter(p=>p&&(p.label||p.text)).slice(0,5).map(p=>({label:p.label||p.text,detail:p.detail||"",text:p.text||p.label}));
-  if(out.reply) S.msgs.push({role:"assistant",text:out.reply,proposals:props,hint:out.hint||null});
-  else if(props.length||out.hint) S.msgs.push({role:"assistant",text:"Here are some suggestions.",proposals:props,hint:out.hint||null});
-  S.ready=!!out.ready && !!S.f.category;
-  const userTurns=S.msgs.filter(m=>m.role==="user").length;
-  if(!S.ready && S.f.category && userTurns>=6){  // safety net: the AI keeps asking, so decide with what we have
-    if(S.f.value==null){ S.f.value=defaultEstimate(); S.f.value_is_estimate=true; }
-    S.ready=true; S.msgs.push({role:"assistant",text:"I have enough to recommend a route. Anything still open is noted in the summary, and you can add it later."});
-  }
-  if(S.ready){
-    const R=determine(); const key=R.channel+"|"+S.f.category+"|"+S.f.value+"|"+JSON.stringify(S.f.risk_flags)+"|"+S.f.supplier;
-    if(key!==S.lastRecKey){ S.result=R; S.lastRecKey=key; S.override=""; S.msgs.push({role:"assistant",kind:"rec"}); }
-    if(!S.quick.length) S.quick = R.channel==="catalogue" ? ["Change quantity","Start a new request"] : ["Draft the service description","Change something"];
-  }
+  if(S.f.category && !S.f.demand_type) S.f.demand_type=catById(S.f.category).type;
+  if(S.f.demand_type==="contingent_labour") S.f.category="contingent";
+}
+function giveUp(k){
+  const f=S.f;
+  if(k==="value"){ f.value=defaultEstimate(); f.value_is_estimate=true; return; }
+  if(["personal_data","ict_outsourcing","system_access"].includes(k)){ f[k]="unsure"; return; }
+  if(k==="supplier"){ f.supplier="None"; return; }
+  if(k==="need") return;
+  f[k]="Not given";
+}
+function wrapUp(){
+  const lines=["Thanks, that's everything I need.","Great, I have the full picture now.","Perfect, that covers it."];
+  return lines[S.msgs.filter(m=>m.role==="user").length % lines.length];
 }
 
-/* ---------- offline fallback: simple slot filling ---------- */
-function offlineTurn(text){
-  const t=" "+S.msgs.filter(m=>m.role==="user").map(m=>m.text).join(" ").toLowerCase()+" ";
-  const f={};
-  if(!S.offlineAsk && S.f.category) Object.assign(f, guessAnswer(text)); // AI asked the last question; pick out what we can
-  if(S.offlineAsk){ // store answer to the question asked last turn
-    const a=text.trim();
-    if(S.offlineAsk==="value"){ const v=parseMoney(a); f.value=v; f.value_is_estimate=false; if(v==null) f.value=defaultEstimate(); f.value_is_estimate = v==null; }
-    if(S.offlineAsk==="quantity") f.quantity=parseInt(a)||a;
-    if(S.offlineAsk==="duration") f.duration=a;
-    if(S.offlineAsk==="deliverables") f.deliverables=a;
-    if(S.offlineAsk==="data") f.risk_flags={...S.f.risk_flags,personal_data:/^y/i.test(a)};
-    if(S.offlineAsk==="location"){ f.location=a; if(/other country/i.test(a)) f.risk_flags={...S.f.risk_flags,...(f.risk_flags||{}),offshore:true}; }
+/* ---------- offline understanding (no AI) ---------- */
+function offlineRead(text, asked){
+  const f=S.f, t=text.toLowerCase(), all=userText();
+  if(!known(f.category) || asked==="need"){
+    let best=null, score=0;
+    for(const c of CATEGORIES){ const s=c.kw.filter(k=>all.includes(k)).length; if(s>score){score=s;best=c;} }
+    if(/contractor|freelance|temporary staff|interim|day rate/.test(all)) best=catById("contingent");
+    if(best){ f.category=best.id; f.demand_type=best.type; f.summary=f.summary||text.slice(0,160); }
+    else if(asked==="need" || text.split(/\s+/).length>3){ f.category="consulting"; f.demand_type="services"; f.summary=text.slice(0,160); }
+    if(best && best.type!=="contingent_labour" && text.split(/\s+/).length<=12) f.item=f.item||text.replace(/^(we need|i need|we want|i want|need)\s+/i,"").replace(/[.]$/,"");
+    if(/\b(renew|extend|extension|prolong)/.test(t)) f.wants_renewal=true;
+    if(/personal|client data|customer data|payroll|hr system/.test(all)) f.personal_data=true;
+    const q=text.match(/\b(\d{1,4})\s+(?:x\s+)?(?:new\s+)?[a-z]/i); if(q && (GOODSLIKE(f)||f.demand_type==="contingent_labour")) { if(f.demand_type==="contingent_labour") f.headcount=+q[1]; else f.quantity=+q[1]; }
+    const words={one:1,two:2,three:3,four:4,five:5}; const w=t.match(/\b(one|two|three|four|five)\b/); if(w && f.demand_type==="contingent_labour" && !known(f.headcount)) f.headcount=words[w[1]];
+    if(f.demand_type==="contingent_labour"){ const r=text.match(/\b(?:\w+\s+)?(developers?|engineers?|analysts?|project managers?|designers?|testers?)\b/i); if(r) f.role=r[0].replace(/s$/,""); }
   }
-  if(!S.f.category){
-    let best=null,score=0; for(const c of CATEGORIES){const s=c.kw.filter(k=>t.includes(k)).length; if(s>score){score=s;best=c;}}
-    if(/contractor|freelance|temporary staff|interim|day rate/.test(t)) best=CATEGORIES.find(c=>c.id==="contingent");
-    best=best||CATEGORIES.find(c=>c.id==="consulting");
-    f.category=best.id; f.demand_type=best.type; f.summary=text.slice(0,160);
-    const v=parseMoney(text); if(v!=null){f.value=v;f.value_is_estimate=false;}
-    const q=text.match(/\b(\d{1,4})\s+(?:x\s+)?[a-z]/i); if(q && best.type==="goods") f.quantity=parseInt(q[1]);
-    f.risk_flags={personal_data:/personal|customer data|client data|hr data/.test(t),ict_outsourcing:/host|cloud|outsourc|managed service/.test(t),critical_service:/critical|payments|trading/.test(t),offshore:/offshore|india|nearshore/.test(t)};
-  }
-  const merged={...S.f,...f};
-  const type=merged.demand_type;
-  const slots = type==="goods"||type==="software" ? ["quantity","value"]
-              : type==="contingent_labour" ? ["duration","location","value"]
-              : ["deliverables","duration","data","location","value"];
-  const have={quantity:merged.quantity!=null,value:merged.value!=null,duration:!!merged.duration,deliverables:!!merged.deliverables,location:!!merged.location,data:S.offlineAsk==="data"||S.f._askedData};
-  if(S.offlineAsk==="data") S.f._askedData=true;
-  // catalogue goods with quantity: value from catalogue price
-  const cat=catalogueMatches(t);
-  if((type==="goods"||type==="software") && cat.length && merged.quantity!=null && merged.value==null){ f.value=cat[0].price*merged.quantity; f.value_is_estimate=true; have.value=true; }
-  const next=slots.find(s=>!have[s]);
-  const Q={quantity:["How many do you need?",["1","5","10","25"]],
-           value:["Roughly what budget do you expect?",["Under 2,500","Around 20,000","Around 100,000","Don't know"]],
-           duration:["How long will it run?",["Under 3 months","3–6 months","6–12 months","Over 12 months"]],
-           deliverables:["What should the supplier deliver at the end?",[]],
-           data:["Will the supplier see personal or client data?",["Yes","No","Not sure"]],
-           location:["Where will the work happen?",["On site","Remote, same country","Remote, other country"]]};
-  const catName=catById(merged.category).name.toLowerCase();
-  S.offlineAsk=next||null;
-  if(!next) return {reply:"Thanks, that's everything I need. Here is the recommendation.",fields:f,missing:[],quick_replies:[],ready:true,confidence:.6};
-  const first = !S.f.category ? `Got it. This looks like ${catName}. ` : "";
-  const proposals = offlineProposals(next, merged);
-  const ctr = CONTRACTS.find(c=>c.category===merged.category && new Date(c.expires)>new Date());
-  const hint = !S.f.category && ctr ? `There's an active **${ctr.title}** with ${ctr.supplier}. Using it is usually the fastest route.` : null;
-  return {proposals, hint, reply:first+Q[next][0],fields:f,missing:slots.filter(s=>!have[s]).map(s=>({quantity:"Quantity",value:"Budget",duration:"Duration",deliverables:"Deliverables",data:"Data access",location:"Work location"})[s]),quick_replies:Q[next][1],ready:false,confidence:.5};
+  ALL_SUPPLIERS.forEach(s=>{ if(t.includes(s.toLowerCase())) f.supplier=s; });
+  Object.assign(f, guessExtras(text, asked));
+  if(asked && asked!=="need" && !known(f[asked])) f[asked]=readAnswer(asked, text);
 }
-const DELIV_EX = {
-  "consulting":["Current-state process map|Where time and errors occur today","Target process and controls design|Future steps, roles and checks","Implementation roadmap|Phased plan with quick wins","Training and handover|So the team can run it alone"],
-  "it-services":["Working software release|Built, tested and deployed","Technical design|Architecture and interfaces","Test results and sign-off|Evidence it works","Handover and documentation|Runbook for support"],
-  "marketing":["Venue and logistics|Booking, travel, catering","Agenda and content|Speakers and sessions","Invitations and registration|Guest management","Post-event report|Attendance and feedback"],
-  "facilities":["Service schedule|What is done and when","Monthly service report|Quality and issues","Named site contact|Single point of contact"],
-  "legal":["Legal opinion|Written advice on the question","Contract drafts|Ready-to-sign documents","Negotiation support|Calls with the counterparty"],
-  "training":["Course delivery|Sessions for the group","Training materials|Slides and exercises","Attendance and assessment|Who passed"],
-  "cloud":["Hosting environment|Set up and running","Service levels|Uptime and support times","Migration support|Moving existing workloads"],
-  "_":["Final report|Findings and recommendations","Working result|The thing you need delivered","Handover|So your team can take over"]
-};
-function offlineProposals(slot, f){
-  const mk=(label,detail,text)=>({label,detail,text:text||label});
-  if(slot==="deliverables") return (DELIV_EX[f.category]||DELIV_EX._).map(x=>{const [l,d]=x.split("|");return mk(l,d,l);});
-  if(slot==="value"){
-    const base={goods:[2000,10000,40000],software:[10000,40000,120000],services:[40000,150000,400000],contingent_labour:[60000,150000,300000]}[f.demand_type]||[40000,150000,400000];
-    const lbl=v=>"Around "+money(v);
-    return [mk(lbl(base[0]),"Small scope",`Budget around ${money(base[0])}`),mk(lbl(base[1]),"Typical for this kind of work",`Budget around ${money(base[1])}`),mk(lbl(base[2]),"Large or long-running",`Budget around ${money(base[2])}`),mk("Not sure","I'll use a typical estimate","Don't know")];
+const CLOSED=["value","quantity","headcount","personal_data","ict_outsourcing","system_access","budget_approved"];
+function readAnswer(k, text){
+  const t=text.trim().toLowerCase();
+  if(k==="value"){ const v=parseMoney(text); if(v!=null){S.f.value_is_estimate=false;return v;} if(/know|sure|idea|estimate/.test(t)){S.f.value_is_estimate=true;return defaultEstimate();} return null; }
+  if(k==="quantity"||k==="headcount"){ const n=t.match(/\d+/); return n?+n[0]:(/more/.test(t)?"4+":null); }
+  if(["personal_data","ict_outsourcing","system_access"].includes(k)) return /^(y|yes|yeah|they will|it will)/.test(t)||/\bwill\b(?!.*\bnot\b)/.test(t)?true:/^(n|no|none|nope)\b|not /.test(t)?false:"unsure";
+  if(k==="budget_approved") return /^y/.test(t)?"yes":/part/.test(t)?"partly":"no";
+  if(k==="supplier"){
+    if(S.det&&S.det.route==="contract"&&S.det.contract){ if(/^(y|yes|sure|ok|happy|fine)/.test(t)) return S.det.contract.supplier; if(/^(no|nope|not)/.test(t)){ S.f.decline_contract=true; const named=ALL_SUPPLIERS.find(x=>t.includes(x.toLowerCase())); return named||null; } }
+    return /^(no|none|nope|not really|no preference|any)/.test(t)?"None":text.trim();
   }
-  return [];
+  return text.trim();
 }
-function guessAnswer(text){
+function guessExtras(text, asked){
   const t=text.toLowerCase(), out={};
-  const d=t.match(/(\d+\s*(?:-|–|to)?\s*\d*\s*(?:months?|weeks?|years?))|(under|over)\s+\d+\s*(?:months?|weeks?)/); if(d) out.duration=text.match(new RegExp(d[0].replace(/[-–]/g,"[-–]"),"i"))?.[0]||d[0];
-  const v=parseMoney(text); if(v!=null){out.value=v;out.value_is_estimate=false;}
-  if(/personal|client data|customer data/.test(t)) S.f._askedData=true, out.risk_flags={...S.f.risk_flags,personal_data:!/\bno\b|not /.test(t)};
-  if(/on site|onsite|remote|office/.test(t)) out.location=text;
+  const d=t.match(/\b\d+\s*(?:-|–|to)?\s*\d*\s*(?:months?|weeks?|years?)\b|\b(?:under|over)\s+(?:a\s+)?\d*\s*(?:months?|year)/);
+  if(d && !known(S.f.duration)) out.duration=d[0];
+  if(asked!=="day_rate" && asked!=="quantity" && asked!=="headcount"){ const v=parseMoney(text); if(v!=null && !known(S.f.value)){ out.value=v; out.value_is_estimate=false; } }
+  if(/other country|offshore|nearshore/.test(t)) out.offshore=true;
   return out;
 }
 function parseMoney(s){
-  const m=String(s).toLowerCase().replace(/,/g,"").match(/(\d+(?:\.\d+)?)\s*(k|m|thousand|million)?\b/); if(!m) return null;
-  if(!m[2] && !/(eur|€|£|\$|budget|around|under|about|\d{4,})/.test(String(s).toLowerCase().replace(/,/g,""))) return null;
-  let v=parseFloat(m[1]); if(/^(k|thousand)$/.test(m[2]||"")) v*=1e3; if(/^(m|million)$/.test(m[2]||"")) v*=1e6; return v;
+  const str=String(s).toLowerCase().replace(/(\d),(\d{3})/g,"$1$2");
+  const re=/(€|eur\b|£|\$)?\s*(\d+(?:\.\d+)?)\s*(k|m|thousand|million|eur\b|euros?)?\b(\s+[a-z]+)?/g;
+  let best=null, bestScore=0, m;
+  while((m=re.exec(str))){
+    const unit=(m[3]||"").trim(), after=(m[4]||"").trim(), before=str.slice(Math.max(0,m.index-14),m.index);
+    if(!m[1] && !unit && /^(people|persons?|users?|months?|weeks?|days?|years?|hours?|guests?|licen[cs]es?|seats?|laptops?|pcs|units?|x)$/.test(after)) continue;
+    let score=(m[1]?3:0)+(unit?3:0)+(m[2].length>=4?1:0)+(/(around|about|approx|budget|cost|roughly|up to|max)\s*$/.test(before)?2:0);
+    if(score>bestScore){ bestScore=score; best=m; }
+  }
+  if(!best) return null;
+  let v=parseFloat(best[2]); const u=(best[3]||"").trim();
+  if(/^(k|thousand)$/.test(u)) v*=1e3; if(/^(m|million)$/.test(u)) v*=1e6; return v;
 }
-function defaultEstimate(){ return {goods:5000,software:20000,services:100000,contingent_labour:150000,mixed:100000}[S.f.demand_type]||100000; }
-function offlineSD(){
+function defaultEstimate(){
+  const f=S.f, mo=monthsOf(f.duration);
+  if(f.demand_type==="services") return Math.round(mo*30000/10000)*10000||100000;
+  if(f.demand_type==="software") return /system|platform|replace|erp|crm/.test(userText()) ? 250000 : 30000;
+  return {goods:5000,contingent_labour:150000}[f.demand_type]||100000;
+}
+function offlineQuestion(k, prevRoute){
+  const f=S.f, F=FACTS[k];
+  let intro="";
+  if(!prevRoute && S.det){
+    const n=catById(f.category).name; intro = `This sounds like ${/^[A-Z]{2}/.test(n)?n:n.charAt(0).toLowerCase()+n.slice(1)}. `;
+    if(S.det.contract && hasSupplier(f)) intro += `We have the ${S.det.contract.title} with ${S.det.contract.supplier}, which makes this quicker. `;
+    if(S.det.route==="catalogue") intro += `Good news: ${S.det.catalogue.map(i=>i.name).join(" and ")} ${S.det.catalogue.length>1?"are":"is"} in our catalogue. `;
+  } else {
+    const acks=["Thanks.","Okay, noted.","That helps.","Understood."]; intro=acks[Object.values(S.asked).reduce((a,b)=>a+b,0)%acks.length]+" ";
+    if(k==="value" && known(f.duration)) intro="";
+  }
+  const why = F.why ? " "+F.why(f) : "", ex = F.ex(f) ? " "+F.ex(f) : "";
+  return `${intro}${F.q(f)}${ex}${why}`.trim();
+}
+
+/* =========================================================
+   8. RECOMMENDATION, DESCRIPTION, SUBMIT
+   ========================================================= */
+function showRecommendation(){
+  const D=S.det, key=D.route+"|"+JSON.stringify(S.f);
+  if(key===S.lastRecKey) return; S.lastRecKey=key; S.override="";
+  S.msgs.push({role:"assistant",kind:"rec",rec:{...D,f:{...S.f}}});
+}
+async function draftSD(){
+  if(S.busy) return; S.busy=true; render();
+  const doc=CHANNELS[S.det.route].doc||"Service description";
+  try{
+    if(aiReady()){
+      const convo=S.msgs.filter(m=>!m.kind).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
+      S.sd=await callLLM(SD_SYSTEM(doc),[{role:"user",content:`Conversation:\n${convo}\n\nFacts: ${JSON.stringify(S.f)}`}]);
+    } else S.sd=offlineSD(doc);
+    S.sd._doc=doc;
+    S.msgs.push({role:"assistant",text:`Here's a first draft of the ${doc.toLowerCase()}. Click any text to change it, or tell me what to adjust, for example "make it shorter".`});
+    S.msgs.push({role:"assistant",kind:"sd"});
+  }catch(e){ S.sd=offlineSD(doc); S.sd._doc=doc; S.msgs.push({role:"assistant",text:`The AI couldn't write it just now, so here's a draft from what you told me.`}); S.msgs.push({role:"assistant",kind:"sd"}); }
+  S.busy=false; render();
+}
+const SD_SYSTEM = doc => `You write a "${doc}" for a corporate procurement team, based on a conversation with a business colleague.
+Plain, direct English, short bullet points, no marketing words. Do not invent names, numbers or dates; put unknowns under "open_points".
+For a role profile, use scope_in for responsibilities and requirements for skills.
+Return JSON only: {"title":"","objective":"2-3 sentences","scope_in":[""],"scope_out":[""],"deliverables":[""],"requirements":[""],"timeline":"","location":"","acceptance_criteria":[""],"evaluation_criteria":[""],"open_points":[""]}`;
+async function refineSD(text){
+  S.msgs.push({role:"user",text}); S.busy=true; render();
+  try{ const d=await callLLM(SD_SYSTEM(S.sd._doc),[{role:"user",content:`Current draft: ${JSON.stringify(S.sd)}\nChange request: ${text}\nReturn the full updated JSON.`}]); d._doc=S.sd._doc; S.sd=d;
+       S.msgs.push({role:"assistant",text:"Done, here's the updated version."}); S.msgs.push({role:"assistant",kind:"sd"}); }
+  catch(e){ S.msgs.push({role:"assistant",kind:"sys",text:"The AI couldn't update it just now. You can edit the text directly."}); }
+  S.busy=false; render();
+}
+function offlineSD(doc){
   const f=S.f, c=catById(f.category);
   return {title:`${c.name}: ${(f.summary||"").slice(0,70)}`, objective:f.summary||"",
-    scope_in:[f.deliverables||"To be confirmed with the requester"], scope_out:["Anything not listed in scope"],
-    deliverables:[f.deliverables||"To be confirmed"], requirements:["Supplier passes standard onboarding and risk checks"],
-    timeline:f.duration||f.needed_by||"To be confirmed", location:f.location||"To be confirmed",
-    acceptance_criteria:["Deliverables accepted in writing by the requester"], supplier_requirements:["Proven experience in "+c.name.toLowerCase()],
-    evaluation_criteria:["Price","Quality of approach","Relevant experience"], open_points:["Drafted offline. Add an API key for an AI-written description."]};
+    scope_in:[f.deliverables||f.role||f.item||"To be confirmed"].filter(Boolean), scope_out:["Anything not listed in scope"],
+    deliverables:[f.deliverables||f.item||"To be confirmed"], requirements:[f.skills||"Supplier passes standard onboarding and risk checks"],
+    timeline:[f.needed_by&&`Start ${f.needed_by}`,f.duration&&`for ${f.duration}`].filter(Boolean).join(", ")||"To be confirmed", location:f.location||"To be confirmed",
+    acceptance_criteria:["Deliverables accepted in writing by the requester"], evaluation_criteria:["Price","Quality of approach","Relevant experience"],
+    open_points:aiReady()?[]:["Drafted without AI. Add a key for a fuller draft."]};
 }
+function submit(){
+  const id="REQ-"+Math.floor(1e5+Math.random()*9e5), ch=CHANNELS[S.override||S.det.route].name;
+  S.msgs.push({role:"assistant",text:`Done. Request **${id}** is created and routed as **${ch}**. You'll get an update at each step.\n(Prototype: nothing was sent anywhere.)`});
+  render();
+}
+function payload(){
+  return {created:new Date().toISOString(), facts:S.f, category_name:catById(S.f.category).name,
+    conversation:S.msgs.filter(m=>!m.kind).map(m=>({role:m.role,text:m.text})),
+    decision:S.det?{route:S.det.route, chosen:S.override||S.det.route, override:!!S.override, justification:($("#just")||{}).value||null, why:S.det.why,
+      required_facts:requiredFor(S.det.route,S.f), contract:S.det.contract?.id||null, controls:S.det.controls.map(c=>c[1]), next_steps:S.det.steps, thresholds:CONFIG.thresholds}:null,
+    document:S.sd, source:aiReady()?CONFIG.provider:"offline"};
+}
+function download(){ const b=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=`intake-${Date.now()}.json`; a.click(); }
 
 /* =========================================================
-   6. RULES ENGINE (deterministic)
-   ========================================================= */
-const catById=id=>CATEGORIES.find(c=>c.id===id)||{id,name:id||"–",type:"services"};
-const allUserText=()=>" "+S.msgs.filter(m=>m.role==="user").map(m=>m.text).join(" ").toLowerCase()+" ";
-function catalogueMatches(t=allUserText()){ return CATALOGUE.filter(i=>i.kw.some(k=>t.includes(k))); }
-function contractMatch(){
-  const sup=(S.f.supplier||"").toLowerCase(), v=S.f.value, today=new Date();
-  const list=CONTRACTS.filter(c=>c.category===S.f.category&&new Date(c.expires)>today&&(v==null||c.remaining>=v));
-  if(!sup) return list[0]||null;
-  return list.find(c=>c.supplier.toLowerCase().includes(sup)||sup.includes(c.supplier.toLowerCase()))||null;
-}
-const isPreferred=(sup,cat)=>(PREFERRED[cat]||[]).some(p=>p.toLowerCase()===String(sup).toLowerCase());
-
-function determine(){
-  const f=S.f,T=CONFIG.thresholds,fl=f.risk_flags||{},v=f.value;
-  const anyRisk=fl.personal_data||fl.ict_outsourcing||fl.critical_service||fl.offshore;
-  const cat=catalogueMatches(), ctr=contractMatch(), trace=[]; let ch=null;
-  const step=(rule,hit,why)=>{trace.push({rule,hit:!!hit&&!ch,why}); if(hit&&!ch) ch=hit;};
-  step("External workers?", f.demand_type==="contingent_labour"&&"contingent", f.demand_type==="contingent_labour"?"You need external workers.":"No external workers needed.");
-  if(!ch) step("Standard catalogue item?", cat.length&&(f.demand_type==="goods"||f.demand_type==="software")&&"catalogue", cat.length?`Matches: ${cat.map(i=>i.name).join(", ")}.`:"No catalogue item matches.");
-  if(!ch) step("Active contract covers it?", ctr&&"contract", ctr?`${ctr.title} with ${ctr.supplier} (${ctr.id}), valid to ${fmtDate(ctr.expires)}.`:"No active contract for this"+(f.supplier?` with ${f.supplier}`:"")+".");
-  if(!ch) step(`Up to ${money(T.pcardMax)} and low risk?`, v!=null&&v<=T.pcardMax&&!anyRisk&&f.demand_type!=="services"&&"pcard", v==null?"Value unknown.":`Value ${money(v)}${anyRisk?", but risk flags are set":""}.`);
-  if(!ch) step(`Up to ${money(T.quickQuoteMax)}?`, v!=null&&v<=T.quickQuoteMax&&"quote", v==null?"Value unknown, treated as above the limit.":`Value ${money(v)}.`);
-  if(!ch) step("Otherwise","sourcing","Value or risk needs competitive sourcing.");
-  return {channel:ch,trace,catalogue:cat,contract:ctr,controls:controlsFor(ch),steps:nextSteps(ch,cat,ctr)};
-}
-function controlsFor(ch){
-  const f=S.f,fl=f.risk_flags||{},T=CONFIG.thresholds,out=[];
-  if(ch==="sourcing") out.push({t:"Approval to source",d:"Budget owner confirms need and budget before sourcing starts.",k:""});
-  if(ch==="contract") out.push({t:"Confirm contract use",d:"Contract owner confirms scope and remaining value.",k:""});
-  if(fl.personal_data) out.push({t:"Data protection review",d:"Supplier will handle personal or client data.",k:"warn"});
-  if(fl.ict_outsourcing||fl.critical_service) out.push({t:"ICT and outsourcing assessment",d:"Supplier runs IT or a process, or the service is critical.",k:"warn"});
-  if(fl.offshore) out.push({t:"Offshoring check",d:"Work happens outside your country.",k:"warn"});
-  if(f.value!=null&&f.value>=T.materialityMin) out.push({t:"Material spend review",d:`Value is ${money(T.materialityMin)} or more.`,k:"warn"});
-  if(f.supplier&&ch!=="contract"&&ch!=="catalogue"&&!isPreferred(f.supplier,f.category)) out.push({t:"Non-preferred supplier exception",d:`${f.supplier} is not preferred for this category. Preferred: ${(PREFERRED[f.category]||["none"]).join(", ")}.`,k:"bad"});
-  if(["services","contingent_labour","mixed"].includes(f.demand_type)&&ch!=="catalogue") out.push({t:"Risk questionnaire, pre-filled",d:"Answers come from this conversation. You only confirm them.",k:""});
-  return out;
-}
-function nextSteps(ch,cat,ctr){
-  switch(ch){
-    case "catalogue": return [`Add ${cat.map(i=>i.name).join(", ")} to your basket${S.f.quantity?` (${S.f.quantity})`:""}.`,"Confirm the delivery address.","Submit. Standard items go straight through."];
-    case "contract":  return [`Raise a call-off against ${ctr.id} with ${ctr.supplier}.`,"Attach the service description as the scope.","Contract owner confirms, then the order goes out."];
-    case "pcard":     return ["Check the supplier takes card payment.","Pay with your purchasing card.","Upload the receipt within 5 working days."];
-    case "quote":     return [`Get at least 3 quotes, ideally from ${(PREFERRED[S.f.category]||["approved suppliers"]).join(", ")}.`,"Compare them against the service description.","Raise the request with the chosen quote."];
-    case "sourcing":  return ["Submit. A sourcing project is created with the service description attached.","A buyer contacts you to agree timeline and evaluation team.","Risk and supplier checks run in parallel."];
-    case "contingent":return ["Submit the role profile to the external workers channel.","The managed service provider shortlists candidates.","Onboarding and system access follow after selection."];
-  }
-  return [];
-}
-function overrideImpact(from,to){
-  if(!to||to===from) return null;
-  const rank={catalogue:0,pcard:1,contract:2,quote:3,contingent:3,sourcing:4};
-  if(rank[to]>rank[from]) return {msg:`A stricter route than needed. Allowed, but slower (${CHANNELS[to].days} working days).`};
-  return {msg:`This skips the standard route. It adds an exception approval and a procurement review, about 7 to 12 extra working days.`};
-}
-
-/* =========================================================
-   7. HELPERS
+   9. RENDER
    ========================================================= */
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const md=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
 const money=v=>v==null?"Unknown":new Intl.NumberFormat("en-GB",{style:"currency",currency:CONFIG.currency,maximumFractionDigits:0}).format(v);
 const fmtDate=d=>{const x=new Date(d);return isNaN(x)?d:x.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});};
-const md=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
-const SHIELD='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>';
+const show=(k,v)=>v===true?"Yes":v===false?"No":v==="unsure"?"Not sure":k==="value"?money(Number(v))+(S.f.value_is_estimate?" (est.)":""):String(v);
 
-/* =========================================================
-   8. RENDER
-   ========================================================= */
-const EXAMPLES=[
-  ["Hardware","We need 15 laptops for new joiners in Frankfurt."],
-  ["Consulting","Consultants to redesign our supplier onboarding process."],
-  ["External workers","Two Java developers for the payments migration."],
-  ["Event","A two-day leadership offsite in Lisbon for 40 people."]
+const TRIES=[
+  ["Catalogue","We need 15 laptops for new joiners in Frankfurt."],
+  ["Card purchase","A conference ticket, about €900."],
+  ["Existing contract","More support from Lakeshore Advisory for our operations team."],
+  ["Renewal","Renew our training contract with Litware Learning."],
+  ["Quick quote","An agency for a client dinner for 40 people, around 30k."],
+  ["Sourcing","A new HR system to replace our payroll tool."],
+  ["External workers","Two Java developers as contractors for 9 months."]
 ];
 function render(){
   $("#aiDot").className="dot"+(aiReady()?" on":"");
   $("#aiLabel").textContent=aiReady()?`AI on · ${providerLabel()}`:"Offline rules";
   const box=$("#msgs");
   if(!S.msgs.length){
-    box.innerHTML=`<div class="welcome">
-      <div class="big"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-      <h1>What do you need to buy?</h1>
-      <p>Describe it in your own words. I'll ask only what's missing and tell you the fastest way to get it.</p>
-      <div class="ex">${EXAMPLES.map(([h,t],i)=>`<button data-ex="${i}"><b>${h}</b>${esc(t)}</button>`).join("")}</div>
-      ${aiReady()?"":`<p class="muted" style="margin-top:16px">No AI connected. Offline rules are running. Set GEMINI_API_KEY on Vercel, or add a key in Settings.</p>`}
-    </div>`;
-    box.querySelectorAll("[data-ex]").forEach(b=>b.onclick=()=>handleUser(EXAMPLES[b.dataset.ex][1]));
+    box.innerHTML=`<div class="welcome"><h1>What do you need to buy?</h1>
+      <p>Tell me in your own words. I'll ask only what's needed, one thing at a time, and then show you the quickest way to get it.</p>
+      <div class="tries">${TRIES.map(([h,t],i)=>`<button data-try="${i}"><small>${h}</small><span>${esc(t)}</span></button>`).join("")}</div></div>`;
+    box.querySelectorAll("[data-try]").forEach(b=>b.onclick=()=>handleUser(TRIES[b.dataset.try][1]));
   } else {
-    box.innerHTML=S.msgs.map((m,i)=>msgHTML(m,i)).join("")+(S.busy?`<div class="m a"><div class="av">G</div><div class="bub"><span class="typing"><i></i><i></i><i></i></span></div></div>`:"");
-    bindCards();
+    const lastRec=S.msgs.map((m,i)=>m.kind==="rec"?i:-1).filter(i=>i>=0).pop();
+    const lastSd=S.msgs.map((m,i)=>m.kind==="sd"?i:-1).filter(i=>i>=0).pop();
+    box.innerHTML=S.msgs.map((m,i)=>msgHTML(m,i,lastRec,lastSd)).join("")+(S.busy?`<div class="m a"><div class="av">G</div><div class="bub"><span class="typing"><i></i><i></i><i></i></span></div></div>`:"");
+    bind();
   }
-  $("#qr").innerHTML=S.busy?"":S.quick.map(q=>`<button>${esc(q)}</button>`).join("");
-  $("#qr").querySelectorAll("button").forEach(b=>b.onclick=()=>quickAction(b.textContent));
-  bindProposals();
+  $("#qr").innerHTML=S.busy?"":S.choices.map(q=>`<button>${esc(q)}</button>`).join("");
+  $("#qr").querySelectorAll("button").forEach(b=>b.onclick=()=>handleUser(b.textContent));
   $("#send").disabled=S.busy;
   renderSide();
   requestAnimationFrame(()=>box.scrollTop=box.scrollHeight);
 }
-function quickAction(t){
-  if(/^draft the service description/i.test(t)) return draftSD();
-  if(/^start a new request/i.test(t)) return reset();
-  handleUser(t);
-}
-function msgHTML(m,i){
+function msgHTML(m,i,lastRec,lastSd){
   if(m.role==="user") return `<div class="m u"><div class="bub">${esc(m.text)}</div></div>`;
-  if(m.kind==="err") return `<div class="m a"><div class="av">G</div><div class="bub errm">${esc(m.text)}</div></div>`;
-  if(m.kind==="rec") return `<div class="m a"><div class="av">G</div><div class="wide">${recHTML(i)}</div></div>`;
-  if(m.kind==="sd")  return `<div class="m a"><div class="av">G</div><div class="wide">${sdHTML()}</div></div>`;
-  const isLast = i===S.msgs.length-1;
-  const props = (m.proposals&&m.proposals.length&&isLast&&!S.busy) ? `<div class="props"><div class="props-h">✦ Suggestions · pick one or more</div>
-    <div class="props-g">${m.proposals.map((p,k)=>`<button class="prop" data-prop="${k}"><b>${esc(p.label)}</b>${p.detail?`<span>${esc(p.detail)}</span>`:""}</button>`).join("")}</div>
-    <div class="muted">Picked items go into the message box so you can edit them before sending.</div></div>` : "";
-  const hint = m.hint ? `<div class="hint"><span>💡</span><span>${md(m.hint)}</span></div>` : "";
-  return `<div class="m a"><div class="av">G</div><div class="bub">${md(m.text)}</div></div>${hint}${props}`;
+  if(m.kind==="sys") return `<div class="sys">${esc(m.text)}</div>`;
+  if(m.kind==="rec") return `<div class="m a"><div class="av">G</div><div class="wide">${i===lastRec?recHTML(m.rec):`<div class="card old">Earlier recommendation: ${esc(CHANNELS[m.rec.route].name)}. Updated below.</div>`}</div></div>`;
+  if(m.kind==="sd")  return i===lastSd?`<div class="m a"><div class="av">G</div><div class="wide">${sdHTML()}</div></div>`:"";
+  return `<div class="m a"><div class="av">G</div><div class="bub">${md(m.text)}</div></div>`;
 }
-function bindProposals(){
-  const last=S.msgs[S.msgs.length-1]; if(!last||!last.proposals) return;
-  const btns=[...document.querySelectorAll("[data-prop]")];
-  btns.forEach(b=>b.onclick=()=>{
-    b.classList.toggle("sel");
-    const picked=btns.filter(x=>x.classList.contains("sel")).map(x=>last.proposals[+x.dataset.prop].text);
-    const inp=$("#inp"); inp.value=picked.join("; "); inp.dispatchEvent(new Event("input")); inp.focus();
-  });
-}
-function recHTML(i){
-  const latest = S.msgs.map((m,j)=>m.kind==="rec"?j:-1).filter(j=>j>=0).pop()===i;
-  const R=S.result, c=CHANNELS[R.channel];
-  if(!latest) return `<div class="card"><div class="sec" style="border:0"><span class="muted">Earlier recommendation, replaced by the one below.</span></div></div>`;
-  const imp=overrideImpact(R.channel,S.override);
+function recHTML(R){
+  const c=CHANNELS[R.route], f=R.f;
+  const ovr=S.override&&S.override!==R.route;
+  const faster={catalogue:0,pcard:1,contract:2,renewal:3,quote:3,contingent:3,sourcing:4};
   return `<div class="card">
-    <div class="rec-h"><div class="eyebrow">Recommended buying channel</div><h2>${c.name}</h2><p>${c.blurb}</p>
-      <div class="kpis"><div class="kpi"><b>${c.days}</b><span>working days, typical</span></div>
-      <div class="kpi"><b>${money(S.f.value)}</b><span>${S.f.value_is_estimate?"estimated value":"value"}</span></div>
-      <div class="kpi"><b>${R.controls.length}</b><span>checks</span></div></div></div>
-    ${R.controls.length?`<div class="sec"><h4>Checks and approvals</h4>${R.controls.map(x=>`<div class="ctrl"><span class="ic ${x.k}">${SHIELD}</span><div><b style="font-weight:600">${esc(x.t)}</b><div class="r">${esc(x.d)}</div></div></div>`).join("")}</div>`:`<div class="sec"><h4>Checks and approvals</h4><span class="muted">None. This goes straight through.</span></div>`}
-    <div class="sec"><h4>What happens next</h4><ol class="ns">${R.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol></div>
-    <details class="sec"><summary>Why this channel</summary><ul class="trace">${R.trace.map(t=>`<li><span class="tick ${t.hit?"s":"n"}">${t.hit?"✓":"–"}</span><div><b style="font-weight:600">${esc(t.rule)}</b><div class="r">${esc(t.why)}</div></div></li>`).join("")}</ul></details>
-    <details class="sec" ${S.override?"open":""}><summary>Use a different route</summary>
-      <select class="inp" id="ovr" style="margin-top:10px"><option value="">Keep the recommendation</option>${Object.entries(CHANNELS).filter(([k])=>k!==R.channel).map(([k,v])=>`<option value="${k}" ${S.override===k?"selected":""}>${v.name}</option>`).join("")}</select>
-      ${imp?`<div class="ovr">${esc(imp.msg)}<textarea class="inp" id="just" rows="2" style="margin-top:8px" placeholder="Why does the standard route not work?"></textarea></div>`:""}
-    </details>
+    <div class="rec-h"><div class="eyebrow">Recommended route</div><h2>${c.name}</h2>
+      <div class="meta">Typically ${c.days} working days${known(f.value)?` · ${money(Number(f.value))}${f.value_is_estimate?" estimated":""}`:""}</div></div>
+    <div class="sec"><h4>Why</h4>${esc(R.why)}</div>
+    <div class="sec"><h4>What happens next</h4><ol>${R.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol></div>
+    ${R.controls.length?`<div class="sec"><h4>Checks along the way</h4>${R.controls.map(([k,t,d])=>`<div class="chk"><i class="${k}">✓</i><div>${esc(t)}<br><span>${esc(d)}</span></div></div>`).join("")}</div>`:`<div class="sec"><h4>Checks along the way</h4>None. Standard items go straight through.</div>`}
     <div class="acts">
-      ${R.channel!=="catalogue"?`<button class="btn btn-a" data-act="sd">${S.sd?"Redraft":"Draft"} service description</button>`:""}
+      ${c.doc?`<button class="btn btn-a" data-act="sd">${S.sd?"Redraft":"Write"} the ${c.doc.toLowerCase()}</button>`:""}
       <button class="btn btn-p" data-act="submit">Submit request</button>
-      <button class="btn btn-g" data-act="json">Download JSON</button>
+      <button class="lnk" data-act="more">${S.showMore?"Fewer options":"More options"}</button>
     </div>
-    <div id="doneMsg"></div>
+    ${S.showMore?`<div class="more">
+      <label class="muted">Use a different route</label>
+      <select class="inp" id="ovr" style="margin-top:6px"><option value="">Keep ${esc(c.name)}</option>${Object.entries(CHANNELS).filter(([k])=>k!==R.route).map(([k,v])=>`<option value="${k}" ${S.override===k?"selected":""}>${v.name}</option>`).join("")}</select>
+      ${ovr?`<div class="ovr">${faster[S.override]<faster[R.route]?"This skips the standard route. It adds an exception approval and a procurement review, about 7 to 12 extra working days.":"A stricter route than needed. Allowed, but slower."}<textarea class="inp" id="just" rows="2" style="margin-top:8px" placeholder="Why does the standard route not work?"></textarea></div>`:""}
+      <div style="margin-top:10px"><button class="lnk" data-act="json">Download the request as JSON</button></div>
+    </div>`:""}
   </div>`;
 }
-const SD_SEC=[["objective","Objective",0],["scope_in","In scope",1],["scope_out","Out of scope",1],["deliverables","Deliverables",1],["requirements","Requirements",1],["timeline","Timeline",0],["location","Location",0],["acceptance_criteria","Acceptance criteria",1],["supplier_requirements","Supplier requirements",1],["evaluation_criteria","How offers are compared",1],["open_points","Open points",1]];
+const SD_SEC=[["objective","Objective",0],["scope_in","In scope",1],["scope_out","Out of scope",1],["deliverables","Deliverables",1],["requirements","Requirements",1],["timeline","Timeline",0],["location","Location",0],["acceptance_criteria","Acceptance criteria",1],["evaluation_criteria","How offers are compared",1],["open_points","Open points",1]];
 function sdHTML(){
   const d=S.sd;
-  return `<div class="card sd">
-    <div class="sd-h"><small>Service description · click any text to edit</small><div class="t" contenteditable data-sd="title">${esc(d.title||"Untitled")}</div></div>
-    ${SD_SEC.filter(([k])=>d[k]&&(Array.isArray(d[k])?d[k].length:String(d[k]).trim())).map(([k,l,list])=>`<div class="sec"><h4>${l}</h4>${list?`<ul contenteditable data-sd="${k}" data-list="1">${d[k].map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<div contenteditable data-sd="${k}">${esc(d[k])}</div>`}</div>`).join("")}
-    <div class="acts"><button class="btn btn-g" data-act="copy">Copy text</button><button class="btn btn-g" data-act="json">Download JSON</button></div>
-  </div>`;
+  return `<div class="card sd"><div class="sd-h"><small>${esc(d._doc||"Service description")} · click to edit</small><div class="t" contenteditable data-sd="title">${esc(d.title||"Untitled")}</div></div>
+    ${SD_SEC.filter(([k])=>d[k]&&(Array.isArray(d[k])?d[k].filter(Boolean).length:String(d[k]).trim())).map(([k,l,list])=>`<div class="sec"><h4>${l}</h4>${list?`<ul contenteditable data-sd="${k}" data-list="1">${d[k].filter(Boolean).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<div contenteditable data-sd="${k}">${esc(d[k])}</div>`}</div>`).join("")}
+    <div class="acts"><button class="btn btn-g" data-act="copy">Copy text</button><button class="btn btn-p" data-act="submit">Submit request</button></div></div>`;
 }
-function bindCards(){
+function bind(){
   const o=$("#ovr"); if(o) o.onchange=e=>{S.override=e.target.value;render();};
   document.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>{
     const a=b.dataset.act;
-    if(a==="sd") draftSD();
-    if(a==="json") download();
-    if(a==="copy") navigator.clipboard?.writeText(sdText()).then(()=>{b.textContent="Copied";});
-    if(a==="submit"){ const id="REQ-"+Math.floor(1e5+Math.random()*9e5);
-      S.msgs.push({role:"assistant",text:`Done. Request **${id}** is created and routed to **${CHANNELS[S.override||S.result.channel].name}**. You'll get updates on each step.\n(Prototype: nothing was sent anywhere.)`}); S.quick=["Start a new request"]; render(); }
+    if(a==="sd") draftSD(); if(a==="submit") submit(); if(a==="json") download();
+    if(a==="more"){ S.showMore=!S.showMore; render(); }
+    if(a==="copy") navigator.clipboard?.writeText(sdText()).then(()=>b.textContent="Copied");
   });
-  document.querySelectorAll("[data-sd]").forEach(el=>el.addEventListener("blur",()=>{
-    const k=el.dataset.sd; S.sd[k]=el.dataset.list?[...el.querySelectorAll("li")].map(li=>li.textContent.trim()).filter(Boolean):el.textContent.trim();
-  }));
-}
-function renderSide(){
-  const f=S.f, R=S.ready?S.result:null;
-  const rows=[["Need",f.summary],["Category",f.category?catById(f.category).name:null],["Type",f.demand_type?DEMAND_TYPES[f.demand_type]:null],
-    ["Value",f.value!=null?money(f.value)+(f.value_is_estimate?" (est.)":""):null],["Quantity",f.quantity],["Duration",f.duration],
-    ["Location",f.location],["Supplier",f.supplier],["Needed by",f.needed_by?fmtDate(f.needed_by):null]];
-  const filled=rows.filter(r=>r[1]!=null&&r[1]!=="").length;
-  const pct=S.ready?100:Math.min(90,Math.round(filled/6*90));
-  const flags=Object.entries(f.risk_flags||{}).filter(([,v])=>v).map(([k])=>({personal_data:"Personal data",ict_outsourcing:"ICT / outsourcing",critical_service:"Critical service",offshore:"Offshore"})[k]);
-  $("#side").innerHTML=`
-    <div class="panel">
-      <div class="eyebrow">Your request</div>
-      <div class="prog"><i style="width:${pct}%"></i></div>
-      <div class="muted" style="margin-bottom:10px">${S.ready?"Ready for a decision":S.msgs.length?"Collecting details":"Waiting for your first message"}</div>
-      ${rows.map(([k,v])=>`<div class="row ${v==null||v===""?"empty":""}"><span>${k}</span><span>${v==null||v===""?"—":esc(String(v).length>60?String(v).slice(0,58)+"…":v)}</span></div>`).join("")}
-      ${flags.length?`<div style="margin-top:10px">${flags.map(x=>`<span class="badge">${x}</span>`).join("")}</div>`:""}
-    </div>
-    ${S.missing.length&&!S.ready?`<div class="panel"><div class="eyebrow" style="margin-bottom:8px">Still needed</div>${S.missing.map(x=>`<div class="miss">${esc(typeof x==="string"?x:JSON.stringify(x))}</div>`).join("")}</div>`:""}
-    ${R?`<div class="panel"><div class="eyebrow" style="margin-bottom:6px">Channel</div><b style="font-family:'Inter Tight';font-size:18px;color:var(--navy)">${CHANNELS[S.override||R.channel].name}</b>${S.override?`<div class="muted">Override. Standard: ${CHANNELS[R.channel].name}</div>`:""}</div>`:""}
-    <div class="panel muted">AI understands your need and writes the service description. The buying channel comes from fixed rules, visible under "Why this channel" and editable in Settings.</div>`;
-}
-
-/* ---------- service description ---------- */
-async function draftSD(){
-  if(S.busy) return;
-  S.busy=true; S.quick=[]; render();
-  try{
-    if(aiReady()){
-      const convo=S.msgs.filter(m=>!m.kind).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
-      S.sd=await callLLM(SD_SYSTEM,[{role:"user",content:`Conversation:\n${convo}\n\nKnown fields: ${JSON.stringify({...S.f,category_name:catById(S.f.category).name,currency:CONFIG.currency})}`}]);
-    } else S.sd=offlineSD();
-    S.msgs.push({role:"assistant",text:"Here's a draft service description. Click any text to change it. This is what suppliers will see."});
-    S.msgs.push({role:"assistant",kind:"sd"});
-    S.quick=["Make it shorter","Add more detail on deliverables"];
-  }catch(e){ S.msgs.push({role:"assistant",kind:"err",text:"Could not draft the description: "+e.message}); }
-  S.busy=false; render();
+  document.querySelectorAll("[data-sd]").forEach(el=>el.addEventListener("blur",()=>{const k=el.dataset.sd; S.sd[k]=el.dataset.list?[...el.querySelectorAll("li")].map(li=>li.textContent.trim()).filter(Boolean):el.textContent.trim();}));
 }
 function sdText(){ const d=S.sd; return [d.title,"",...SD_SEC.filter(([k])=>d[k]).map(([k,l,list])=>`${l}\n${list?d[k].map(x=>"- "+x).join("\n"):d[k]}\n`)].join("\n"); }
-function payload(){
-  return {created:new Date().toISOString(),fields:S.f,category_name:catById(S.f.category).name,
-    conversation:S.msgs.filter(m=>!m.kind).map(m=>({role:m.role,text:m.text})),
-    decision:S.result?{recommended:S.result.channel,chosen:S.override||S.result.channel,override:!!S.override,justification:($("#just")||{}).value||null,
-      trace:S.result.trace,controls:S.result.controls,next_steps:S.result.steps,contract:S.result.contract?.id||null,catalogue_items:S.result.catalogue.map(i=>i.id),thresholds:CONFIG.thresholds}:null,
-    service_description:S.sd, source:aiReady()?CONFIG.provider:"offline"};
-}
-function download(){ const b=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=`intake-${Date.now()}.json`; a.click(); }
 
-/* refinement requests on the SD go back through the LLM */
-const _handle=handleUser;
-handleUser=async function(text){
-  if(S.sd && /^(make it shorter|add more detail|shorten|rewrite)/i.test(text.trim()) && aiReady()){
-    S.msgs.push({role:"user",text}); S.busy=true; S.quick=[]; render();
-    try{ S.sd=await callLLM(SD_SYSTEM,[{role:"user",content:`Current service description: ${JSON.stringify(S.sd)}\n\nChange request: ${text}\nReturn the full updated JSON.`}]);
-      S.msgs.push({role:"assistant",text:"Updated."}); S.msgs.push({role:"assistant",kind:"sd"}); }
-    catch(e){ S.msgs.push({role:"assistant",kind:"err",text:e.message}); }
-    S.busy=false; render(); return;
-  }
-  return _handle(text);
-};
+function renderSide(){
+  const f=S.f, D=S.det;
+  if(!D){ $("#side").innerHTML=`<div class="panel"><div class="eyebrow">Your request</div><p class="muted" style="margin:8px 0 0">Start by describing what you need. The route and what's needed for it appear here.</p></div>${sideNote()}`; return; }
+  const req=requiredFor(D.route,f), needsValue=!["catalogue","contingent"].includes(D.route)&&!req.includes("value");
+  const list=[...(needsValue?["value"]:[]),...req];
+  const done=list.filter(k=>known(f[k])).length, pct=Math.round(done/list.length*100);
+  $("#side").innerHTML=`<div class="panel">
+      <div class="eyebrow">Route ${S.missing.length?"so far":""}</div>
+      <div class="route">${CHANNELS[S.override||D.route].name}</div>
+      <div class="prov">${S.missing.length?"May change as you answer":"Ready"} · ${esc(catById(f.category).name)}</div>
+      <div class="prog"><i style="width:${pct}%"></i></div>
+      <div class="muted" style="margin-bottom:8px">${done} of ${list.length} details for this route</div>
+      ${list.map(k=>{const ok=known(f[k]), nx=!ok&&S.missing[0]===k; return `<div class="fact ${ok?"ok":""} ${nx?"next":""}"><span class="ic">${ok?"✓":""}</span><span class="k">${FACTS[k].label}</span><span class="v">${ok?esc(show(k,f[k])):nx?"asking now":"—"}</span></div>`;}).join("")}
+    </div>${sideNote()}`;
+}
+const sideNote=()=>`<div class="panel muted">The route and the details it needs come from fixed rules (editable in Settings). The AI only runs the conversation and writes the description.</div>`;
 
 /* =========================================================
-   9. SETTINGS DRAWER
+   10. SETTINGS
    ========================================================= */
 function openSettings(){
   const T=CONFIG.thresholds;
   $("#drawerRoot").innerHTML=`<div class="scrim" id="scrim"></div><div class="drawer">
     <header><h3>Settings</h3><button class="btn btn-g" id="close">Close</button></header>
     <div class="body">
-      <section><div class="eyebrow">AI provider</div>
-        <div class="muted" style="margin-top:4px">A key entered here lasts until you reload the page. To keep it, paste it into CONFIG at the top of the file.</div>
+      <section><div class="eyebrow">AI</div>
         <div class="seg" id="prov">${[...(SERVER?["server"]:[]),"gemini","groq","offline"].map(p=>`<button data-p="${p}" class="${CONFIG.provider===p?"on":""}">${({server:"Server",gemini:"Gemini key",groq:"Groq key",offline:"Offline"})[p]}</button>`).join("")}</div>
         <div id="pf"></div><div id="test"></div></section>
-      <section><div class="eyebrow">Channel rules</div>
-        <label>P-card limit (${CONFIG.currency})</label><input class="inp" type="number" id="t1" value="${T.pcardMax}">
+      <section><div class="eyebrow">Route rules</div>
+        <label>Card purchase limit (${CONFIG.currency})</label><input class="inp" type="number" id="t1" value="${T.pcardMax}">
         <label>Quick-quote limit (${CONFIG.currency})</label><input class="inp" type="number" id="t2" value="${T.quickQuoteMax}">
-        <label>Material spend review from (${CONFIG.currency})</label><input class="inp" type="number" id="t3" value="${T.materialityMin}"></section>
+        <label>Material spend review from (${CONFIG.currency})</label><input class="inp" type="number" id="t3" value="${T.materialityMin}">
+        <label>Renewal window before contract end (days)</label><input class="inp" type="number" id="t4" value="${T.renewalWindowDays}"></section>
     </div></div>`;
   const pf=()=>{const p=CONFIG.provider;
-    if(p==="server"){
-      $("#pf").innerHTML=`<div class="alert info">The key is stored on the server. Nothing secret is in this page.</div>${SERVER.accessRequired?`<label>Access code</label><input class="inp" type="password" id="ac" value="${esc(CONFIG.accessCode)}">`:""}`;
-      const ac=$("#ac"); if(ac) ac.oninput=e=>CONFIG.accessCode=e.target.value.trim();
-      return;
-    }
-    $("#pf").innerHTML=p==="offline"?`<div class="alert info">Keyword rules and fixed questions. Nothing leaves the browser.</div>`:
-      `<label>${p==="gemini"?"Gemini":"Groq"} API key</label><input class="inp" type="password" id="key" placeholder="${p==="gemini"?"AIza…":"gsk_…"}" value="${esc(CONFIG.keys[p])}">
-       <label>Model</label><input class="inp" id="model" value="${esc(CONFIG.models[p])}">
-       <button class="btn btn-g" id="tbtn" style="margin-top:12px">Test connection</button>`;
-    if(p!=="offline"){
-      $("#key").oninput=e=>{CONFIG.keys[p]=e.target.value.trim();render();};
-      $("#model").oninput=e=>CONFIG.models[p]=e.target.value.trim();
-      $("#tbtn").onclick=async()=>{$("#test").innerHTML=`<div class="alert info">Testing…</div>`;
-        try{await callLLM('Return JSON {"ok":true}',[{role:"user",content:"ping, reply in json"}]);$("#test").innerHTML=`<div class="alert info">Connected. The model answered.</div>`;}
-        catch(e){$("#test").innerHTML=`<div class="alert err">${esc(e.message)}</div>`;}};
-    }};
+    if(p==="server"){ $("#pf").innerHTML=`<div class="alert info">The key is stored on the server.</div>${SERVER.accessRequired?`<label>Access code</label><input class="inp" type="password" id="ac" value="${esc(CONFIG.accessCode)}">`:""}`; const ac=$("#ac"); if(ac) ac.oninput=e=>CONFIG.accessCode=e.target.value.trim(); return; }
+    if(p==="offline"){ $("#pf").innerHTML=`<div class="alert info">Standard questions with examples. Nothing leaves the browser.</div>`; return; }
+    $("#pf").innerHTML=`<label>${p==="gemini"?"Gemini":"Groq"} API key</label><input class="inp" type="password" id="key" value="${esc(CONFIG.keys[p])}"><label>Model</label><input class="inp" id="model" value="${esc(CONFIG.models[p])}"><button class="btn btn-g" id="tbtn" style="margin-top:12px">Test connection</button>`;
+    $("#key").oninput=e=>{CONFIG.keys[p]=e.target.value.trim();render();}; $("#model").oninput=e=>CONFIG.models[p]=e.target.value.trim();
+    $("#tbtn").onclick=async()=>{$("#test").innerHTML=`<div class="alert info">Testing…</div>`;try{await callLLM('Return JSON {"ok":true}',[{role:"user",content:"ping, reply in json"}]);$("#test").innerHTML=`<div class="alert info">Connected.</div>`;}catch(e){$("#test").innerHTML=`<div class="alert err">${esc(e.message)}</div>`;}};
+  };
   pf();
   document.querySelectorAll("#prov button").forEach(b=>b.onclick=()=>{CONFIG.provider=b.dataset.p;document.querySelectorAll("#prov button").forEach(x=>x.classList.toggle("on",x===b));pf();render();});
-  [["#t1","pcardMax"],["#t2","quickQuoteMax"],["#t3","materialityMin"]].forEach(([id,k])=>$(id).oninput=e=>{const v=parseFloat(e.target.value);if(!isNaN(v))CONFIG.thresholds[k]=v;});
-  const close=()=>{$("#drawerRoot").innerHTML=""; if(S.ready){S.result=determine();} render();};
+  [["#t1","pcardMax"],["#t2","quickQuoteMax"],["#t3","materialityMin"],["#t4","renewalWindowDays"]].forEach(([id,k])=>$(id).oninput=e=>{const v=parseFloat(e.target.value);if(!isNaN(v))CONFIG.thresholds[k]=v;});
+  const close=()=>{$("#drawerRoot").innerHTML=""; if(S.det){refresh(); if(!S.missing.length) showRecommendation();} render();};
   $("#close").onclick=close; $("#scrim").onclick=close;
 }
 
 /* =========================================================
-   10. WIRING
+   11. WIRING
    ========================================================= */
 function reset(){ Object.assign(S,fresh()); render(); $("#inp").focus(); }
 const inp=$("#inp");
 inp.addEventListener("input",()=>{inp.style.height="auto";inp.style.height=Math.min(inp.scrollHeight,160)+"px";});
 inp.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("#comp").requestSubmit();}});
 $("#comp").onsubmit=e=>{e.preventDefault();const t=inp.value;inp.value="";inp.style.height="auto";handleUser(t);};
-$("#cfgBtn").onclick=openSettings;
-$("#newBtn").onclick=reset;
-$("#sumBtn").onclick=()=>$("#side").classList.toggle("open");
+$("#cfgBtn").onclick=openSettings; $("#newBtn").onclick=reset; $("#sumBtn").onclick=()=>$("#side").classList.toggle("open");
 (async()=>{
-  render();
-  await detectServer(); resolveProvider();
+  render(); await detectServer(); resolveProvider();
   if(CONFIG.provider==="server" && SERVER.accessRequired && !CONFIG.accessCode){
-    try{ CONFIG.accessCode = sessionStorage.getItem("ac")||""; }catch(e){}
-    if(!CONFIG.accessCode){ const c=prompt("Enter the access code for this demo:"); if(c){ CONFIG.accessCode=c.trim(); try{sessionStorage.setItem("ac",CONFIG.accessCode);}catch(e){} } }
+    try{CONFIG.accessCode=sessionStorage.getItem("ac")||"";}catch(e){}
+    if(!CONFIG.accessCode){ const c=prompt("Enter the access code for this demo:"); if(c){CONFIG.accessCode=c.trim(); try{sessionStorage.setItem("ac",CONFIG.accessCode);}catch(e){}} }
   }
   render();
 })();
