@@ -76,6 +76,18 @@ button,input,select,textarea{font:inherit;color:inherit}
 .typing i{width:7px;height:7px;border-radius:50%;background:var(--ink-3);animation:bl 1.2s infinite}
 .typing i:nth-child(2){animation-delay:.15s}.typing i:nth-child(3){animation-delay:.3s}
 @keyframes bl{0%,60%,100%{opacity:.25}30%{opacity:1}}
+.props{margin:8px 0 0 40px;max-width:min(640px,85%)}
+.props-h{font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--amber-ink);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.props-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+.prop{border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 12px;text-align:left;cursor:pointer;font-size:13.5px;line-height:1.4;transition:.15s;position:relative}
+.prop b{display:block;font-size:13.5px;color:var(--ink);margin-bottom:2px;padding-right:18px}
+.prop span{color:var(--ink-3);font-size:12.5px}
+.prop:hover{border-color:var(--navy-3)}
+.prop.sel{border-color:var(--navy);background:#f4f7fd;box-shadow:0 0 0 2px rgba(44,74,138,.15)}
+.prop.sel:after{content:"✓";position:absolute;top:8px;right:10px;font-weight:700;color:var(--navy)}
+.props .muted{margin-top:6px}
+.hint{display:flex;gap:10px;align-items:flex-start;margin:8px 0 0 40px;max-width:min(640px,85%);background:var(--amber-soft);border-radius:12px;padding:10px 12px;font-size:13.5px;color:#5c4100}
+@media(max-width:600px){.props,.hint{margin-left:0;max-width:100%}}
 .errm{background:var(--bad-soft)!important;color:var(--bad)}
 
 /* composer */
@@ -359,7 +371,15 @@ How to talk:
 - Short, friendly, plain English. No procurement jargon (say "external workers", not "contingent labour"; "approval", not "PR").
 - Ask at most 2 questions per turn. Never ask for something the user already said.
 - Briefly confirm what you understood when it helps, in one sentence.
-- Offer 2-5 quick reply options when the answer is a choice.
+- Offer 2-5 quick reply options when the answer is a short single choice.
+- Make answering easy. With every question, propose concrete answers tailored to THIS need in "proposals" (2-5 items). The user can pick several, then edit before sending. Examples:
+  - deliverables for a process redesign: "Current-state process map", "Target process and controls design", "Implementation roadmap with quick wins", "Training and handover"
+  - budget: ranges with a one-line basis, e.g. label "€150–250k", text "Budget around €200k (2 consultants for 4 months)". Base it on what you know (duration, team size, type of work).
+  - scope: typical in-scope and out-of-scope items for this kind of work
+  Each proposal: "label" (short, max 6 words), "detail" (one short line explaining it), "text" (the full answer sentence that is sent if picked).
+- Use "hint" for one short, useful tip when you have one: an existing contract or preferred supplier for this category, a typical price range, or a common pitfall. Otherwise null.
+- Active contracts you may mention: ${CONTRACTS.map(c=>`${c.title} with ${c.supplier} (category ${c.category}, to ${c.expires})`).join("; ")}.
+- Preferred suppliers: ${Object.entries(PREFERRED).map(([k,v])=>`${k}: ${v.join(", ")}`).join("; ")}.
 - If the user corrects something, update it without fuss.
 
 What you need before "ready" is true:
@@ -377,7 +397,7 @@ Risk flags are true only with a reason: personal_data (supplier handles personal
 When ready becomes true, the reply says in one sentence that you have what you need and the recommendation follows below. Do not name a buying channel yourself.
 
 Each turn you get the user's message plus the current known fields. Return JSON only:
-{"reply":"text shown to the user","fields":{"summary":"one-sentence plain description of the need","category":null,"demand_type":null,"value":null,"value_is_estimate":false,"needed_by":null,"location":null,"supplier":null,"quantity":null,"duration":null,"deliverables":null,"risk_flags":{"personal_data":false,"ict_outsourcing":false,"critical_service":false,"offshore":false}},"missing":["short label of what is still needed"],"quick_replies":["option"],"ready":false,"confidence":0.0}
+{"reply":"text shown to the user","fields":{"summary":"one-sentence plain description of the need","category":null,"demand_type":null,"value":null,"value_is_estimate":false,"needed_by":null,"location":null,"supplier":null,"quantity":null,"duration":null,"deliverables":null,"risk_flags":{"personal_data":false,"ict_outsourcing":false,"critical_service":false,"offshore":false}},"missing":["short label of what is still needed"],"quick_replies":["option"],"proposals":[{"label":"","detail":"","text":""}],"hint":null,"ready":false,"confidence":0.0}
 Use null for unknown fields. Keep fields you already know.`;
 }
 
@@ -422,7 +442,9 @@ function applyTurn(out){
   if(S.f.category && !CATEGORIES.some(c=>c.id===S.f.category)) S.f.category=null;
   S.missing=out.missing||[]; S.quick=(out.quick_replies||[]).slice(0,5);
   S.confidence=out.confidence||S.confidence;
-  if(out.reply) S.msgs.push({role:"assistant",text:out.reply});
+  const props=(out.proposals||[]).filter(p=>p&&(p.label||p.text)).slice(0,5).map(p=>({label:p.label||p.text,detail:p.detail||"",text:p.text||p.label}));
+  if(out.reply) S.msgs.push({role:"assistant",text:out.reply,proposals:props,hint:out.hint||null});
+  else if(props.length||out.hint) S.msgs.push({role:"assistant",text:"Here are some suggestions.",proposals:props,hint:out.hint||null});
   S.ready=!!out.ready && !!S.f.category;
   if(S.ready){
     const R=determine(); const key=R.channel+"|"+S.f.category+"|"+S.f.value+"|"+JSON.stringify(S.f.risk_flags)+"|"+S.f.supplier;
@@ -435,6 +457,7 @@ function applyTurn(out){
 function offlineTurn(text){
   const t=" "+S.msgs.filter(m=>m.role==="user").map(m=>m.text).join(" ").toLowerCase()+" ";
   const f={};
+  if(!S.offlineAsk && S.f.category) Object.assign(f, guessAnswer(text)); // AI asked the last question; pick out what we can
   if(S.offlineAsk){ // store answer to the question asked last turn
     const a=text.trim();
     if(S.offlineAsk==="value"){ const v=parseMoney(a); f.value=v; f.value_is_estimate=false; if(v==null) f.value=defaultEstimate(); f.value_is_estimate = v==null; }
@@ -474,7 +497,38 @@ function offlineTurn(text){
   S.offlineAsk=next||null;
   if(!next) return {reply:"Thanks, that's everything I need. Here is the recommendation.",fields:f,missing:[],quick_replies:[],ready:true,confidence:.6};
   const first = !S.f.category ? `Got it. This looks like ${catName}. ` : "";
-  return {reply:first+Q[next][0],fields:f,missing:slots.filter(s=>!have[s]).map(s=>({quantity:"Quantity",value:"Budget",duration:"Duration",deliverables:"Deliverables",data:"Data access",location:"Work location"})[s]),quick_replies:Q[next][1],ready:false,confidence:.5};
+  const proposals = offlineProposals(next, merged);
+  const ctr = CONTRACTS.find(c=>c.category===merged.category && new Date(c.expires)>new Date());
+  const hint = !S.f.category && ctr ? `There's an active **${ctr.title}** with ${ctr.supplier}. Using it is usually the fastest route.` : null;
+  return {proposals, hint, reply:first+Q[next][0],fields:f,missing:slots.filter(s=>!have[s]).map(s=>({quantity:"Quantity",value:"Budget",duration:"Duration",deliverables:"Deliverables",data:"Data access",location:"Work location"})[s]),quick_replies:Q[next][1],ready:false,confidence:.5};
+}
+const DELIV_EX = {
+  "consulting":["Current-state process map|Where time and errors occur today","Target process and controls design|Future steps, roles and checks","Implementation roadmap|Phased plan with quick wins","Training and handover|So the team can run it alone"],
+  "it-services":["Working software release|Built, tested and deployed","Technical design|Architecture and interfaces","Test results and sign-off|Evidence it works","Handover and documentation|Runbook for support"],
+  "marketing":["Venue and logistics|Booking, travel, catering","Agenda and content|Speakers and sessions","Invitations and registration|Guest management","Post-event report|Attendance and feedback"],
+  "facilities":["Service schedule|What is done and when","Monthly service report|Quality and issues","Named site contact|Single point of contact"],
+  "legal":["Legal opinion|Written advice on the question","Contract drafts|Ready-to-sign documents","Negotiation support|Calls with the counterparty"],
+  "training":["Course delivery|Sessions for the group","Training materials|Slides and exercises","Attendance and assessment|Who passed"],
+  "cloud":["Hosting environment|Set up and running","Service levels|Uptime and support times","Migration support|Moving existing workloads"],
+  "_":["Final report|Findings and recommendations","Working result|The thing you need delivered","Handover|So your team can take over"]
+};
+function offlineProposals(slot, f){
+  const mk=(label,detail,text)=>({label,detail,text:text||label});
+  if(slot==="deliverables") return (DELIV_EX[f.category]||DELIV_EX._).map(x=>{const [l,d]=x.split("|");return mk(l,d,l);});
+  if(slot==="value"){
+    const base={goods:[2000,10000,40000],software:[10000,40000,120000],services:[40000,150000,400000],contingent_labour:[60000,150000,300000]}[f.demand_type]||[40000,150000,400000];
+    const lbl=v=>"Around "+money(v);
+    return [mk(lbl(base[0]),"Small scope",`Budget around ${money(base[0])}`),mk(lbl(base[1]),"Typical for this kind of work",`Budget around ${money(base[1])}`),mk(lbl(base[2]),"Large or long-running",`Budget around ${money(base[2])}`),mk("Not sure","I'll use a typical estimate","Don't know")];
+  }
+  return [];
+}
+function guessAnswer(text){
+  const t=text.toLowerCase(), out={};
+  const d=t.match(/(\d+\s*(?:-|–|to)?\s*\d*\s*(?:months?|weeks?|years?))|(under|over)\s+\d+\s*(?:months?|weeks?)/); if(d) out.duration=text.match(new RegExp(d[0].replace(/[-–]/g,"[-–]"),"i"))?.[0]||d[0];
+  const v=parseMoney(text); if(v!=null){out.value=v;out.value_is_estimate=false;}
+  if(/personal|client data|customer data/.test(t)) S.f._askedData=true, out.risk_flags={...S.f.risk_flags,personal_data:!/\bno\b|not /.test(t)};
+  if(/on site|onsite|remote|office/.test(t)) out.location=text;
+  return out;
 }
 function parseMoney(s){
   const m=String(s).toLowerCase().replace(/,/g,"").match(/(\d+(?:\.\d+)?)\s*(k|m|thousand|million)?\b/); if(!m) return null;
@@ -587,6 +641,7 @@ function render(){
   }
   $("#qr").innerHTML=S.busy?"":S.quick.map(q=>`<button>${esc(q)}</button>`).join("");
   $("#qr").querySelectorAll("button").forEach(b=>b.onclick=()=>quickAction(b.textContent));
+  bindProposals();
   $("#send").disabled=S.busy;
   renderSide();
   requestAnimationFrame(()=>box.scrollTop=box.scrollHeight);
@@ -601,7 +656,21 @@ function msgHTML(m,i){
   if(m.kind==="err") return `<div class="m a"><div class="av">G</div><div class="bub errm">${esc(m.text)}</div></div>`;
   if(m.kind==="rec") return `<div class="m a"><div class="av">G</div><div class="wide">${recHTML(i)}</div></div>`;
   if(m.kind==="sd")  return `<div class="m a"><div class="av">G</div><div class="wide">${sdHTML()}</div></div>`;
-  return `<div class="m a"><div class="av">G</div><div class="bub">${md(m.text)}</div></div>`;
+  const isLast = i===S.msgs.length-1;
+  const props = (m.proposals&&m.proposals.length&&isLast&&!S.busy) ? `<div class="props"><div class="props-h">✦ Suggestions · pick one or more</div>
+    <div class="props-g">${m.proposals.map((p,k)=>`<button class="prop" data-prop="${k}"><b>${esc(p.label)}</b>${p.detail?`<span>${esc(p.detail)}</span>`:""}</button>`).join("")}</div>
+    <div class="muted">Picked items go into the message box so you can edit them before sending.</div></div>` : "";
+  const hint = m.hint ? `<div class="hint"><span>💡</span><span>${md(m.hint)}</span></div>` : "";
+  return `<div class="m a"><div class="av">G</div><div class="bub">${md(m.text)}</div></div>${hint}${props}`;
+}
+function bindProposals(){
+  const last=S.msgs[S.msgs.length-1]; if(!last||!last.proposals) return;
+  const btns=[...document.querySelectorAll("[data-prop]")];
+  btns.forEach(b=>b.onclick=()=>{
+    b.classList.toggle("sel");
+    const picked=btns.filter(x=>x.classList.contains("sel")).map(x=>last.proposals[+x.dataset.prop].text);
+    const inp=$("#inp"); inp.value=picked.join("; "); inp.dispatchEvent(new Event("input")); inp.focus();
+  });
 }
 function recHTML(i){
   const latest = S.msgs.map((m,j)=>m.kind==="rec"?j:-1).filter(j=>j>=0).pop()===i;
