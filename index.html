@@ -114,6 +114,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .inp{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:#fff;outline:none}
 .ovr{border:1px dashed var(--warn);background:var(--warn-soft);border-radius:10px;padding:10px 12px;color:#6b3a06;margin-top:8px}
 .old{opacity:.6;font-size:13px;padding:10px 14px}
+.sec.lead{background:#fbfaf5;border-left:3px solid var(--amber);font-size:14.5px;line-height:1.6}
 .sd-h{background:var(--navy);color:#fff;padding:14px 20px}
 .sd-h small{font-size:11.5px;color:#aab6d3;letter-spacing:.06em;text-transform:uppercase}
 .sd-h .t{font-family:"Inter Tight";font-size:17px;font-weight:700;outline:none;margin-top:2px}
@@ -249,8 +250,8 @@ const ALL_SUPPLIERS = [...new Set([...CONTRACTS.map(c=>c.supplier),...Object.val
    3. ROUTES — what each one is, and what must be known for it
    ========================================================= */
 const CHANNELS = {
-  catalogue: {name:"Catalogue order",            days:"1–3",   doc:null},
-  pcard:     {name:"P-card purchase",            days:"1–2",   doc:null},
+  catalogue: {name:"Catalogue order",            days:"1–3",   doc:"Request summary"},
+  pcard:     {name:"P-card purchase",            days:"1–2",   doc:"Request summary"},
   contract:  {name:"Contract call-off",          days:"3–7",   doc:"Scope of work"},
   renewal:   {name:"Contract renewal",           days:"10–20", doc:"Renewal brief"},
   quote:     {name:"Quick quote",                days:"7–15",  doc:"Service description"},
@@ -277,7 +278,7 @@ const FACTS = {
   item:           {label:"Item",            q:f=>f.demand_type==="services"?"What exactly are you buying?":"Which item or product do you need?", ex:f=>f.demand_type==="software"?"For example: \"a project-tracking tool for 25 users\".":f.demand_type==="services"?"For example: \"one ticket for the Procurement Leaders conference\".":"For example: \"a 27-inch monitor\" or a product link."},
   quantity:       {label:"Quantity",        q:f=>f.demand_type==="software"?"How many users or licences?":"How many do you need?", ex:()=>""},
   value:          {label:"Budget",          q:()=>"Roughly what will this cost in total?", ex:f=>`A rough figure is fine${f.duration?`, for the full ${f.duration}`:""}. If you don't know, just say so and I'll estimate it.`, why:()=>"The amount decides how much competition is needed."},
-  deliverables:   {label:"Deliverables",    q:()=>"What should the supplier deliver?", ex:f=>`For example: ${DELIV_EX[f.category]||DELIV_EX._}.`},
+  deliverables:   {label:"Deliverables",    q:f=>f.demand_type==="contingent_labour"?"What will they work on?":"What should the supplier deliver?", ex:f=>f.demand_type==="contingent_labour"?"For example: \"building the new payments API with our team\".":`For example: ${DELIV_EX[f.category]||DELIV_EX._}.`},
   duration:       {label:"Duration",        q:f=>f.wants_renewal?"How long should the renewed contract run?":"How long will the work run?", ex:()=>"", choices:["Under 3 months","3–6 months","6–12 months","Over a year"]},
   needed_by:      {label:"Start / delivery",q:f=>["goods","software"].includes(f.demand_type)?"When do you need it?":"When should it start?", ex:()=>"A date or \"as soon as possible\" is fine."},
   location:       {label:"Location",        q:f=>["goods","software"].includes(f.demand_type)?"Where should it be delivered?":"Where will the work happen?", ex:f=>["goods","software"].includes(f.demand_type)?"An office or building is enough.":"", choices:f=>["goods","software"].includes(f.demand_type)?null:["On site","Remote, same country","Remote, other country"]},
@@ -291,21 +292,57 @@ const FACTS = {
   skills:         {label:"Key skills",      q:()=>"What skills or experience must they have?", ex:()=>"For example: \"Java 17, Spring Boot, payments experience\"."},
   day_rate:       {label:"Rate or budget",  q:()=>"Do you have a day rate or total budget in mind?", ex:()=>"For example: \"around €700 a day\" or \"€150k in total\". \"Not sure\" is fine."},
   system_access:  {label:"System access",   q:()=>"Will they need access to our systems or client data?", ex:()=>"", choices:["Yes","No","Not sure"]},
-  renewal_change: {label:"Changes",         q:()=>"Does anything change compared with the current contract?", ex:()=>"For example: \"same scope, 20% more volume\" or \"no changes\"."}
+  renewal_change: {label:"Changes",         q:()=>"Does anything change compared with the current contract?", ex:()=>"For example: \"same scope, 20% more volume\" or \"no changes\"."},
+  // ---- sourcing ----
+  background:     {label:"Why now",         q:()=>"What's behind this need? Why now?", ex:()=>"For example: a new regulation, a growing team, or a system reaching end of life.", why:()=>"It helps suppliers propose the right approach."},
+  acceptance:     {label:"Success looks like", q:()=>"How will you know the work has been done well?", ex:f=>f.demand_type==="contingent_labour"?"":`For example: ${f.category==="consulting"?"\"the new process is live in all countries and onboarding takes under 5 days\"":f.category==="marketing"?"\"the event runs on budget and guest feedback averages 4 out of 5\"":"\"it is live, tested and signed off by the business owner\""}.`},
+  evaluation_priority:{label:"Most important", q:()=>"When we compare offers, what matters most to you?", ex:()=>"", choices:["Best price","Best quality","Fastest delivery","A balance"]},
+  supplier_requirements:{label:"Supplier must have", q:()=>"Must the supplier have any certifications or specific experience?", ex:f=>["it-services","cloud","software","market-data"].includes(f.category)?"For example: ISO 27001 certification, or experience in financial services.":"For example: at least three similar projects, or a team that speaks German."},
+  current_supplier:{label:"Today's provider", q:()=>"Is this replacing or continuing something you have today?", ex:()=>"If so, who provides it now? \"No, it's new\" is fine."},
+  volume:         {label:"Volume",          q:f=>f.category==="training"?"How many people will take part?":f.category==="facilities"?"How many sites or how much floor space?":f.category==="telecom"?"How many users or lines?":"How many people, sites or users is this for?", ex:()=>""},
+  support_needs:  {label:"Install & support", q:()=>"Do you need installation, warranty or ongoing support with it?", ex:()=>"For example: on-site installation and a 3-year warranty."},
+  // ---- risk ----
+  data_details:   {label:"Data involved",   q:()=>"What kind of data will they see, and where would it be stored?", ex:()=>"For example: \"employee names and salaries, stored in the EU\".", why:()=>"This shapes the data protection review."},
+  criticality:    {label:"If it stopped",   q:()=>"If this stopped working for a day, what would happen?", ex:()=>"For example: \"clients couldn't log in\" or \"a short delay, nothing serious\".", why:()=>"It tells us how critical the supplier is."},
+  subcontracting: {label:"Subcontractors",  q:()=>"Is the supplier likely to use subcontractors or teams in other countries?", ex:()=>"", choices:["No","Yes","Not sure"]},
+  // ---- contract ----
+  pricing_model:  {label:"Payment model",   q:()=>"How would you prefer to pay?", ex:()=>"A fixed price suits a clear scope, a day rate suits flexible work, and a monthly fee suits an ongoing service.", choices:["Fixed price","Day rate","Monthly fee","Not sure"]},
+  service_levels: {label:"Service levels",  q:()=>"Which service levels matter to you?", ex:f=>f.category==="facilities"?"For example: daily cleaning before 8am and issues fixed within 24 hours.":"For example: 99.9% availability, a response within 4 hours, or a monthly report."},
+  ip_ownership:   {label:"Who owns the work", q:()=>"Should we own what the supplier creates, such as designs, code or materials?", ex:()=>"", choices:["Yes, we own it","Shared use is fine","Not sure"]},
+  performance:    {label:"Supplier so far", q:f=>`How has ${hasSupplier(f)?f.supplier:"the supplier"} performed so far?`, ex:()=>"Anything to fix in the renewal is useful to know.", choices:["Very well","Okay","Some issues"]},
+  cost_centre:    {label:"Cost centre",     q:()=>"Last one: which cost centre or budget pays for this?", ex:()=>"A cost centre number or the budget owner's name is enough."}
 };
 const GOODSLIKE = f => f.demand_type==="goods" || f.demand_type==="software";
+// relevance rules: an extra question is only asked when it matters
+const REL = {
+  pd:       f => yes(f.personal_data) || yes(f.system_access),
+  techy:    f => yes(f.ict_outsourcing) || ["cloud","it-services","software","market-data","telecom"].includes(f.category),
+  ongoing:  f => yes(f.ict_outsourcing) || ["facilities","cloud","telecom","software","market-data"].includes(f.category),
+  creates:  f => ["it-services","consulting","marketing"].includes(f.category) || (f.category==="software" && /build|develop|custom/.test(userText())),
+  volume:   f => ["training","facilities","telecom","marketing"].includes(f.category),
+  subcon:   f => yes(f.personal_data) || yes(f.ict_outsourcing),
+};
 function requiredFor(route, f){
-  const g = GOODSLIKE(f), sw = f.demand_type==="software";
+  const g=GOODSLIKE(f), sw=f.demand_type==="software", on=(c,k)=>c?[].concat(k):[];
+  const risk = () => ["personal_data", ...on(REL.pd(f),"data_details")];
   switch(route){
-    case "catalogue":  return ["item","quantity","needed_by","location"];
+    case "catalogue":  return ["item","quantity","needed_by","location","cost_centre"];
     case "pcard":      return ["item","value","supplier","needed_by"];
-    case "contract":   return [...(hasSupplier(f)?[]:["supplier"]), ...(g ? ["item","quantity","value","needed_by"] : ["deliverables","value","duration","needed_by","personal_data"])];
-    case "renewal":    return ["value","duration","renewal_change","personal_data"];
-    case "quote":      return g ? ["item","quantity","value","needed_by","location",...(sw?["personal_data"]:[]),"supplier"]
-                                : ["deliverables","value","duration","needed_by","location","personal_data","supplier"];
-    case "sourcing":   return [...(g ? ["item","quantity"] : ["deliverables","duration"]),"value","needed_by","location",
-                               ...(sw||!g ? ["personal_data","ict_outsourcing"] : []),"supplier",...(hasSupplier(f)?["supplier_reason"]:[]),"budget_approved"];
-    case "contingent": return ["role","headcount","skills","duration","needed_by","location","day_rate","system_access"];
+    case "contract":   return [...on(!hasSupplier(f),"supplier"),
+                               ...(g ? ["item","quantity","value","needed_by","location"]
+                                     : ["deliverables","value","duration","needed_by","location",...risk(),"acceptance"]),"cost_centre"];
+    case "renewal":    return ["value","duration","renewal_change","performance",...risk(),...on(REL.ongoing(f),"service_levels"),"cost_centre"];
+    case "quote":      return g ? ["item","quantity","value","needed_by","location","support_needs",...on(sw,risk()),"supplier","cost_centre"]
+                                : ["deliverables","value","duration","needed_by","location",...on(REL.volume(f),"volume"),...risk(),"acceptance","pricing_model","supplier","cost_centre"];
+    case "sourcing":   return g
+      ? ["item","quantity","background","value","needed_by","location","support_needs",
+         ...on(sw,[...risk(),"ict_outsourcing","criticality",...on(REL.subcon(f),"subcontracting"),"service_levels","pricing_model"]),
+         "supplier_requirements","current_supplier","evaluation_priority","supplier",...on(hasSupplier(f),"supplier_reason"),"budget_approved","cost_centre"]
+      : ["deliverables","background","value","duration","needed_by","location",...on(REL.volume(f),"volume"),
+         ...risk(),"ict_outsourcing",...on(REL.techy(f),"criticality"),...on(REL.subcon(f),"subcontracting"),...on(REL.ongoing(f),"service_levels"),
+         ...on(REL.creates(f),"ip_ownership"),"acceptance","pricing_model","supplier_requirements","current_supplier","evaluation_priority",
+         "supplier",...on(hasSupplier(f),"supplier_reason"),"budget_approved","cost_centre"];
+    case "contingent": return ["role","deliverables","headcount","skills","duration","needed_by","location","day_rate","system_access",...on(REL.pd(f),"data_details"),"cost_centre"];
   }
   return [];
 }
@@ -315,9 +352,10 @@ function requiredFor(route, f){
    ========================================================= */
 const BLANK_FACTS = {summary:null,category:null,demand_type:null,item:null,quantity:null,value:null,value_is_estimate:false,deliverables:null,duration:null,
   needed_by:null,location:null,supplier:null,supplier_reason:null,personal_data:null,ict_outsourcing:null,critical_service:null,offshore:null,
-  budget_approved:null,decline_contract:null,role:null,headcount:null,skills:null,day_rate:null,system_access:null,renewal_change:null,wants_renewal:null};
+  budget_approved:null,decline_contract:null,background:null,acceptance:null,evaluation_priority:null,supplier_requirements:null,current_supplier:null,
+  volume:null,support_needs:null,data_details:null,criticality:null,subcontracting:null,pricing_model:null,service_levels:null,ip_ownership:null,performance:null,cost_centre:null,role:null,headcount:null,skills:null,day_rate:null,system_access:null,renewal_change:null,wants_renewal:null};
 const S = fresh();
-function fresh(){ return {msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
+function fresh(){ return {completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
 
 /* =========================================================
    5. RULES ENGINE (deterministic)
@@ -366,6 +404,8 @@ function controlsFor(route, ctr){
   if(yes(f.personal_data)||yes(f.system_access)) out.push(["w","Data protection review","The supplier will see personal or client data."]);
   if(yes(f.ict_outsourcing)||yes(f.critical_service)) out.push(["w","ICT and outsourcing assessment","The supplier runs IT or a process for us."]);
   if(yes(f.offshore)||/other country/i.test(f.location||"")) out.push(["w","Offshoring check","Work happens outside your country."]);
+  if(yes(f.subcontracting)) out.push(["w","Subcontractor check","The supplier may use subcontractors."]);
+  if(["contingent","contract","quote","sourcing","renewal"].includes(route) && /on.?site|office/i.test(f.location||"") && f.demand_type!=="goods") out.push(["i","Site access","Building access is arranged before the start."]);
   if(v!=null && v>=T.materialityMin) out.push(["w","Material spend review",`Value is ${money(T.materialityMin)} or more.`]);
   if(hasSupplier(f) && ["quote","sourcing","pcard"].includes(route) && !(PREFERRED[f.category]||[]).some(p=>p.toLowerCase()===String(f.supplier).toLowerCase()))
     out.push(["b","Non-preferred supplier",`${f.supplier} is not a preferred supplier for this category.`]);
@@ -455,7 +495,8 @@ Your job each turn:
 2. Write "reply":
    - Start with a short, natural reaction to what they said (vary it; do not start with "Got it" every time). Show you understood, using their words.
    - Where it helps, add one useful remark in plain words: an existing contract or preferred supplier for this, a typical price, or why the next question matters.
-   - Then ask about the FIRST item in still_needed that is still unknown after your update. One question at a time. Include a short, concrete example that fits their need, written into the sentence (for example "such as a current-state process map and a rollout plan").
+   - Then ask about the FIRST item in still_needed that is still unknown after your update. One question at a time; you may combine it with the second item only when they naturally belong together (for example start date and duration).
+   - If the user's answer already covers later items in still_needed, record those too so they are not asked again. Include a short, concrete example that fits their need, written into the sentence (for example "such as a current-state process map and a rollout plan").
    - 2 to 4 sentences. Warm, direct, plain English. No procurement jargon, no bullet lists, no headings.
    - Never name or decide the buying route yourself. Never ask about something not in still_needed.
 3. If nothing in still_needed is unknown after your update, set "complete" true and reply with one sentence saying you have what you need.
@@ -467,7 +508,10 @@ item, quantity (number), value (total ${CONFIG.currency}, number), value_is_esti
 location (delivery place or where the work happens), supplier (name, or "None"), supplier_reason, personal_data (true | false | "unsure"),
 ict_outsourcing (true | false | "unsure"), critical_service (bool), offshore (bool), budget_approved ("yes" | "no" | "partly"),
 role, headcount (number), skills, day_rate, system_access (true | false | "unsure"), renewal_change, wants_renewal (true if they want to renew or extend an existing contract),
-decline_contract (true if they do not want to use the existing contract supplier you asked about; if they agree, set supplier to that supplier's name).
+decline_contract (true if they do not want to use the existing contract supplier you asked about; if they agree, set supplier to that supplier's name),
+background (why it is needed now), acceptance (how success is judged), evaluation_priority, supplier_requirements, current_supplier ("None" if new),
+volume, support_needs, data_details (which data and where stored), criticality (what happens if it stops; also set critical_service true if clients or regulated activity are hit),
+subcontracting (true | false | "unsure"), pricing_model, service_levels, ip_ownership, performance (how the current supplier performed), cost_centre.
 External workers or contractors are demand_type contingent_labour.
 
 Context you may use in remarks:
@@ -500,7 +544,7 @@ function chatHistory(){
    ========================================================= */
 async function handleUser(text){
   text=text.trim(); if(!text||S.busy) return;
-  if(S.sd && /^(make it|shorten|shorter|add more|rewrite)/i.test(text) && aiReady()) return refineSD(text);
+  if(S.sd && /^(make it|shorten|shorter|add more|rewrite|reword)|\b(summary|description|document)\b/i.test(text) && aiReady()) return refineSD(text);
   const asked=S.lastAsked; if(asked) S.asked[asked]=(S.asked[asked]||0)+1;
   S.msgs.push({role:"user",text}); S.choices=[]; S.busy=true; render();
   let reply=null, choices=[], complete=false, note=null;
@@ -528,9 +572,12 @@ async function handleUser(text){
   if(note) S.msgs.push({role:"assistant",kind:"sys",text:note});
 
   if(!S.missing.length){
-    S.msgs.push({role:"assistant",text: complete && reply ? reply : wrapUp()});
+    const lead = S.completed ? "Updated. Here's the revised summary." : `${complete && reply ? reply.replace(/\s*$/,"") : wrapUp()} Below is the route I recommend and the full summary of your request. Please check it before you submit.`;
+    S.msgs.push({role:"assistant",text:lead});
     showRecommendation();
-    S.lastAsked=null;
+    S.lastAsked=null; S.completed=true;
+    render();
+    await buildDoc();
   } else {
     const next=S.missing[0];
     const aiAskedOk = reply && !complete;
@@ -557,7 +604,7 @@ function mergeFacts(nf){
 function giveUp(k){
   const f=S.f;
   if(k==="value"){ f.value=defaultEstimate(); f.value_is_estimate=true; return; }
-  if(["personal_data","ict_outsourcing","system_access"].includes(k)){ f[k]="unsure"; return; }
+  if(["personal_data","ict_outsourcing","system_access","subcontracting"].includes(k)){ f[k]="unsure"; return; }
   if(k==="supplier"){ f.supplier="None"; return; }
   if(k==="need") return;
   f[k]="Not given";
@@ -587,12 +634,14 @@ function offlineRead(text, asked){
   Object.assign(f, guessExtras(text, asked));
   if(asked && asked!=="need" && !known(f[asked])) f[asked]=readAnswer(asked, text);
 }
-const CLOSED=["value","quantity","headcount","personal_data","ict_outsourcing","system_access","budget_approved"];
+const CLOSED=["value","quantity","headcount","personal_data","ict_outsourcing","system_access","budget_approved","subcontracting"];
 function readAnswer(k, text){
   const t=text.trim().toLowerCase();
   if(k==="value"){ const v=parseMoney(text); if(v!=null){S.f.value_is_estimate=false;return v;} if(/know|sure|idea|estimate/.test(t)){S.f.value_is_estimate=true;return defaultEstimate();} return null; }
   if(k==="quantity"||k==="headcount"){ const n=t.match(/\d+/); return n?+n[0]:(/more/.test(t)?"4+":null); }
-  if(["personal_data","ict_outsourcing","system_access"].includes(k)) return /^(y|yes|yeah|they will|it will)/.test(t)||/\bwill\b(?!.*\bnot\b)/.test(t)?true:/^(n|no|none|nope)\b|not /.test(t)?false:"unsure";
+  if(k==="criticality"){ if(/client|customer|regulat|payment|trading|can.?t|cannot|outage|down|serious/.test(t) && !/nothing serious|no impact|minor/.test(t)) S.f.critical_service=true; return text.trim(); }
+  if(k==="current_supplier" && /^(no|none|new|it.?s new)/.test(t)) return "None";
+  if(["personal_data","ict_outsourcing","system_access","subcontracting"].includes(k)) return /^(y|yes|yeah|they will|it will)/.test(t)||/\bwill\b(?!.*\bnot\b)/.test(t)?true:/^(n|no|none|nope)\b|not /.test(t)?false:"unsure";
   if(k==="budget_approved") return /^y/.test(t)?"yes":/part/.test(t)?"partly":"no";
   if(k==="supplier"){
     if(S.det&&S.det.route==="contract"&&S.det.contract){ if(/^(y|yes|sure|ok|happy|fine)/.test(t)) return S.det.contract.supplier; if(/^(no|nope|not)/.test(t)){ S.f.decline_contract=true; const named=ALL_SUPPLIERS.find(x=>t.includes(x.toLowerCase())); return named||null; } }
@@ -603,7 +652,7 @@ function readAnswer(k, text){
 function guessExtras(text, asked){
   const t=text.toLowerCase(), out={};
   const d=t.match(/\b\d+\s*(?:-|–|to)?\s*\d*\s*(?:months?|weeks?|years?)\b|\b(?:under|over)\s+(?:a\s+)?\d*\s*(?:months?|year)/);
-  if(d && !known(S.f.duration)) out.duration=d[0];
+  if(d && !known(S.f.duration) && (!asked || asked==="duration" || asked==="need")) out.duration=d[0];
   if(asked!=="day_rate" && asked!=="quantity" && asked!=="headcount"){ const v=parseMoney(text); if(v!=null && !known(S.f.value)){ out.value=v; out.value_is_estimate=false; } }
   if(/other country|offshore|nearshore/.test(t)) out.offshore=true;
   return out;
@@ -647,47 +696,115 @@ function offlineQuestion(k, prevRoute){
    8. RECOMMENDATION, DESCRIPTION, SUBMIT
    ========================================================= */
 function showRecommendation(){
-  const D=S.det, key=D.route+"|"+JSON.stringify(S.f);
-  if(key===S.lastRecKey) return; S.lastRecKey=key; S.override="";
-  S.msgs.push({role:"assistant",kind:"rec",rec:{...D,f:{...S.f}}});
+  const D=S.det, snap={...D,f:{...S.f}};
+  const last=[...S.msgs].reverse().find(m=>m.kind==="rec");
+  if(last && last.rec.route===D.route){ last.rec=snap; return; }   // same route: refresh the card in place
+  S.override=""; S.msgs.push({role:"assistant",kind:"rec",rec:snap});
 }
-async function draftSD(){
-  if(S.busy) return; S.busy=true; render();
-  const doc=CHANNELS[S.det.route].doc||"Service description";
-  try{
-    if(aiReady()){
+
+/* ---------- holistic service description ---------- */
+const DOC_SYSTEM = (doc) => `You write the "${doc}" for a corporate procurement request. It goes to the sourcing, risk and contract teams, so it must be complete and stand on its own.
+Use every fact and every detail from the conversation. Do not invent names, numbers, dates or facts. Where something important is unknown or "Not given", list it under open_points.
+You may propose sensible milestones and out-of-scope items that follow from the facts; keep them modest and realistic.
+
+"summary": ONE holistic paragraph of 120 to 220 words in plain English that brings everything together: what is needed and why, scope and deliverables,
+timing and location, volume and budget, how success is judged, the risk profile (data, systems, criticality, subcontracting, offshoring), the commercial set-up
+(payment model, ownership of work, budget status, cost centre, supplier) and the recommended buying route. Someone who reads only this paragraph must understand the whole request.
+All other sections: short bullet points, plain language, no marketing words, no jargon.
+risk_profile: one bullet each for personal or client data, system access or IT outsourcing, criticality, offshoring, subcontracting. Only those that apply, and say "No" plainly where the user said no.
+commercials: estimated value, payment model, budget approval, cost centre, ownership of work, contract term, supplier (named or preferred, and why).
+For a "Request summary" (simple purchases) keep it short: a 40 to 80 word summary and only the sections that matter.
+For a "Role profile" use deliverables for responsibilities and supplier_requirements for required skills.
+Return JSON only:
+{"title":"","summary":"","background":"","objectives":[""],"scope_in":[""],"scope_out":[""],"deliverables":[""],"milestones":[""],"timeline":"","location":"","volumes":"",
+ "service_levels":[""],"acceptance_criteria":[""],"supplier_requirements":[""],"risk_profile":[""],"commercials":[""],"evaluation_criteria":[""],"open_points":[""]}`;
+
+async function buildDoc(){
+  const key=JSON.stringify(S.f)+S.det.route;
+  if(S.sd && S.docKey===key){ S.msgs.push({role:"assistant",kind:"sd"}); return; }
+  const doc=CHANNELS[S.det.route].doc;
+  let d=null;
+  if(aiReady()){
+    try{
       const convo=S.msgs.filter(m=>!m.kind).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
-      S.sd=await callLLM(SD_SYSTEM(doc),[{role:"user",content:`Conversation:\n${convo}\n\nFacts: ${JSON.stringify(S.f)}`}]);
-    } else S.sd=offlineSD(doc);
-    S.sd._doc=doc;
-    S.msgs.push({role:"assistant",text:`Here's a first draft of the ${doc.toLowerCase()}. Click any text to change it, or tell me what to adjust, for example "make it shorter".`});
-    S.msgs.push({role:"assistant",kind:"sd"});
-  }catch(e){ S.sd=offlineSD(doc); S.sd._doc=doc; S.msgs.push({role:"assistant",text:`The AI couldn't write it just now, so here's a draft from what you told me.`}); S.msgs.push({role:"assistant",kind:"sd"}); }
-  S.busy=false; render();
+      d=await callLLM(DOC_SYSTEM(doc),[{role:"user",content:`Conversation:\n${convo}\n\nFacts: ${JSON.stringify(cleanFacts())}\nCategory: ${catById(S.f.category).name}\n`+
+        `Recommended route: ${CHANNELS[S.det.route].name}. ${S.det.why}\nChecks: ${S.det.controls.map(c=>c[1]).join(", ")||"none"}\nExisting contract: ${S.det.contract?`${S.det.contract.title} with ${S.det.contract.supplier}`:"none"}`}]);
+      if(!d || !d.summary) throw new Error("empty");
+    }catch(e){ d=null; S.msgs.push({role:"assistant",kind:"sys",text:"The AI couldn't write the summary just now, so it's built from your answers."}); }
+  }
+  S.sd = d || offlineDoc(doc); S.sd._doc=doc; S.docKey=key;
+  S.msgs.push({role:"assistant",kind:"sd"});
 }
-const SD_SYSTEM = doc => `You write a "${doc}" for a corporate procurement team, based on a conversation with a business colleague.
-Plain, direct English, short bullet points, no marketing words. Do not invent names, numbers or dates; put unknowns under "open_points".
-For a role profile, use scope_in for responsibilities and requirements for skills.
-Return JSON only: {"title":"","objective":"2-3 sentences","scope_in":[""],"scope_out":[""],"deliverables":[""],"requirements":[""],"timeline":"","location":"","acceptance_criteria":[""],"evaluation_criteria":[""],"open_points":[""]}`;
+const cleanFacts = () => Object.fromEntries(Object.entries(S.f).filter(([k,v])=>known(v)&&k!=="decline_contract").map(([k,v])=>[k,v===true?"yes":v===false?"no":v]));
+
 async function refineSD(text){
   S.msgs.push({role:"user",text}); S.busy=true; render();
-  try{ const d=await callLLM(SD_SYSTEM(S.sd._doc),[{role:"user",content:`Current draft: ${JSON.stringify(S.sd)}\nChange request: ${text}\nReturn the full updated JSON.`}]); d._doc=S.sd._doc; S.sd=d;
+  try{ const d=await callLLM(DOC_SYSTEM(S.sd._doc),[{role:"user",content:`Current document: ${JSON.stringify(S.sd)}\nChange request: ${text}\nReturn the full updated JSON. Keep the summary holistic.`}]); d._doc=S.sd._doc; S.sd=d;
        S.msgs.push({role:"assistant",text:"Done, here's the updated version."}); S.msgs.push({role:"assistant",kind:"sd"}); }
   catch(e){ S.msgs.push({role:"assistant",kind:"sys",text:"The AI couldn't update it just now. You can edit the text directly."}); }
   S.busy=false; render();
 }
-function offlineSD(doc){
-  const f=S.f, c=catById(f.category);
-  return {title:`${c.name}: ${(f.summary||"").slice(0,70)}`, objective:f.summary||"",
-    scope_in:[f.deliverables||f.role||f.item||"To be confirmed"].filter(Boolean), scope_out:["Anything not listed in scope"],
-    deliverables:[f.deliverables||f.item||"To be confirmed"], requirements:[f.skills||"Supplier passes standard onboarding and risk checks"],
-    timeline:[f.needed_by&&`Start ${f.needed_by}`,f.duration&&`for ${f.duration}`].filter(Boolean).join(", ")||"To be confirmed", location:f.location||"To be confirmed",
-    acceptance_criteria:["Deliverables accepted in writing by the requester"], evaluation_criteria:["Price","Quality of approach","Relevant experience"],
-    open_points:aiReady()?[]:["Drafted without AI. Add a key for a fuller draft."]};
+
+// built from the answers alone (no AI)
+function offlineDoc(doc){
+  const f=S.f, D=S.det, ch=CHANNELS[D.route], c=catById(f.category);
+  const g=k=>known(f[k])&&f[k]!=="Not given"?f[k]:null, lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1), cap=x=>String(x).charAt(0).toUpperCase()+String(x).slice(1);
+  const split=x=>x?String(x).split(/;|\n|,\s*(?:and\s+)?|\s+and\s+/).map(t=>t.trim()).filter(Boolean).map(cap):[];
+  const P=[];
+  P.push(`${cap(String(g("summary")||g("item")||c.name).replace(/\.$/,""))}.`);
+  if(g("background")) P.push(`It is needed because ${lf(g("background")).replace(/\.$/,"")}.`);
+  if(f.demand_type==="contingent_labour") P.push(`We need ${g("headcount")||1} ${g("role")||"external worker"}${(+g("headcount")||1)>1?"s":""}${g("skills")?` with ${g("skills")}`:""}${g("deliverables")?`, working on ${lf(g("deliverables"))}`:""}.`);
+  else if(g("deliverables")) P.push(`The supplier is expected to deliver ${lf(g("deliverables")).replace(/\.$/,"")}.`);
+  else if(g("quantity")) P.push(f.demand_type==="software"?`It is for ${g("quantity")} users.`:`The order is ${g("quantity")} × ${g("item")||"items"}.`);
+  const loc=g("location"), onsite=loc&&/^on.?site/i.test(loc);
+  if(GOODSLIKE(f)){ if(g("needed_by")||loc) P.push(`${g("needed_by")?`It is needed by ${g("needed_by")}`:"It is needed"}${loc?(onsite?", delivered on site":`, delivered to ${loc}`):""}${g("support_needs")?`, with ${lf(g("support_needs"))}`:""}.`); }
+  else { const when=[g("needed_by")&&`starts ${g("needed_by")}`, g("duration")&&`runs for ${g("duration")}`].filter(Boolean).join(" and ");
+    if(when||loc) P.push(`The work ${when||"location is"}${loc?`${when?", ":" "}${onsite?"on site":lf(loc)}`:""}.`); }
+  if(g("volume")) P.push(`Volume: ${g("volume")}.`);
+  if(known(f.value)) P.push(`The ${f.value_is_estimate?"estimated ":""}budget is ${money(Number(f.value))}${g("pricing_model")&&!/not sure/i.test(g("pricing_model"))?`, paid as ${lf(g("pricing_model"))}`:""}${g("budget_approved")?`, and the budget is ${g("budget_approved")==="yes"?"approved":g("budget_approved")==="partly"?"partly approved":"not yet approved"}`:""}.`);
+  if(g("acceptance")) P.push(`Success means ${lf(g("acceptance")).replace(/\.$/,"")}.`);
+  const risk=[];
+  if(known(f.personal_data)) risk.push(yes(f.personal_data)?`The supplier will handle personal or client data${g("data_details")?` (${g("data_details")})`:""}.`:f.personal_data===false?"No personal or client data is involved.":"Whether personal data is involved is still to be confirmed.");
+  if(known(f.system_access)) risk.push(yes(f.system_access)?"They will need access to our systems.":"No system access is needed.");
+  if(known(f.ict_outsourcing)) risk.push(yes(f.ict_outsourcing)?"The supplier will run or host IT or a process for us.":"No IT or process is outsourced.");
+  if(g("criticality")) risk.push(`If it stopped: ${lf(g("criticality")).replace(/\.$/,"")}${yes(f.critical_service)?", so it is treated as critical":""}.`);
+  if(known(f.subcontracting)) risk.push(yes(f.subcontracting)?"Subcontractors may be used.":"No subcontractors are expected.");
+  if(yes(f.offshore)||/other country/i.test(f.location||"")) risk.push("Work happens outside the requester's country.");
+  P.push(...risk);
+  if(hasSupplier(f)) P.push(`The requested supplier is ${f.supplier}${g("supplier_reason")?`, because ${lf(g("supplier_reason")).replace(/\.$/,"")}`:""}.`);
+  else if((PREFERRED[f.category]||[]).length && !["catalogue","contingent"].includes(D.route)) P.push(`Preferred suppliers for this category are ${PREFERRED[f.category].join(" and ")}.`);
+  if(g("current_supplier")) P.push(g("current_supplier")==="None"?"This is a new need, not a replacement.":`Today this is provided by ${g("current_supplier")}.`);
+  if(g("performance")) P.push(`The current supplier has performed: ${lf(g("performance"))}.`);
+  if(g("cost_centre")) P.push(`Cost centre: ${g("cost_centre")}.`);
+  P.push(`Recommended route: ${ch.name}. ${D.why}`);
+  const simple=["catalogue","pcard"].includes(D.route);
+  const out={title:`${c.name}: ${cap(String(g("summary")||g("item")||g("role")||"").replace(/\.$/,"")).slice(0,80)}`, summary:P.join(" ")};
+  if(simple){ out.commercials=[known(f.value)&&`Value: ${money(Number(f.value))}${f.value_is_estimate?" (estimate)":""}`, g("cost_centre")&&`Cost centre: ${g("cost_centre")}`, hasSupplier(f)&&`Supplier: ${f.supplier}`].filter(Boolean); return out; }
+  Object.assign(out,{
+    background:g("background")||"",
+    scope_in: f.demand_type==="contingent_labour"?split(g("deliverables")):split(g("deliverables")||g("item")),
+    scope_out:["Anything not listed in scope"],
+    deliverables: split(g("deliverables")||(g("item")&&`${g("quantity")||""} ${g("item")}`.trim())),
+    timeline:[g("needed_by")&&`Start: ${g("needed_by")}`, g("duration")&&`Duration: ${g("duration")}`].filter(Boolean).join(". "),
+    location:g("location")||"", volumes:g("volume")||(g("quantity")?String(g("quantity")):""),
+    service_levels:split(g("service_levels")), acceptance_criteria:split(g("acceptance")),
+    supplier_requirements:[...split(g("supplier_requirements")),...split(g("skills"))],
+    risk_profile:risk,
+    commercials:[known(f.value)&&`Estimated value: ${money(Number(f.value))}${f.value_is_estimate?" (estimate)":""}`, g("pricing_model")&&`Payment model: ${g("pricing_model")}`,
+      g("day_rate")&&`Rate: ${g("day_rate")}`, g("budget_approved")&&`Budget approved: ${g("budget_approved")}`, g("cost_centre")&&`Cost centre: ${g("cost_centre")}`,
+      g("ip_ownership")&&`Ownership of work: ${g("ip_ownership")}`, g("duration")&&`Contract term: ${g("duration")}`,
+      hasSupplier(f)?`Supplier: ${f.supplier}${g("supplier_reason")?` (${g("supplier_reason")})`:""}`:`Supplier: open, preferred are ${(PREFERRED[f.category]||["none listed"]).join(", ")}`].filter(Boolean),
+    evaluation_criteria: g("evaluation_priority")?[`Main priority: ${g("evaluation_priority")}`,"Relevant experience","Quality of approach","Price"].filter((x,i,a)=>a.indexOf(x)===i):[],
+    open_points:[...Object.entries(f).filter(([k,v])=>v==="Not given"&&FACTS[k]).map(([k])=>`${FACTS[k].label}: not given`), ...(aiReady()?[]:["Built without AI from your answers. With AI, the wording is fuller."])]
+  });
+  return out;
 }
+
 function submit(){
+  if(!S.sd) return;
   const id="REQ-"+Math.floor(1e5+Math.random()*9e5), ch=CHANNELS[S.override||S.det.route].name;
-  S.msgs.push({role:"assistant",text:`Done. Request **${id}** is created and routed as **${ch}**. You'll get an update at each step.\n(Prototype: nothing was sent anywhere.)`});
+  S.submitted=id;
+  S.msgs.push({role:"assistant",text:`Submitted. Request **${id}** goes to **${ch}** with the summary attached. You'll get an update at each step.\n(Prototype: nothing was sent anywhere.)`});
   render();
 }
 function payload(){
@@ -757,8 +874,7 @@ function recHTML(R){
     <div class="sec"><h4>What happens next</h4><ol>${R.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol></div>
     ${R.controls.length?`<div class="sec"><h4>Checks along the way</h4>${R.controls.map(([k,t,d])=>`<div class="chk"><i class="${k}">✓</i><div>${esc(t)}<br><span>${esc(d)}</span></div></div>`).join("")}</div>`:`<div class="sec"><h4>Checks along the way</h4>None. Standard items go straight through.</div>`}
     <div class="acts">
-      ${c.doc?`<button class="btn btn-a" data-act="sd">${S.sd?"Redraft":"Write"} the ${c.doc.toLowerCase()}</button>`:""}
-      <button class="btn btn-p" data-act="submit">Submit request</button>
+      <span class="muted">The full summary follows below.</span>
       <button class="lnk" data-act="more">${S.showMore?"Fewer options":"More options"}</button>
     </div>
     ${S.showMore?`<div class="more">
@@ -769,12 +885,16 @@ function recHTML(R){
     </div>`:""}
   </div>`;
 }
-const SD_SEC=[["objective","Objective",0],["scope_in","In scope",1],["scope_out","Out of scope",1],["deliverables","Deliverables",1],["requirements","Requirements",1],["timeline","Timeline",0],["location","Location",0],["acceptance_criteria","Acceptance criteria",1],["evaluation_criteria","How offers are compared",1],["open_points","Open points",1]];
+const SD_SEC=[["background","Background and need",0],["objectives","Objectives",1],["scope_in","In scope",1],["scope_out","Out of scope",1],["deliverables","Deliverables",1],["milestones","Milestones",1],
+  ["timeline","Timeline",0],["location","Location",0],["volumes","Volumes",0],["service_levels","Service levels",1],["acceptance_criteria","Acceptance criteria",1],["supplier_requirements","Supplier requirements",1],
+  ["risk_profile","Risk profile",1],["commercials","Commercial and contract",1],["evaluation_criteria","How offers are compared",1],["open_points","Open points",1]];
 function sdHTML(){
-  const d=S.sd;
-  return `<div class="card sd"><div class="sd-h"><small>${esc(d._doc||"Service description")} · click to edit</small><div class="t" contenteditable data-sd="title">${esc(d.title||"Untitled")}</div></div>
-    ${SD_SEC.filter(([k])=>d[k]&&(Array.isArray(d[k])?d[k].filter(Boolean).length:String(d[k]).trim())).map(([k,l,list])=>`<div class="sec"><h4>${l}</h4>${list?`<ul contenteditable data-sd="${k}" data-list="1">${d[k].filter(Boolean).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<div contenteditable data-sd="${k}">${esc(d[k])}</div>`}</div>`).join("")}
-    <div class="acts"><button class="btn btn-g" data-act="copy">Copy text</button><button class="btn btn-p" data-act="submit">Submit request</button></div></div>`;
+  const d=S.sd, has=k=>d[k]&&(Array.isArray(d[k])?d[k].filter(Boolean).length:String(d[k]).trim());
+  return `<div class="card sd"><div class="sd-h"><small>${esc(d._doc||"Service description")} · click any text to edit</small><div class="t" contenteditable data-sd="title">${esc(d.title||"Untitled")}</div></div>
+    ${has("summary")?`<div class="sec lead"><h4>Summary</h4><div contenteditable data-sd="summary">${esc(d.summary)}</div></div>`:""}
+    ${SD_SEC.filter(([k])=>has(k)).map(([k,l,list])=>`<div class="sec"><h4>${l}</h4>${list?`<ul contenteditable data-sd="${k}" data-list="1">${[].concat(d[k]).filter(Boolean).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<div contenteditable data-sd="${k}">${esc(d[k])}</div>`}</div>`).join("")}
+    <div class="acts">${S.submitted?`<span class="muted">Submitted as ${esc(S.submitted)}</span>`:`<button class="btn btn-p" data-act="submit">Looks right, submit</button>`}<button class="btn btn-g" data-act="copy">Copy text</button>
+      <span class="muted">Something to change? Just tell me.</span></div></div>`;
 }
 function bind(){
   const o=$("#ovr"); if(o) o.onchange=e=>{S.override=e.target.value;render();};
@@ -786,7 +906,7 @@ function bind(){
   });
   document.querySelectorAll("[data-sd]").forEach(el=>el.addEventListener("blur",()=>{const k=el.dataset.sd; S.sd[k]=el.dataset.list?[...el.querySelectorAll("li")].map(li=>li.textContent.trim()).filter(Boolean):el.textContent.trim();}));
 }
-function sdText(){ const d=S.sd; return [d.title,"",...SD_SEC.filter(([k])=>d[k]).map(([k,l,list])=>`${l}\n${list?d[k].map(x=>"- "+x).join("\n"):d[k]}\n`)].join("\n"); }
+function sdText(){ const d=S.sd; return [d.title,"",d.summary||"","",...SD_SEC.filter(([k])=>d[k]).map(([k,l,list])=>`${l}\n${list?d[k].map(x=>"- "+x).join("\n"):d[k]}\n`)].join("\n"); }
 
 function renderSide(){
   const f=S.f, D=S.det;

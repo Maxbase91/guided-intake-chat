@@ -2,6 +2,8 @@
 
 A conversational procurement intake prototype. The user describes a need in plain language. Fixed rules pick one of seven buying routes (catalogue, card purchase, contract call-off, contract renewal, quick quote, sourcing project, external workers) and define exactly which details each route needs. The AI runs the conversation: one question at a time, with a concrete example, reading the answers. It never decides the route.
 
+Sourcing, risk and contract details (background, acceptance criteria, payment model, service levels, ownership of work, data details, criticality, subcontracting, supplier requirements, current provider, evaluation priority, budget approval, cost centre) are asked only when relevant to the route and the answers so far. Before submission the chat writes a holistic service description: one summary paragraph covering everything, plus structured sections including a risk profile and commercial terms.
+
 All reference data (catalogue, contracts, preferred suppliers) is mock data. Use dummy requests only.
 
 ## How it is built
