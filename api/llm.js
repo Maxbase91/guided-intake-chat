@@ -279,8 +279,10 @@ module.exports = async (req, res) => {
     // Mistral detail: each model on its own, with Mistral's raw reply (no secrets)
     let mistralDetail = null;
     if (process.env.MISTRAL_API_KEY && q.check === "mistral") {
+      if (q.list) { try { const r = await fetch("https://api.mistral.ai/v1/models", { headers: { Authorization: `Bearer ${process.env.MISTRAL_API_KEY}` } }); const d = await r.json(); return res.status(200).json({ models: (d.data || []).filter((m) => m.capabilities?.completion_chat !== false).map((m) => m.id) }); } catch (e) { return res.status(200).json({ error: String(e) }); } }
       mistralDetail = [];
-      for (const model of ["mistral-small-latest", "mistral-medium-latest", "open-mistral-nemo", "ministral-8b-latest"]) {
+      const list = q.models ? String(q.models).split(",").map((x) => x.trim()).filter(Boolean).slice(0, 10) : ["mistral-small-latest", "mistral-medium-latest", "open-mistral-nemo", "ministral-8b-latest"];
+      for (const model of list) {
         await sleep(1500);
         const r = await fetch("https://api.mistral.ai/v1/chat/completions", { method: "POST", signal: AbortSignal.timeout(15000),
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.MISTRAL_API_KEY}` },
