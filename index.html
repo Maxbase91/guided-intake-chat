@@ -570,6 +570,11 @@ function chatHistory(){
    ========================================================= */
 async function handleUser(text){
   text=text.trim(); if(!text||S.busy) return;
+  try{ await handleTurn(text); }
+  catch(e){ console.error(e); S.msgs.push({role:"assistant",kind:"sys",text:"Something went wrong on my side. Please send that again."}); }
+  finally{ S.busy=false; render(); }
+}
+async function handleTurn(text){
   if(S.sd && /^(make it|shorten|shorter|add more|rewrite|reword)|\b(summary|description|document)\b/i.test(text) && aiReady()) return refineSD(text);
   const asked=S.lastAsked; if(asked) S.asked[asked]=(S.asked[asked]||0)+1;
   S.msgs.push({role:"user",text}); S.choices=[]; S.busy=true; render();
@@ -603,7 +608,8 @@ async function handleUser(text){
     showRecommendation();
     S.lastAsked=null; S.completed=true;
     render();
-    await buildDoc();
+    try{ await buildDoc(); }
+    catch(e){ console.error(e); S.msgs.push({role:"assistant",kind:"sys",text:"Something went wrong while writing the documents. Please tell me to try again."}); }
   } else {
     let next=S.missing[0];
     const aiAskedOk = reply && !complete && aiAsking && S.missing.slice(0,2).includes(aiAsking);
@@ -617,9 +623,20 @@ async function handleUser(text){
   S.busy=false; render();
 }
 
+const BOOL_KEYS=["personal_data","ict_outsourcing","critical_service","offshore","system_access","subcontracting","wants_renewal","decline_contract","contract_ok","value_is_estimate"];
+const NUM_KEYS=["value","quantity","headcount"];
+function normFact(k,v){
+  if(Array.isArray(v)) v=v.filter(x=>x!==null&&x!=="").map(x=>typeof x==="object"?Object.values(x).join(" "):String(x)).join("; ");
+  else if(v && typeof v==="object") v=Object.values(v).filter(Boolean).join(", ");
+  if(BOOL_KEYS.includes(k)){ if(typeof v==="boolean") return v; const t=String(v).toLowerCase(); return /not sure|unsure|unknown|maybe/.test(t)?"unsure":/^(y|true)/.test(t)?true:/^(n|false)/.test(t)?false:"unsure"; }
+  if(NUM_KEYS.includes(k)){ if(typeof v==="number") return v; const n=parseFloat(String(v).replace(/[^\d.]/g,"")); return isNaN(n)?String(v):n; }
+  if(k==="budget_approved" && typeof v==="boolean") return v?"yes":"no";
+  return typeof v==="string"?v:String(v);
+}
 function mergeFacts(nf){
   for(const k of Object.keys(BLANK_FACTS)){
-    const v=nf[k]; if(v===null||v===undefined||v==="") continue;
+    let v=nf[k]; if(v===null||v===undefined||v==="") continue;
+    v=normFact(k,v); if(v===""||v===null) continue;
     if(k==="value"){ const n=Number(String(v).replace(/[^\d.]/g,"")); if(n) S.f.value=n; continue; }
     S.f[k]=v;
   }
@@ -884,7 +901,7 @@ function showRecommendation(){
 // summary paragraph built from the answers alone (no AI)
 function offlineSummary(){
   const f=S.f, D=S.det, ch=CHANNELS[D.route], c=catById(f.category);
-  const g=k=>known(f[k])&&f[k]!=="Not given"?f[k]:null, lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1), cap=x=>String(x).charAt(0).toUpperCase()+String(x).slice(1);
+  const g=k=>known(f[k])&&f[k]!=="Not given"?(NUM_KEYS.includes(k)||typeof f[k]==="boolean"?f[k]:String(f[k])):null, lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1), cap=x=>String(x).charAt(0).toUpperCase()+String(x).slice(1);
   const split=x=>x?String(x).split(/;|\n|,\s*(?:and\s+)?|\s+and\s+/).map(t=>t.trim()).filter(Boolean).map(cap):[];
   const P=[];
   P.push(`${cap(String(g("summary")||g("item")||c.name).replace(/\.$/,""))}.`);
@@ -923,7 +940,7 @@ function offlineSummary(){
 // full business requirements document built from the answers alone (no AI); the AI version is merged on top
 function offlineBRD(risk){
   const f=S.f, D=S.det, route=D.route, c=catById(f.category);
-  const g=k=>known(f[k])&&f[k]!=="Not given"&&f[k]!=="unsure"?f[k]:null, cap=cap1, lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1);
+  const g=k=>known(f[k])&&f[k]!=="Not given"&&f[k]!=="unsure"?(NUM_KEYS.includes(k)||typeof f[k]==="boolean"?f[k]:String(f[k])):null, cap=cap1, lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1);
   const split=x=>x?String(x).split(/;|\n|,\s*(?:and\s+)?|\s+and\s+/).map(t=>t.trim().replace(/\.$/,"")).filter(Boolean).map(cap):[];
   const R=[], req=(type,text,priority="Must")=>R.push({type,text,priority});
   const goods=GOODSLIKE(f), cont=f.demand_type==="contingent_labour";
