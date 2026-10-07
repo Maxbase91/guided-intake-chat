@@ -592,7 +592,7 @@ function computeQuality(aiRemarks){
   if(f.value_is_estimate && !["catalogue"].includes(route)) pts.push({lvl:"info",text:`The budget of ${money(Number(f.value))} is an estimate.`});
   if(route==="sourcing" && f.budget_approved && f.budget_approved!=="yes") pts.push({lvl:"warn",text:"Budget not yet approved. Sourcing can only start once it is."});
   if(known(f.needed_by) && !S.flags.some(x=>x.fact==="needed_by")){ const d=parseWhen(f.needed_by); if(d){ const days=(d-new Date())/864e5; if(days<(LEAD_DAYS[route]||0)) pts.push({lvl:"info",text:`Tight timeline: ${CHANNELS[route].name.toLowerCase()} usually takes ${CHANNELS[route].days} working days.`}); } }
-  (aiRemarks||[]).filter(x=>typeof x==="string"&&x.trim()).slice(0,2).forEach(x=>pts.push({lvl:"info",text:x.trim().replace(/\.?$/,".")}));
+  (aiRemarks||[]).filter(x=>typeof x==="string"&&x.trim()&&!/^(none|n\/a|no (issues|concerns|remarks)|nothing)\b/i.test(x.trim())).slice(0,2).forEach(x=>pts.push({lvl:"info",text:x.trim().replace(/\.?$/,".")}));
   const answered=req.filter(k=>known(f[k])&&f[k]!=="Not given"&&f[k]!=="unsure").length, complete=req.length?Math.round(answered/req.length*100):100;
   const warn=pts.filter(p=>p.lvl==="warn").length, info=pts.filter(p=>p.lvl==="info").length;
   const score=Math.max(35,Math.min(100,100-15*warn-5*info-Math.round((100-complete)/2)));
