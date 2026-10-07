@@ -405,9 +405,9 @@ function requiredFor(route, f){
     case "quote":      return g ? ["item","quantity","needed_by",...on(!sw,"location"),"value","supplier",...on(sw,data())]
                                 : ["deliverables","background",...on(REL.volume(f),"volume"),"needed_by","value","supplier",...data()];
     case "sourcing":   return g
-      ? ["item","quantity","must_haves","background",...on(sw,"current_solution"),"needed_by",...on(!sw,"location"),"value","supplier",...on(hasSupplier(f),"supplier_reason"),"budget_approved",
+      ? ["item","quantity","must_haves","background",...on(sw,"current_solution"),...on(!S.asked.background,"impact_delay"),"needed_by",...on(!sw,"location"),"value","supplier",...on(hasSupplier(f),"supplier_reason"),"budget_approved",
          ...on(sw,[...data(),...ict()])]
-      : ["deliverables","background","current_solution",...on(REL.volume(f),"volume"),"needed_by","duration","value","supplier",...on(hasSupplier(f),"supplier_reason"),"budget_approved",
+      : ["deliverables","background","current_solution",...on(!S.asked.background,"impact_delay"),...on(REL.volume(f),"volume"),"needed_by","duration","value","supplier",...on(hasSupplier(f),"supplier_reason"),"budget_approved",
          ...data(),...ict(),"acceptance"];
     case "contingent": return ["role","headcount","skills","deliverables","current_solution","needed_by","duration","location","day_rate","system_access",...on(REL.pd(f),"data_details")];
   }
@@ -529,7 +529,7 @@ function techFromRules(f){
 }
 function ictType(f){
   const t=userText()+" "+[f.item,f.deliverables,f.skills,f.role,f.summary].filter(Boolean).join(" ").toLowerCase(), has=re=>re.test(t);
-  if(has(/\bsaas\b|software as a service|cloud[- ]based|subscription|\bhosted\b/) && (f.category==="software"||has(/software|tool|system|platform|application/))) return "Cloud services: SaaS";
+  if((has(/\bsaas\b|software as a service|cloud[- ]based|subscription|\bhosted\b|host and run|hosts? (?:it|and run)/) || (f.category==="software" && yes(f.ict_outsourcing))) && (f.category==="software"||has(/software|tool|system|platform|application/))) return "Cloud services: SaaS";
   if(has(/\bpaas\b|platform as a service/)) return "Cloud services: PaaS";
   if(has(/\biaas\b|infrastructure as a service/)) return "Cloud services: IaaS";
   if(f.category==="cloud") return has(/data cent(?:re|er)|colocation|on[- ]prem/)?"ICT facilities and hosting (excluding cloud)":"Cloud services: IaaS";
@@ -1233,9 +1233,9 @@ const DESC_SECTIONS=[["summary","What it is"],["audience","Who it is for"],["pro
 const DESC_LISTS=["capabilities","benefits"];
 const CITIES=PLACES.split("|").slice(0,PLACES.split("|").indexOf("Jaipur")+1);
 const MONTHS_RE="(?:January|February|March|April|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)";
-const AMOUNT_RE="(?:€|EUR\\s?)?\\d[\\d,.]*\\s*(?:k|m|bn|million|thousand)?\\s*(?:€|EUR|euros?)?";
+const AMOUNT_RE="(?:€|EUR\\s?)?\\d(?:[\\d,.]*\\d)?(?:\\s*(?:k|m|bn|million|thousand)\\b)?(?:\\s*(?:€|EUR|euros?)\\b)?";
 const SCRUB={
-  money:/€|£|\$\s?\d|\bEUR\b|\b\d+(?:[.,]\d+)?\s*(?:k|m|bn|million|thousand)\b|\bbudget\w*\b|\bcost cent(?:re|er)s?\b|\bbudget approval\b|\bday rates?\b/i,
+  money:/€|£|\$\s?\d|\bEUR\b|\b\d+(?:[.,]\d+)?\s*(?:k|m|bn|million|thousand)\b|\bbudget\w*\b|\bcost cent(?:re|er)s?\b|\bbudget approval\b|\b(?:which|that|it|this) (?:is|has been|was) (?:already |not yet |partly )?(?:approved|signed off)\b|\bapproved budget\b|\bday rates?\b/i,
   route:/recommended route|buying route|sourcing (?:project|event)|quick quote|call-?off|\bp-?card\b|card purchase|catalogue order|existing (?:contract|framework)|framework (?:agreement|contract)|preferred suppliers?|three quotes|competing offers|procurement route|\bcompete\b/i,
   risk:/\b(?:will|won.?t|will not|does not|doesn.?t|no|not|without)\b[^.]{0,40}\b(?:personal|client|customer) data\b|\boutsourc\w*|\bsubcontract\w*|\boffshor\w*|\bsystem access\b|\bif it stopped\b|\bICT review\b|\btreated as critical\b|\bdata protection review\b/i,
   unknown:/\b(?:i|we) (?:don.?t|do not|dont) know\b|\bnot sure\b|\bunsure\b|\bnot given\b|\btbc\b|\btbd\b|\bto be confirmed\b|\bno idea\b/i,
@@ -1263,7 +1263,7 @@ function scrubText(t, keepTime){
     if(bad(parts[0])) return "";
     const kept=parts.filter(p=>!bad(p)); const y=kept.join(", ").trim();
     return words(y)>=3 ? y+(end||".") : "";
-  }).filter(Boolean).join(" ").replace(/\s+([,.])/g,"$1").replace(/,\s*\./g,".").trim();
+  }).filter(Boolean).join(" ").replace(/,?\s+\b(?:needed|required|live|delivered|starting|due|which|and)\s*(?=[.,;]|$)/gi,"").replace(/\s+([,.])/g,"$1").replace(/,\s*\./g,".").trim();
   return out;
 }
 const firstPerson = x => String(x||"").replace(/^\s*(?:hi|hello)[,!]?\s*/i,"").replace(/^(?:please\s+)?(?:we|i)(?:'d| would)?\s+(?:would like|are looking for|am looking for|need|want|like)\s+(?:t?o (?:buy|get|order|have|procure)\s+)?/i,"");
