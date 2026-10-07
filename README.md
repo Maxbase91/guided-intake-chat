@@ -10,7 +10,7 @@ Each answer is checked against what is already known: vague answers, a budget th
 
 ## Two outputs: description and captured details
 
-The **service description** says what is being bought and why, for senior stakeholder review: name, what it is, who it is for, the problem it solves, functions it supports, key capabilities, main benefits, what changes from today (and why external support is needed), how success is measured, and regulatory and control benefits. A section only appears when an answer backs it. It never contains amounts, dates, location, suppliers, budget approval, the buying route or risk answers: a code check removes these, even if the AI writes them.
+The **service description** says what is being bought and why, for senior stakeholder review: name, what it is, who it is for, the problem it solves, functions it supports, key capabilities, main benefits, what changes from today (and why external support is needed), how success is measured, and regulatory and control benefits. A section only appears when an answer backs it. Below the sections, the same description is written as one summary paragraph of at most 1,000 characters. It never contains amounts, dates, location, suppliers, budget approval, the buying route or risk answers: a code check removes these, even if the AI writes them.
 
 Everything procurement needs is **captured separately** as a table: route, budget and approval, quantity, timing, location, supplier, personal data, ICT service (DORA) and outsourcing flags, impact if it doesn't go ahead. The business requirements document contains both.
 
@@ -47,3 +47,7 @@ Open `index.html` in a browser and paste a key into `CONFIG.keys` at the top of 
 ## Change the rules
 
 Thresholds sit in `CONFIG.thresholds` and can also be changed live in the **Rules** panel. Catalogue, contracts and preferred suppliers sit in section 2 of the script.
+
+## Answer checks against nonsense and repeats
+
+An answer that has nothing to do with the question (a recipe, a joke) is caught by rules and by the AI, and the question is asked again once. If the second answer is still unrelated, the detail is recorded as not given and listed as an open point; it never reaches the description. One answer can fill several details (for example the problem, who it is for, today's solution and the impact of delay), and nothing the user already said is asked again. Chat replies never show internal field names or values.

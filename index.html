@@ -148,7 +148,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .side .grp em{font-style:normal;color:var(--ok);letter-spacing:0;text-transform:none}
 .sec.desc{background:#fbfaf5;border-left:3px solid var(--amber)}
 .ds{margin:0 0 10px}.ds:last-child{margin:0}.ds h5{margin:0 0 2px;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--amber-ink)}
-.ds p{margin:0;font-size:14.5px;line-height:1.55}.ds ul{margin:2px 0 0;padding-left:18px;font-size:14.5px;line-height:1.5}
+.ds p{margin:0;font-size:14.5px;line-height:1.55}
+.ds.narr{margin-top:14px;padding-top:12px;border-top:1px dashed #e6d9b0}.ds ul{margin:2px 0 0;padding-left:18px;font-size:14.5px;line-height:1.5}
 .sec.record h4 .muted{font-weight:400;text-transform:none;letter-spacing:0;margin-left:6px}
 .kvg{display:grid;grid-template-columns:minmax(120px,38%) 1fr;gap:4px 12px;font-size:13px}.kvg span:nth-child(odd){color:var(--ink-3)}
 .sec.chips{display:flex;flex-wrap:wrap;gap:6px}
@@ -1296,7 +1297,7 @@ const STRIP_TIME=[
   /\s*,?\s*\b(?:around|about|roughly|approximately)\s+\d+\s*(?:-|–|to)?\s*\d*\s*(?:months?|years?|weeks?)\b/gi,
   /\s*,?\s*(?:as soon as possible|asap)\b/gi
 ];
-const STRIP_MONEY=[new RegExp(`\\s*,?\\s*(?:with\\s+)?(?:an?\\s+|the\\s+)?(?:total\\s+)?budget\\s*(?:is|of)?\\s*(?:about|around|roughly|approximately|of|up to)?\\s*${AMOUNT_RE}`,"gi"),
+const STRIP_MONEY=[new RegExp(`\\s*,?\\s*(?:with\\s+)?(?:an?\\s+|the\\s+)?(?:(?:approved|agreed|total|overall|estimated|available)\\s+)*budget\\s*(?:is|of)?\\s*(?:about|around|roughly|approximately|of|up to)?\\s*${AMOUNT_RE}`,"gi"),
   new RegExp(`\\s*,?\\s*\\b(?:for|at|around|about|roughly|costing|worth)\\s+(?:about\\s+|around\\s+)?(?:€|EUR\\s?)\\d[\\d,.]*\\s*(?:k|m|million)?|\\s*,?\\s*\\b(?:around|about|roughly)\\s+\\d[\\d,.]*\\s*(?:k|m|million)\\b`,"gi")];
 function supplierRe(){ const names=[...ALL_SUPPLIERS,...(hasSupplier(S.f)?[String(S.f.supplier)]:[])].filter(x=>x&&x.length>2).map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")); return names.length?new RegExp(`\\b(?:${names.join("|")})\\b`,"i"):null; }
 // removes captured details (money, dates, places, suppliers, route, risk answers, "I don't know") from description text
@@ -1327,11 +1328,35 @@ function offlineDescription(){
   if(cont) summary=`External ${lf(g("role")||"specialist")} support${g("skills")?` with ${g("skills")}`:""}${dl?`, working on ${dl}`:""}.`;
   else if(goods) summary=[sentence(lead||g("item")||c.name), sw&&known(f.quantity)?`It is for ${fmtN(f.quantity)} users.`:""].filter(Boolean).join(" ");
   else summary=[sentence(lead||(dl?"":`${c.name}${f.demand_type==="services"&&!/services$/i.test(c.name)?" services":""}`)), dl?`The supplier will deliver ${dl}.`:""].filter(Boolean).join(" ");
-  if(["catalogue","pcard"].includes(S.det.route)) return {summary:scrubText(summary)};
+  if(["catalogue","pcard"].includes(S.det.route)){ const sm=scrubText(summary); return {summary:sm, narrative:sm}; }
   const d={summary, audience:sentence(g("users")), problem:sentence(g("background")), functions:"",
     capabilities:split(g("must_haves")||(cont?g("skills"):g("deliverables"))), benefits:[], difference:sentence(g("current_solution")), success:sentence(g("acceptance")), regulatory:""};
   for(const [k] of DESC_SECTIONS){ d[k]=Array.isArray(d[k])?d[k].map(x=>scrubText(x,k==="success")).filter(Boolean):scrubText(d[k],k==="success"); }
+  d.narrative=composeNarrative(d);
   return d;
+}
+const NARR_MAX=1000;
+function clampText(t, max=NARR_MAX){
+  const seen=new Set(); t=String(t||"").replace(/\s+/g," ").trim().split(/(?<=[.!?])\s+/).filter(x=>{const k=x.toLowerCase(); if(seen.has(k)) return false; seen.add(k); return true;}).join(" ");
+  if(t.length<=max) return t;
+  const cut=t.slice(0,max), end=Math.max(cut.lastIndexOf(". "),cut.lastIndexOf("! "),cut.lastIndexOf("? "));
+  return end>max*0.5 ? cut.slice(0,end+1) : cut.slice(0,cut.lastIndexOf(" ")).replace(/[,;:]$/,"")+"…";
+}
+function composeNarrative(d){
+  const lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1), nodot=x=>String(x).trim().replace(/\.$/,"");
+  const cont=S.f.demand_type==="contingent_labour";
+  let sum=String(d.summary||""); if(d.audience) sum=sum.replace(/\s*It is for [\d,]+ users\./,"");
+  const P=[sum], low=sum.toLowerCase();
+  if(d.audience) P.push(`It is for ${lf(nodot(d.audience))}.`);
+  if(d.problem) P.push(`It addresses this problem: ${lf(nodot(d.problem))}.`);
+  if(d.functions) P.push(`It supports ${lf(nodot(d.functions))}.`);
+  const caps=(d.capabilities||[]).filter(x=>!low.includes(lf(nodot(x)).slice(0,25)));
+  if(!cont && caps.length) P.push(`Key capabilities are ${listJoin(caps.map(x=>lf(nodot(x))))}.`);
+  if((d.benefits||[]).length) P.push(`The main benefits are ${listJoin(d.benefits.map(x=>lf(nodot(x))))}.`);
+  if(d.difference) P.push(`Current situation: ${lf(nodot(d.difference))}.`);
+  if(d.success) P.push(`Success means ${lf(nodot(d.success))}.`);
+  if(d.regulatory) P.push(nodot(d.regulatory)+".");
+  return clampText(P.filter(Boolean).join(" "));
 }
 // the AI version, checked in code: anything captured elsewhere is removed; an empty section falls back to the answers
 function mergeDesc(base, ai){
@@ -1342,6 +1367,8 @@ function mergeDesc(base, ai){
     else v=typeof v==="string"?scrubText(v,k==="success"):"";
     if(v && v.length) out[k]=v;
   }
+  const an = ai && typeof ai.narrative==="string" ? scrubText(ai.narrative, false) : "";
+  out.narrative = words(an)>=8 ? clampText(an) : composeNarrative(out);
   return out;
 }
 // what is captured for procurement, shown as a table and never written into the description
@@ -1463,6 +1490,7 @@ const DOC_SYSTEM = () => `You write two things for a corporate procurement reque
    difference: what changes compared with today's solution or process, and why external support is needed.
    success: how success is measured.
    regulatory: regulatory, control, auditability, governance, resilience or compliance benefits. ONLY if the conversation supports it, otherwise "".
+   narrative: the same description written as one flowing summary paragraph for a reader who reads nothing else, at most 1000 characters (shorter is fine). Same rules as above.
    STRICT: the description must NOT contain amounts or budgets, dates, timing or duration, delivery location, supplier names or preferences, budget approval, cost centres,
    the buying route, contracts or frameworks, or risk answers (personal data, system access, outsourcing, criticality, subcontracting). These are captured separately.
    Never copy the user's raw wording such as "I don't know" or typos. Use only what the conversation supports; leave a field "" (or []) when there is nothing to say. Never invent facts.
@@ -1477,7 +1505,7 @@ Requirements: clear, testable, one per line, written as "The supplier shall ..."
 Security, Resilience, Compliance, Supplier, Commercial, Contract, Resourcing, Skills. Priority: Must, Should or Could. 8 to 20 requirements.
 Plain language, short sentences, no marketing words, no jargon.
 Return JSON only:
-{"description":{"name":"","summary":"","audience":"","problem":"","functions":"","capabilities":[""],"benefits":[""],"difference":"","success":"","regulatory":""},
+{"description":{"name":"","summary":"","audience":"","problem":"","functions":"","capabilities":[""],"benefits":[""],"difference":"","success":"","regulatory":"","narrative":""},
  "brd":{"background":"","objectives":[""],"success_criteria":[""],"scope_in":[""],"scope_out":[""],
   "requirements":[{"type":"","text":"","priority":"Must"}],"deliverables":[""],"milestones":[{"milestone":"","timing":""}],
   "timeline":"","location":"","volumes":"","service_levels":[""],"supplier_requirements":[""],"risk_and_compliance":[""],
@@ -1641,7 +1669,8 @@ function recHTML(R){
 function descHTML(editable){
   const d=S.sd.desc||{}, ed=k=>editable?` contenteditable data-sec="${k}"`:"";
   return DESC_SECTIONS.filter(([k])=>Array.isArray(d[k])?d[k].length:d[k]).map(([k,label])=>
-    `<div class="ds"><h5>${esc(label)}</h5>${Array.isArray(d[k])?`<ul${ed(k)}>${d[k].map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<p${ed(k)}>${esc(d[k])}</p>`}</div>`).join("");
+    `<div class="ds"><h5>${esc(label)}</h5>${Array.isArray(d[k])?`<ul${ed(k)}>${d[k].map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<p${ed(k)}>${esc(d[k])}</p>`}</div>`).join("")
+    + (d.narrative && d.narrative!==d.summary ? `<div class="ds narr"><h5>Summary</h5><p${ed("narrative")}>${esc(d.narrative)}</p></div>` : "");
 }
 function sdHTML(){
   const d=S.sd, n=(d.brd.requirements||[]).length, rec=intakeRecord();
@@ -1661,7 +1690,7 @@ function qualityHTML(){
   return `<div class="sec qual"><div class="qhead"><span class="qbadge ${cls}">${q.rating}</span><span>Quality check · ${q.score}/100 · ${q.complete}% of the needed details given${oks?` · ${oks} answer${oks>1?"s":""} clarified`:""}</span></div>
     ${pts.length?`<ul class="qlist">${pts.slice(0,5).map(p=>`<li class="${p.lvl}">${esc(p.text)}</li>`).join("")}</ul>`:`<ul class="qlist"><li class="ok">No gaps or inconsistencies found.</li></ul>`}</div>`;
 }
-function sdText(){ const d=S.sd.desc||{}; return [S.sd.title,...DESC_SECTIONS.filter(([k])=>Array.isArray(d[k])?d[k].length:d[k]).map(([k,l])=>`${l}\n${Array.isArray(d[k])?d[k].map(x=>"- "+x).join("\n"):d[k]}`)].join("\n\n"); }
+function sdText(){ const d=S.sd.desc||{}; return [S.sd.title,...DESC_SECTIONS.filter(([k])=>Array.isArray(d[k])?d[k].length:d[k]).map(([k,l])=>`${l}\n${Array.isArray(d[k])?d[k].map(x=>"- "+x).join("\n"):d[k]}`),...(d.narrative&&d.narrative!==d.summary?[`Summary\n${d.narrative}`]:[])].join("\n\n"); }
 
 /* ---------- business requirements document ---------- */
 const DOC_CSS=`.brd{font-family:Inter,Arial,sans-serif;color:#141b2d;font-size:13.5px;line-height:1.55}
@@ -1675,7 +1704,7 @@ const DOC_CSS=`.brd{font-family:Inter,Arial,sans-serif;color:#141b2d;font-size:1
 .brd td{border-bottom:1px solid #e4e7ef;padding:7px 9px;vertical-align:top}
 .brd table.kv td:first-child{width:34%;color:#4a5470;background:#f8f9fc;font-weight:500}
 .brd .lead{background:#fbfaf5;border-left:3px solid #f2a900;padding:10px 14px;margin:6px 0 10px}
-.brd .lead h5{margin:8px 0 2px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#8a5d00}.brd .lead h5:first-child{margin-top:0}.brd .lead p{margin:0 0 4px}.brd .lead ul{margin:0 0 4px}
+.brd .lead h5{margin:8px 0 2px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#8a5d00}.brd .lead h5:first-child{margin-top:0}.brd .lead .narr{margin-top:10px;padding-top:8px;border-top:1px dashed #e6d9b0}.brd .lead p{margin:0 0 4px}.brd .lead ul{margin:0 0 4px}
 .brd .two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 .brd .pri-Must{color:#b42318;font-weight:600}.brd .pri-Should{color:#b4570b;font-weight:600}.brd .pri-Could{color:#4a5470}
 .brd .small{font-size:12px;color:#7c859e}.brd .conv p{margin:0 0 5px}.brd .conv b{color:#0f2147}`;
@@ -1749,7 +1778,7 @@ function bind(){
     if(a==="copy") navigator.clipboard?.writeText(sdText()).then(()=>b.textContent="Copied");
   });
   document.querySelectorAll("[data-sd]").forEach(el=>el.addEventListener("blur",()=>{const k=el.dataset.sd; S.sd[k]=el.textContent.trim(); S.brdEdited=null;}));
-  document.querySelectorAll("[data-sec]").forEach(el=>el.addEventListener("blur",()=>{const k=el.dataset.sec; S.sd.desc[k]=DESC_LISTS.includes(k)?el.innerText.split("\n").map(x=>x.trim()).filter(Boolean):el.textContent.trim(); S.brdEdited=null;}));
+  document.querySelectorAll("[data-sec]").forEach(el=>el.addEventListener("blur",()=>{const k=el.dataset.sec; S.sd.desc[k]=DESC_LISTS.includes(k)?el.innerText.split("\n").map(x=>x.trim()).filter(Boolean):k==="narrative"?clampText(el.textContent):el.textContent.trim(); S.brdEdited=null;}));
 }
 
 function renderSide(){
