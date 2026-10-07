@@ -135,8 +135,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .recap .rf{font-size:12.5px;color:var(--ink-3);padding:0 14px 10px}
 .recap.mini{box-shadow:none;background:#f8faf9;border-color:#e3efe9}
 .recap.mini .rh{background:transparent;font-weight:500;padding:7px 12px}
-.m.a .bub.chk{background:var(--amber-soft);border:1px solid #f3dfa6}
-.m.a .bub.chk:before{content:"Quick check · ";font-weight:600;color:var(--amber-ink)}
+.m.a .bub.qchk{background:var(--amber-soft);border:1px solid #f3dfa6}
+.m.a .bub.qchk:before{content:"Quick check · ";font-weight:600;color:var(--amber-ink)}
 .sec.qual .qhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13.5px;color:var(--ink-2)}
 .qbadge{font-weight:700;font-size:12.5px;padding:3px 10px;border-radius:99px}
 .q-strong,.q-good{background:var(--ok-soft);color:var(--ok)} .q-fair{background:var(--warn-soft);color:var(--warn)} .q-needs{background:var(--bad-soft);color:var(--bad)}
@@ -1390,7 +1390,7 @@ function msgHTML(m,i,lastRec,lastSd){
   if(m.kind==="recap"){ const lastRecap=S.msgs.map((x,j)=>x.kind==="recap"?j:-1).filter(j=>j>=0).pop(); return `<div class="m a"><div class="av">G</div>${recapHTML(m, i===lastRecap)}</div>`; }
   if(m.kind==="rec") return `<div class="m a"><div class="av">G</div><div class="wide">${i===lastRec?recHTML(m.rec):`<div class="card old">Earlier recommendation: ${esc(CHANNELS[m.rec.route].name)}. Updated below.</div>`}</div></div>`;
   if(m.kind==="sd")  return i===lastSd?`<div class="m a"><div class="av">G</div><div class="wide">${sdHTML()}</div></div>`:"";
-  return `<div class="m a"><div class="av">G</div><div class="bub${m.check?" chk":""}">${md(m.text)}</div></div>`;
+  return `<div class="m a"><div class="av">G</div><div class="bub${m.check?" qchk":""}">${md(m.text)}</div></div>`;
 }
 function recHTML(R){
   const c=CHANNELS[R.route], f=R.f;
