@@ -489,7 +489,7 @@ async function callLLM(system, history, retried){
     const d=await r.json().catch(()=>({}));
     if(r.status===401) throw new Error("Access code missing or wrong. Enter it under Rules.");
     // short per-minute limit: wait the few seconds the provider asks for, then try once more
-    if(r.status===429 && !retried && d.retryAfter && d.retryAfter<=20){ await new Promise(res=>setTimeout(res,(d.retryAfter+1)*1000)); return callLLM(system, history, true); }
+    if(r.status===429 && (retried||0)<2 && d.retryAfter && d.retryAfter<=20){ await new Promise(res=>setTimeout(res,(d.retryAfter+1)*1000)); return callLLM(system, history, (retried||0)+1); }
     if(!r.ok){ const e=new Error(d.error||`Server error ${r.status}`); e.quota=r.status===429||!!d.quota; throw e; }
     if(SERVER && d.provider) SERVER.last=d.provider;
     return parseJSON(d.text);

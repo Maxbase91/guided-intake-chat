@@ -21,6 +21,7 @@ const DEFAULT_COOLDOWN_S = 60;          // skip a limited model this long if the
 // Preferred Groq models, best first. The first one the account can use is taken.
 const GROQ_PREFERRED = [
   "openai/gpt-oss-120b",
+  "moonshotai/kimi-k2-instruct-0905",
   "llama-3.3-70b-versatile",
   "meta-llama/llama-4-maverick-17b-128e-instruct",
   "moonshotai/kimi-k2-instruct",
@@ -86,7 +87,7 @@ async function groqModels() {
   const d = await r.json().catch(() => ({}));
   if (!r.ok) throw new LlmError(d?.error?.message || `Groq error ${r.status}`, r.status);
   const ids = (d.data || []).filter((m) => m.active !== false).map((m) => m.id)
-    .filter((id) => !/whisper|guard|tts|playai|distil|embed|compound|prompt-guard/i.test(id));
+    .filter((id) => /gpt-oss|llama|qwen|kimi|mistral|gemma|deepseek/i.test(id) && !/whisper|guard|tts|orpheus|playai|distil|embed|compound|vision|safeguard/i.test(id));
   groqListCache = { ids, at: Date.now() };
   return ids;
 }
