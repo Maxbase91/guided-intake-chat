@@ -342,7 +342,7 @@ const FACTS = {
   location:       {label:"Location",        q:f=>["goods","software"].includes(f.demand_type)?"Where should it be delivered?":"Where will the work happen?", ex:f=>["goods","software"].includes(f.demand_type)?"An office or building is enough.":"", choices:f=>["goods","software"].includes(f.demand_type)?null:["On site","Remote, same country","Remote, other country"]},
   supplier:       {label:"Supplier",        q:f=>S.det&&S.det.route==="contract"&&S.det.contract&&!hasSupplier(f)?`We already have the ${S.det.contract.title} with ${S.det.contract.supplier} for this kind of work. Are you happy to use them?`:"Do you already have a supplier in mind?", ex:f=>S.det&&S.det.route==="contract"&&!hasSupplier(f)?"That's usually the quickest way, because no new competition is needed.":`It's fine to say no.${(PREFERRED[f.category]||[]).length?` Our preferred ones for this are ${PREFERRED[f.category].join(" and ")}.`:""}`, choices:f=>S.det&&S.det.route==="contract"&&!hasSupplier(f)?["Yes, use them","No, someone else"]:["No preference"]},
   supplier_reason:{label:"Why this supplier",q:f=>`Why ${f.supplier} in particular?`, ex:()=>"For example: they built the current system, or nobody else offers it.", why:()=>"Without a reason, a purchase this size needs competing offers."},
-  personal_data:  {label:"Personal data",   q:()=>"Will the supplier see personal or client data?", ex:()=>"", why:()=>"If so, a data protection review is added.", choices:["Yes","No","Not sure"]},
+  personal_data:  {label:"Personal data",   q:()=>"Will the supplier see personal or client data? If so, which data, and where will it be stored?", ex:()=>"For example: \"yes, employee names and salaries, stored in the EU\" or simply \"no\".", why:()=>"If so, a data protection review is added.", choices:["Yes","No","Not sure"]},
   tech_service:   {label:"Technology or data service", q:()=>"Will the supplier provide, run or support technology or data for us?", ex:()=>"For example: software, cloud, hosting, IT support, data feeds or IT people.", why:()=>"It tells us whether an ICT review is needed.", choices:["Yes","No","Not sure"]},
   ict_outsourcing:{label:"Runs it for us",  q:()=>"Will the supplier run something for us on an ongoing basis that we would otherwise do ourselves?", ex:()=>"For example: hosting a system, running payroll or operating a service desk.", why:()=>"If so, an outsourcing review is added.", choices:["Yes","No","Not sure"]},
   budget_approved:{label:"Budget approved", q:()=>"Is the budget already approved?", ex:()=>"", why:()=>"Sourcing only starts once the budget is confirmed.", choices:["Yes","Not yet","Partly"]},
@@ -395,7 +395,7 @@ function requiredFor(route, f){
   const g=GOODSLIKE(f), sw=f.demand_type==="software", on=(c,k)=>c?[].concat(k):[];
   const data = () => ["personal_data", ...on(REL.pd(f),"data_details")];
   // ICT and outsourcing: the technology question is only asked when the rules can't tell; the outsourcing question only for an ongoing technology service
-  const ict = () => ["tech_service", ...on(REL.outsrc(f),"ict_outsourcing"), ...on(yes(f.ict_outsourcing),"criticality")];
+  const ict = () => ["tech_service", ...on(REL.outsrc(f),"ict_outsourcing")];   // criticality is assessed in the outsourcing review, not asked here
   switch(route){
     case "catalogue":  return ["item","quantity","needed_by","location"];
     case "pcard":      return ["item","value"];
@@ -441,7 +441,7 @@ const BLANK_FACTS = {summary:null,category:null,demand_type:null,item:null,quant
   volume:null,support_needs:null,data_details:null,criticality:null,subcontracting:null,pricing_model:null,service_levels:null,ip_ownership:null,performance:null,role:null,headcount:null,skills:null,day_rate:null,system_access:null,renewal_change:null,wants_renewal:null};
 let CONV_SEQ=0;
 const S = fresh();
-function fresh(){ return {cid:++CONV_SEQ, curStage:null, stageIds:[], recapped:{}, req:[], challenged:{}, challengeCount:0, flags:[], pending:null, derived:{}, completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
+function fresh(){ return {cid:++CONV_SEQ, curStage:null, stageIds:[], recapped:{}, req:[], challenged:{}, challengeCount:0, flags:[], pending:null, derived:{}, offChecked:{}, completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
 
 /* =========================================================
    5. RULES ENGINE (deterministic)
@@ -609,9 +609,28 @@ const LEAD_DAYS={catalogue:3,pcard:1,contract:7,renewal:20,quote:14,sourcing:45,
 const words = v => String(v||"").trim().split(/\s+/).filter(Boolean).length;
 const VAGUE=/^(tbd|tbc|n\/?a|not sure|don'?t know|idk|stuff|things|everything|various|whatever|same|as usual|-|\?+|ok|okay|yes|no)\.?$/i;
 
+// does a free-text answer relate to the request at all? (catches a recipe or a joke given as "the problem to solve")
+const TEXT_FACTS=["background","users","current_solution","impact_delay","must_haves","deliverables","acceptance","skills","role","item","data_details","renewal_change","supplier_reason","criticality","volume"];
+const STOP=new Set("the and for with that this from have has had are was were will would should could can our your their they them you its it's into onto over under about after before then than when what which who whom why how there here also just only very more most some any all each other such been being not but nor yet out off per via upon within without because while where these those does did done doing make made get got let one two three four five six well much many lot lots like want need needs needed please thanks thank yes".split(" "));
+const BIZ=/\b(teams?|staff|employees?|users?|customers?|clients?|colleagues|buyers?|requesters?|process\w*|manual\w*|slow\w*|delay\w*|costs?|costly|saving\w*|audit\w*|complian\w*|regulat\w*|risks?|controls?|data|systems?|tools?|platforms?|software|reports?|reporting|deadlines?|suppliers?|vendors?|contracts?|services?|support\w*|business|operations?|operational|finance|financial|legal|hr|payroll|procurement|ict|sales|marketing|quality|errors?|mistakes?|spreadsheets?|excel|emails?|mailbox\w*|sharepoint|lists?|databases?|trackers?|workflows?|approv\w*|growth|growing|capacity|skills?|expertise|experience\w*|budget|projects?|deliver\w*|implement\w*|integrat\w*|migrat\w*|security|licen[cs]\w*|office|offices|sites?|events?|training|workshops?|launch\w*|replac\w*|end of life|out of support|problems?|issues?|fail\w*|missing|lack\w*|improv\w*|reduc\w*|increas\w*|faster|efficien\w*|onboard\w*|requests?|orders?|invoices?|pay\w*|paid|penalt\w*|fines?|revenue|profit\w*|loss\w*|lose|losing|miss\w*|late|complain\w*|frustrat\w*|satisf\w*|reputation\w*|findings?|breach\w*|outages?|downtime|blocked|waiting|chas\w*|impact\w*|consequen\w*|serious|critical|minor|visibility|transparen\w*|scal\w*|volume|demand|productiv\w*|workload|bottleneck\w*|backlog|outdated|legacy|obsolete|expir\w*|renew\w*|guests?|venue|catering|cleaning|maintenance|hardware|laptops?|devices?|network|cloud|hosting|applications?|apps?|api|sso|sign-on|portal|dashboards?|interfaces?|sap|developers?|engineers?|consult\w*|advis\w*|strategy|roadmap|analysis|assessment|governance|resilien\w*|polic\w*|certif\w*|requirement\w*|stakeholders?|management|managers?|department|function\w*|bank\w*|trading|regions?|countries|global|internal\w*|external\w*|in-house|outsourc\w*|vendor|tender\w*|rfp|quotes?|kpis?|sla|uptime|availability|automat\w*|digital\w*|standard\w*|consolidat\w*|central\w*|single|manual)\b/i;
+function contentWords(t){ return (String(t||"").toLowerCase().match(/[a-zäöüß][a-zäöüß-]{2,}/g)||[]).filter(w=>!STOP.has(w)); }
+function offTopic(k, v){
+  if(!TEXT_FACTS.includes(k) || typeof v!=="string") return false;
+  const ws=contentWords(v); if(ws.length<4) return false;            // short answers are handled by the vague check
+  if(BIZ.test(v) || /\b(?:IT|ICT|HR|ERP|CRM)\b/.test(v)) return false;
+  const prior=S.msgs.filter(m=>m.role==="user").slice(0,-1).map(m=>m.text).join(" ")+" "+(FACTS[k]?FACTS[k].q(S.f):"")+" "+catById(S.f.category).name+" "+[S.f.item,S.f.deliverables,S.f.summary].filter(x=>typeof x==="string").join(" ");
+  const ctx=new Set(contentWords(prior).map(w=>w.slice(0,5)));
+  return !ws.some(w=>ctx.has(w.slice(0,5)));
+}
+function offTopicIssue(k){
+  const F=FACTS[k], ex=F.ex(S.f);
+  return {fact:k, kind:"offtopic", issue:"answer doesn't relate to the request", message:`That doesn't seem to answer my question. ${F.q(S.f)}${ex?" "+ex:""}`};
+}
+
 // returns {fact, issue, message, choices} for the first real problem in what changed this turn, or null
 function findIssue(changed){
   const f=S.f, route=S.det&&S.det.route, ctx=userText();
+  for(const k of changed) if(!S.offChecked[k] && offTopic(k, f[k])) return offTopicIssue(k);   // nonsense first, regardless of other checks
   for(const k of changed){
     if(S.challenged[k]) continue;
     const v=f[k];
@@ -662,8 +681,9 @@ function computeQuality(aiRemarks){
     if(fl.status==="confirmed") pts.push({lvl:"warn",text:`${label(fl.fact)}: ${fl.issue}. Confirmed by you, so the buyer may ask again.`});
     else if(fl.status==="flexible") pts.push({lvl:"info",text:`Start date is flexible (${fl.issue}).`});
     else if(fl.status==="corrected") pts.push({lvl:"ok",text:`${label(fl.fact)} clarified during the intake.`});
+    else if(fl.status==="unanswered") pts.push({lvl:"warn",text:`${label(fl.fact)}: no usable answer given.`});
   }
-  req.filter(k=>f[k]==="Not given"||f[k]==="unsure").forEach(k=>pts.push({lvl:"warn",text:`${label(k)}: still to be clarified.`}));
+  req.filter(k=>(f[k]==="Not given"||f[k]==="unsure") && !S.flags.some(x=>x.fact===k&&x.status==="unanswered")).forEach(k=>pts.push({lvl:"warn",text:`${label(k)}: still to be clarified.`}));
   if(f.value_is_estimate && !["catalogue"].includes(route)) pts.push({lvl:"info",text:`The budget of ${money(Number(f.value))} is an estimate.`});
   if(route==="sourcing" && f.budget_approved && f.budget_approved!=="yes") pts.push({lvl:"warn",text:"Budget not yet approved. Sourcing can only start once it is."});
   if(known(f.needed_by) && !S.flags.some(x=>x.fact==="needed_by")){ const d=parseWhen(f.needed_by); if(d){ const days=(d-new Date())/864e5; if(days<(LEAD_DAYS[route]||0)) pts.push({lvl:"info",text:`Tight timeline: ${CHANNELS[route].name.toLowerCase()} usually takes ${CHANNELS[route].days} working days.`}); } }
@@ -742,7 +762,8 @@ Your job each turn:
 3. If nothing in still_needed is unknown after your update, set "complete" true and reply with one sentence saying you have what you need.
 4. "choices": up to 4 very short answers only when your question is a closed one (yes/no, a duration band, a number of people). Otherwise [].
 5. Quality check of the user's latest answer, in "assessment": {"fact":"key of the item they answered","ok":true,"issue":"","follow_up":""}.
-   Set ok to false ONLY when the answer is clearly too vague to act on ("stuff", "the usual"), contradicts earlier facts, or is implausible
+   Set ok to false when the answer has nothing to do with the question or the request (for example a recipe, a joke or random text): then use issue "off-topic", do NOT record it as a fact, and ask the question again.
+   Also set ok to false when the answer is clearly too vague to act on ("stuff", "the usual"), contradicts earlier facts, or is implausible
    (for example a budget far too low for the work described, a start date that has passed, "no personal data" for an HR or payroll system).
    Reasonable answers are ok, even if short. Never challenge an item listed in already_checked.
    When ok is false, "reply" must be only a short, friendly follow-up that names the issue and asks to confirm or correct it. Do not ask the next item in that case.
@@ -761,6 +782,9 @@ contract_ok (true only if the user explicitly agrees to use the existing contrac
 decline_contract (true if they decline the existing contract),
 background (the business problem it solves and why now), users (who will use or benefit, and which team or function it supports), current_solution (what is used today and why it can't be done internally),
 impact_delay (what happens if it doesn't go ahead or is delayed), must_haves (key capabilities it must have), acceptance (how success is judged),
+Never ask for something the user already said anywhere in the conversation, even in an answer to a different question: record it instead.
+When one answer covers several items (for example the problem, who it is for and what is used today), record every one of them.
+The personal_data question also asks which data and where it is stored: record data_details from the same answer. If the user says the supplier will host or run it, also set ict_outsourcing true.
 Combined questions: the "background" question also asks who it is for and the impact of delay, so record background, users and impact_delay from that one answer.
 The software "must_haves" question also asks how success is judged, so record must_haves and acceptance from that one answer. evaluation_priority, supplier_requirements, current_supplier ("None" if new),
 volume, support_needs, data_details (which data and where stored), criticality (what happens if it stops; also set critical_service true if clients or regulated activity are hit),
@@ -821,7 +845,7 @@ async function handleTurn(text, cid){
   // the user is answering a check we raised on an earlier answer
   const pend=S.pending; S.pending=null;
   const t=text.trim().toLowerCase();
-  const keepIt = pend && (/^(yes|yep|yeah|correct|that'?s (right|correct)|right|confirmed?|it is|keep( it)?|as i said|it'?s fixed|fixed|hard deadline|that'?s fine|fine)\b/.test(t) || /is right$/.test(t)) && !/\d/.test(t.replace(/^[^\d]*right/,"")) && words(text)<=6;
+  const keepIt = pend && pend.kind!=="offtopic" && (/^(yes|yep|yeah|correct|that'?s (right|correct)|right|confirmed?|it is|keep( it)?|as i said|it'?s fixed|fixed|hard deadline|that'?s fine|fine)\b/.test(t) || /is right$/.test(t)) && !/\d/.test(t.replace(/^[^\d]*right/,"")) && words(text)<=6;
   if(pend && !keepIt && pend.kind!=="date") S.f[pend.fact]=null;
   let reply=null, choices=[], complete=false, note=null, aiAsking=null, aiCheck=null;
   if(aiReady()){
@@ -849,6 +873,10 @@ async function handleTurn(text, cid){
       const nd = parseWhen(text) && !/fixed|can move|flexible|later/.test(t) ? text.trim() : null;
       if(nd && nd!==pend.prev){ S.f.needed_by=cap1(nd); S.flags.push({fact:pend.fact,issue:pend.issue,status:"corrected"}); }
       else { S.f.needed_by=pend.prev; S.flags.push({fact:pend.fact,issue:pend.issue,status:/move|flexible|later/.test(t)?"flexible":"confirmed"}); }
+    } else if(pend.kind==="offtopic"){
+      const nv=S.f[pend.fact];
+      if(!known(nv) || offTopic(pend.fact, nv) || nv===pend.prev){ S.f[pend.fact]="Not given"; S.flags.push({fact:pend.fact,issue:"no usable answer given",status:"unanswered"}); }
+      else S.flags.push({fact:pend.fact,issue:pend.issue,status:"corrected"});
     } else {
       if(!known(S.f[pend.fact])) S.f[pend.fact]=pend.prev;
       S.flags.push({fact:pend.fact,issue:pend.issue,status: JSON.stringify(S.f[pend.fact])===JSON.stringify(pend.prev)?"confirmed":"corrected"});
@@ -864,11 +892,14 @@ async function handleTurn(text, cid){
   const changed=Object.keys(FACTS).filter(k=>known(S.f[k]) && JSON.stringify(before[k])!==JSON.stringify(S.f[k]) && (S.req||[]).concat(["value","needed_by"]).includes(k) && !(pend&&pend.fact===k));
   if(changed.some(k=>["day_rate","duration","headcount","deliverables","quantity"].includes(k)) && known(S.f.value) && !changed.includes("value")) changed.push("value");
   if(prevRoute && S.det && prevRoute!==S.det.route && known(S.f.needed_by) && !changed.includes("needed_by")) changed.push("needed_by");
-  let issue = S.challengeCount<3 ? findIssue(changed) : null;
+  let issue = findIssue(changed);
+  if(issue && issue.kind!=="offtopic" && S.challengeCount>=3) issue=null;
+  const aiOff = aiCheck && /off.?topic|unrelated|not related|does(?:n.?t| not) (?:answer|relate)|irrelevant|nothing to do/i.test(aiCheck.issue||"");
+  if(!issue && aiOff && FACTS[aiCheck.fact] && !S.offChecked[aiCheck.fact] && aiCheck.fact!==(pend&&pend.fact)) issue=offTopicIssue(aiCheck.fact);
   if(!issue && aiCheck && S.challengeCount<3 && changed.includes(aiCheck.fact) && !S.challenged[aiCheck.fact] && FACTS[aiCheck.fact])
     issue={fact:aiCheck.fact, issue:String(aiCheck.issue||"needs a second look").slice(0,140), message:String(aiCheck.follow_up||reply||"").trim()||`Could you double-check this? ${FACTS[aiCheck.fact].q(S.f)}`};
   if(issue){
-    S.challenged[issue.fact]=true; S.challengeCount++;
+    if(issue.kind==="offtopic") S.offChecked[issue.fact]=true; else { S.challenged[issue.fact]=true; S.challengeCount++; }
     S.pending={fact:issue.fact, prev:S.f[issue.fact], issue:issue.issue, kind:issue.kind||""};
     S.msgs.push({role:"assistant",text:issue.message, check:true});
     S.choices=issue.choices||[]; S.lastAsked=issue.fact;
@@ -971,6 +1002,9 @@ function offlineRead(text, asked){
   if(asked && asked!=="need" && !known(f[asked])){ const v=readAnswer(asked, text); if(known(v)) f[asked]=v; }
   splitCombined(asked, text);
   fillUnknown(extractAll(text, asked));
+  // a sentence that became "today's solution" is no longer part of the problem statement
+  if(asked==="background" && typeof f.background==="string" && typeof f.current_solution==="string" && f.background.includes(f.current_solution) && f.background.length>f.current_solution.length+20)
+    f.background=cap1(f.background.replace(f.current_solution,"").replace(/\s*[.;]\s*[.;]\s*/g,". ").replace(/^[\s.;]+|[\s.;]+$/g,""));
 }
 // one question, several facts: problem + who + impact of delay; must-haves + how success is judged
 function splitCombined(asked, text){
@@ -979,6 +1013,11 @@ function splitCombined(asked, text){
     const im=parts.findIndex(x=>/\b(?:if (?:it|this|we|that)|otherwise|without (?:it|this)|delay|slips?|late)\b/i.test(x));
     if(im>0 && !known(f.impact_delay)){ f.impact_delay=cap1(clean(parts.slice(im).join(" ").replace(/^(?:and\s+)?(?:if (?:it|this) (?:slips|is delayed|is late),?\s*)/i,"").replace(/[.]$/,""))); f.background=cap1(clean(parts.slice(0,im).join(" ").replace(/[.;]$/,""))); }
   }
+  if(asked==="personal_data" && yes(f.personal_data) && !known(f.data_details)){
+    const rest=String(text).replace(/^\s*(?:yes|yeah|yep|correct|they will|it will)\b[\s,:;.-]*/i,"").replace(/^(?:they(?:'ll| will)? see|it (?:will )?(?:include|hold)s?)\s+/i,"").trim();
+    if(words(rest)>=2 && /[a-z]/i.test(rest)) f.data_details=cap1(rest.replace(/[.]$/,""));
+  }
+  if(asked==="tech_service" && yes(f.tech_service) && !known(f.ict_outsourcing) && /\b(host|run|operate|manage|maintain)s?\b/i.test(text)) f.ict_outsourcing=!NEG.test(text.toLowerCase().replace(/^no\b/,""));
   if(asked==="must_haves" && f.demand_type==="software"){
     const ac=parts.findIndex(x=>/\b(?:works? (?:if|when)|success|we.?ll know|judge|measured)\b/i.test(x));
     if(ac>0 && !known(f.acceptance)){ f.acceptance=cap1(clean(parts.slice(ac).join(" ").replace(/^(?:and\s+)?(?:it works (?:if|when)|success (?:is|means)|we.?ll know it works (?:if|when))\s*/i,"").replace(/[.]$/,""))); f.must_haves=cap1(clean(parts.slice(0,ac).join(" ").replace(/[.;]$/,""))); }
@@ -1068,7 +1107,7 @@ function extractAll(text, asked){
   const saS=sentWith(/access to (?:our|the|client|internal) (?:systems?|network|applications?|data)|system access|need (?:a )?(?:login|accounts?)/);
   if(saS) o.system_access = NEG.test(saS.toLowerCase().split(/\bbut\b/)[0]) && !/\bbut\b.*access/.test(saS.toLowerCase()) ? false : true;
   if(/\b(but|and)\s+no\s+(?:client|personal|customer)\s+data\b/.test(t)) o.personal_data=false;
-  const itS=sentWith(/\b(managed service|run (?:our|the|it for us)|operate (?:our|the)|outsourc\w*|take over|host (?:it|our|the) for us|on[- ]prem\w*|we host it ourselves)\b/);
+  const itS=sentWith(/\b(managed service|outsourc\w*|take over|(?:host|run|operate)s?(?: and (?:host|run|operate)s?)? (?:it|our|the|this)\b|for us\b|on[- ]prem\w*|we host it ourselves)/);
   if(itS){ const l=itS.toLowerCase(); o.ict_outsourcing = /on[- ]prem|we host it ourselves|in[- ]house/.test(l) || NEG.test(l) ? false : true; }
   const crS=sentWith(/if (?:it|this|the system|the service) (?:stops|fails|goes down|is down|stopped)|business[- ]critical|\bcritical\b|clients? (?:can.?t|cannot|couldn.?t|would not)|(?:staff|employees|people) (?:don.?t|won.?t|wouldn.?t|would not) get paid|outage/);
   if(crS){ o.criticality=cap1(clean(crS.replace(/^.*?\bif (?:it|this|the system|the service) (?:stops|fails|goes down|is down|stopped)(?: working)?(?: for a day)?,?\s*/i,""))); if(!/not critical|nothing serious|no impact|minor/.test(crS.toLowerCase())) o.critical_service=true; }
@@ -1092,7 +1131,8 @@ function extractAll(text, asked){
   // --- purpose: who it is for, today's situation, impact of delay, must-haves
   const us=raw.match(/\b(?:used by|for use by|to be used by|benefits?|for)\s+((?:our|the)\s+(?:\d+\s+)?[\w -]{2,40}?(?:team|teams|department|function|desks?|staff|buyers|colleagues|employees|users|managers|joiners))\b/i);
   if(us && !/\bbudget\b/i.test(us[1])) o.users=cap1(us[1]);
-  const csS=sentWith(/\b(in[- ]house|internally|our own (?:team|staff|people)|no (?:internal )?(?:capacity|team|skills|expertise)|don.?t have the (?:skills|capacity|people|expertise)|lack (?:the )?(?:skills|capacity|expertise))\b/);
+  const csS=sentWith(/\b(in[- ]house|internally|our own (?:team|staff|people)|no (?:internal )?(?:capacity|team|skills|expertise)|don.?t have the (?:skills|capacity|people|expertise)|lack (?:the )?(?:skills|capacity|expertise))\b/)
+    || sentWith(/\b(?:today|currently|at the moment|right now)\b[^.]*\b(?:use|using|done|handled|run|manual\w*|spreadsheets?|excel|email)\b|\b(?:we|they) (?:use|rely on)\b[^.]*\b(?:spreadsheets?|excel|email|manual\w*)\b/);
   if(csS) o.current_solution=cap1(clean(csS.replace(/[.]$/,"")));
   const imS=sentWith(/\bif (?:this|it|we) (?:doesn.?t|does not|don.?t|do not|is|isn.?t) (?:go ahead|happen|delayed|late|get)|\bwithout (?:it|this)\b|\bdelay (?:would|will|means)\b|\botherwise we\b|\bwe (?:would|will) miss\b/);
   if(imS) o.impact_delay=cap1(clean(imS.replace(/[.]$/,"")));
