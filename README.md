@@ -25,8 +25,8 @@ The page checks `/api/llm` on load. If the server has a key, it shows **AI on ·
 
 ## Run locally
 
-Open `index.html` in a browser and paste a key into `CONFIG.keys` at the top of the script, or into **Settings**. Do not commit a key.
+Open `index.html` in a browser and paste a key into `CONFIG.keys` at the top of the script, or into the **Rules** panel (key fields only appear when no server is found). Do not commit a key.
 
 ## Change the rules
 
-Thresholds sit in `CONFIG.thresholds` and can also be changed live in **Settings**. Catalogue, contracts and preferred suppliers sit in section 2 of the script.
+Thresholds sit in `CONFIG.thresholds` and can also be changed live in the **Rules** panel. Catalogue, contracts and preferred suppliers sit in section 2 of the script.

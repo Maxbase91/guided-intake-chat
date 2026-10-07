@@ -165,6 +165,8 @@ body.doc-open{overflow:hidden}
 .seg{display:flex;background:var(--line-2);border-radius:12px;padding:4px;margin-top:10px}
 .seg button{flex:1;border:0;background:transparent;padding:8px;border-radius:9px;cursor:pointer;font-weight:600;color:var(--ink-3)}
 .seg button.on{background:#fff;color:var(--navy);box-shadow:var(--shadow)}
+.tgl{display:flex;gap:10px;align-items:center;margin-top:10px;font-size:14px;font-weight:500;color:var(--ink);cursor:pointer}
+.tgl input{width:18px;height:18px;accent-color:var(--navy)}
 .alert{padding:10px 12px;border-radius:10px;font-size:13.5px;margin-top:10px}
 .alert.info{background:var(--info-soft);color:var(--info)}
 .alert.err{background:var(--bad-soft);color:var(--bad)}
@@ -181,7 +183,7 @@ body.doc-open{overflow:hidden}
     <span class="pill"><span class="dot" id="aiDot"></span><span id="aiLabel">Offline</span></span>
     <button class="tb only-m" id="sumBtn">Summary</button>
     <button class="tb" id="newBtn">New</button>
-    <button class="tb" id="cfgBtn">Settings</button>
+    <button class="tb" id="cfgBtn">Rules</button>
   </div>
 </header>
 
@@ -471,7 +473,7 @@ const monthsOf = d => { const m=String(d||"").match(/(\d+)\s*(?:-|–|to)?\s*(\d
    ========================================================= */
 let SERVER=null;
 const aiReady = () => CONFIG.provider==="server" ? !!SERVER : (["gemini","groq"].includes(CONFIG.provider) && !!CONFIG.keys[CONFIG.provider]);
-const providerLabel = () => CONFIG.provider==="server" ? `Server · ${SERVER&&SERVER.provider==="groq"?"Groq":"Gemini"}` : CONFIG.provider==="gemini"?"Gemini":"Groq";
+const providerLabel = () => CONFIG.provider==="server" ? (((SERVER&&SERVER.last)||(SERVER&&SERVER.provider))==="groq"?"Groq":"Gemini") : CONFIG.provider==="gemini"?"Gemini":"Groq";
 async function detectServer(){
   if(!/^https?:$/.test(location.protocol)) return;
   try{ const r=await fetch("/api/llm"); if(!r.ok) return; const d=await r.json(); if(d&&d.ok) SERVER=d; }catch(e){}
@@ -485,8 +487,9 @@ async function callLLM(system, history){
   if(p==="server"){
     const r=await fetch("/api/llm",{method:"POST",signal:AbortSignal.timeout(58000),headers:{"Content-Type":"application/json","x-access-code":CONFIG.accessCode||""},body:JSON.stringify({system,history})});
     const d=await r.json().catch(()=>({}));
-    if(r.status===401) throw new Error("Access code missing or wrong. Enter it in Settings.");
+    if(r.status===401) throw new Error("Access code missing or wrong. Enter it under Rules.");
     if(!r.ok){ const e=new Error(d.error||`Server error ${r.status}`); e.quota=r.status===429||!!d.quota; throw e; }
+    if(SERVER && d.provider) SERVER.last=d.provider;
     return parseJSON(d.text);
   }
   if(p==="gemini"){
@@ -591,7 +594,7 @@ async function handleTurn(text){
     }catch(e){
       const quota=e.quota||/quota|rate limit|429/i.test(e.message||""), slow=e.name==="TimeoutError"||e.name==="AbortError";
       const auth=/access code/i.test(e.message||"");
-      note = auth ? "This demo needs an access code for the AI. Open Settings and enter it. Until then I'm using standard questions." : quota ? "The AI has reached its usage limit, so I'm using standard questions for now." : slow ? "The AI took too long, so I'm using standard questions for now." : "The AI isn't reachable, so I'm using standard questions for now.";
+      note = auth ? "This demo needs an access code for the AI. Open Rules and enter it. Until then I'm using standard questions." : quota ? "The AI has reached its usage limit, so I'm using standard questions for now." : slow ? "The AI took too long, so I'm using standard questions for now." : "The AI isn't reachable, so I'm using standard questions for now.";
       offlineRead(text, asked);
     }
   } else offlineRead(text, asked);
@@ -1290,34 +1293,48 @@ function renderSide(){
       ${list.map(k=>{const ok=known(f[k]), nx=!ok&&S.missing[0]===k; return `<div class="fact ${ok?"ok":""} ${nx?"next":""}"><span class="ic">${ok?"✓":""}</span><span class="k">${FACTS[k].label}</span><span class="v">${ok?esc(show(k,f[k])):nx?"asking now":"—"}</span></div>`;}).join("")}
     </div>${sideNote()}`;
 }
-const sideNote=()=>`<div class="panel muted">The route and the details it needs come from fixed rules (editable in Settings). The AI only runs the conversation and writes the description.</div>`;
+const sideNote=()=>`<div class="panel muted">The route and the details it needs come from fixed rules (editable under Rules). The AI only runs the conversation and writes the description.</div>`;
 
 /* =========================================================
    10. SETTINGS
    ========================================================= */
 function openSettings(){
-  const T=CONFIG.thresholds;
+  const T=CONFIG.thresholds, hosted=!!SERVER;
+  const aiOn=CONFIG.provider!=="offline";
+  const names={gemini:"Gemini",groq:"Groq"};
+  const chain=hosted?[SERVER.providers.gemini&&"Gemini",SERVER.providers.groq&&"Groq"].filter(Boolean):[];
   $("#drawerRoot").innerHTML=`<div class="scrim" id="scrim"></div><div class="drawer">
-    <header><h3>Settings</h3><button class="btn btn-g" id="close">Close</button></header>
+    <header><h3>Rules</h3><button class="btn btn-g" id="close">Close</button></header>
     <div class="body">
-      <section><div class="eyebrow">AI</div>
-        <div class="seg" id="prov">${[...(SERVER?["server"]:[]),"gemini","groq","offline"].map(p=>`<button data-p="${p}" class="${CONFIG.provider===p?"on":""}">${({server:"Server",gemini:"Gemini key",groq:"Groq key",offline:"Offline"})[p]}</button>`).join("")}</div>
-        <div id="pf"></div><div id="test"></div></section>
       <section><div class="eyebrow">Route rules</div>
+        <p class="muted" style="margin:6px 0 0">Owned by the business. Changes apply to the current request straight away.</p>
         <label>Card purchase limit (${CONFIG.currency})</label><input class="inp" type="number" id="t1" value="${T.pcardMax}">
         <label>Quick-quote limit (${CONFIG.currency})</label><input class="inp" type="number" id="t2" value="${T.quickQuoteMax}">
         <label>Material spend review from (${CONFIG.currency})</label><input class="inp" type="number" id="t3" value="${T.materialityMin}">
         <label>Renewal window before contract end (days)</label><input class="inp" type="number" id="t4" value="${T.renewalWindowDays}"></section>
+      <section><div class="eyebrow">AI</div>
+        ${hosted?`
+          <label class="tgl"><input type="checkbox" id="aiToggle" ${aiOn?"checked":""}><span>Use AI for the conversation and the documents</span></label>
+          <p class="muted" style="margin:8px 0 0">${aiOn?`Connected through the server: ${chain.join(", then ")}${chain.length>1?" as backup":""}. Keys are stored on Vercel, never in this page.${SERVER.last?` Last answer from ${names[SERVER.last]||SERVER.last}.`:""}`:"Off: standard questions and documents built from the rules. Nothing leaves the browser."}</p>
+          ${SERVER.accessRequired&&aiOn?`<label>Access code</label><input class="inp" type="password" id="ac" value="${esc(CONFIG.accessCode)}">`:""}`
+        :`<div class="seg" id="prov">${["gemini","groq","offline"].map(p=>`<button data-p="${p}" class="${CONFIG.provider===p?"on":""}">${({gemini:"Gemini key",groq:"Groq key",offline:"Offline"})[p]}</button>`).join("")}</div>
+          <p class="muted" style="margin:8px 0 0">No server found, so this page is running from a file. A key entered here stays in this tab only.</p>
+          <div id="pf"></div><div id="test"></div>`}
+      </section>
     </div></div>`;
-  const pf=()=>{const p=CONFIG.provider;
-    if(p==="server"){ $("#pf").innerHTML=`<div class="alert info">The key is stored on the server.</div>${SERVER.accessRequired?`<label>Access code</label><input class="inp" type="password" id="ac" value="${esc(CONFIG.accessCode)}">`:""}`; const ac=$("#ac"); if(ac) ac.oninput=e=>CONFIG.accessCode=e.target.value.trim(); return; }
-    if(p==="offline"){ $("#pf").innerHTML=`<div class="alert info">Standard questions with examples. Nothing leaves the browser.</div>`; return; }
-    $("#pf").innerHTML=`<label>${p==="gemini"?"Gemini":"Groq"} API key</label><input class="inp" type="password" id="key" value="${esc(CONFIG.keys[p])}"><label>Model</label><input class="inp" id="model" value="${esc(CONFIG.models[p])}"><button class="btn btn-g" id="tbtn" style="margin-top:12px">Test connection</button>`;
-    $("#key").oninput=e=>{CONFIG.keys[p]=e.target.value.trim();render();}; $("#model").oninput=e=>CONFIG.models[p]=e.target.value.trim();
-    $("#tbtn").onclick=async()=>{$("#test").innerHTML=`<div class="alert info">Testing…</div>`;try{await callLLM('Return JSON {"ok":true}',[{role:"user",content:"ping, reply in json"}]);$("#test").innerHTML=`<div class="alert info">Connected.</div>`;}catch(e){$("#test").innerHTML=`<div class="alert err">${esc(e.message)}</div>`;}};
-  };
-  pf();
-  document.querySelectorAll("#prov button").forEach(b=>b.onclick=()=>{CONFIG.provider=b.dataset.p;document.querySelectorAll("#prov button").forEach(x=>x.classList.toggle("on",x===b));pf();render();});
+  if(hosted){
+    $("#aiToggle").onchange=e=>{ CONFIG.provider=e.target.checked?"server":"offline"; render(); openSettings(); };
+    const ac=$("#ac"); if(ac) ac.oninput=e=>{ CONFIG.accessCode=e.target.value.trim(); try{sessionStorage.setItem("ac",CONFIG.accessCode);}catch(x){} };
+  } else {
+    const pf=()=>{const p=CONFIG.provider;
+      if(p==="offline"||p==="auto"){ $("#pf").innerHTML=`<div class="alert info">Standard questions with examples. Nothing leaves the browser.</div>`; return; }
+      $("#pf").innerHTML=`<label>${names[p]} API key</label><input class="inp" type="password" id="key" value="${esc(CONFIG.keys[p])}"><label>Model</label><input class="inp" id="model" value="${esc(CONFIG.models[p])}"><button class="btn btn-g" id="tbtn" style="margin-top:12px">Test connection</button>`;
+      $("#key").oninput=e=>{CONFIG.keys[p]=e.target.value.trim();render();}; $("#model").oninput=e=>CONFIG.models[p]=e.target.value.trim();
+      $("#tbtn").onclick=async()=>{$("#test").innerHTML=`<div class="alert info">Testing…</div>`;try{await callLLM('Return JSON {"ok":true}',[{role:"user",content:"ping, reply in json"}]);$("#test").innerHTML=`<div class="alert info">Connected.</div>`;}catch(e){$("#test").innerHTML=`<div class="alert err">${esc(e.message)}</div>`;}};
+    };
+    pf();
+    document.querySelectorAll("#prov button").forEach(b=>b.onclick=()=>{CONFIG.provider=b.dataset.p;document.querySelectorAll("#prov button").forEach(x=>x.classList.toggle("on",x===b));pf();render();});
+  }
   [["#t1","pcardMax"],["#t2","quickQuoteMax"],["#t3","materialityMin"],["#t4","renewalWindowDays"]].forEach(([id,k])=>$(id).oninput=e=>{const v=parseFloat(e.target.value);if(!isNaN(v))CONFIG.thresholds[k]=v;});
   const close=()=>{$("#drawerRoot").innerHTML=""; if(S.det){refresh(); if(!S.missing.length) showRecommendation();} render();};
   $("#close").onclick=close; $("#scrim").onclick=close;
