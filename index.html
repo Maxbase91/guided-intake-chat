@@ -1067,9 +1067,18 @@ async function buildDoc(){
       if(!ai || !ai.summary) throw new Error("empty");
     }catch(e){ ai=null; S.msgs.push({role:"assistant",kind:"sys",text:"The AI couldn't write the documents just now, so they are built from your answers."}); }
   }
-  S.sd = {title:(ai&&ai.title)||base.title, summary:(ai&&ai.summary)||base.summary, brd:mergeBRD(offlineBRD(base.risk), ai&&ai.brd), _ai:!!ai, _date:new Date()};
+  S.sd = {title:(ai&&ai.title)||base.title, summary:guardSummary(ai&&ai.summary)||base.summary, brd:mergeBRD(offlineBRD(base.risk), ai&&ai.brd), _ai:!!ai, _date:new Date()};
   S.docKey=key; S.brdEdited=null;
   S.msgs.push({role:"assistant",kind:"sd"});
+}
+// hard checks on the AI summary: right currency, the agreed total, no risk verdicts of its own
+function guardSummary(t){
+  if(!t || typeof t!=="string") return null;
+  if(/£|\$\s?\d|\bUSD\b|\bGBP\b/.test(t)) return null;
+  t=t.split(/(?<=[.!?])\s+/).filter(x=>!/\brisk (?:profile|level|rating)\b[^.]*\b(?:is|as|considered|assessed|rated)\b/i.test(x)).join(" ");
+  t=t.replace(/(\d[\d,.]*)\s*EUR\b/g,(m,n)=>"€"+n);
+  if(known(S.f.value)){ const amt=money(Number(S.f.value)); if(!t.includes(amt)) t=t.replace(/\s*$/,"")+` The ${S.f.value_is_estimate?"estimated ":""}total value is ${amt}.`; }
+  return t;
 }
 const cleanFacts = () => Object.fromEntries(Object.entries(S.f).filter(([k,v])=>known(v)&&k!=="decline_contract").map(([k,v])=>[k,v===true?"yes":v===false?"no":v]));
 
