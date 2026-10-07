@@ -311,6 +311,7 @@ const FACTS = {
   day_rate:       {label:"Rate or budget",  q:()=>"Do you have a day rate or total budget in mind?", ex:()=>"For example: \"around €700 a day\" or \"€150k in total\". \"Not sure\" is fine."},
   system_access:  {label:"System access",   q:()=>"Will they need access to our systems or client data?", ex:()=>"", choices:["Yes","No","Not sure"]},
   renewal_change: {label:"Changes",         q:()=>"Does anything change compared with the current contract?", ex:()=>"For example: \"same scope, 20% more volume\" or \"no changes\"."},
+  contract_ok:    {label:"Use existing contract", q:()=>S.det&&S.det.contract?`We already have the ${S.det.contract.title} with ${S.det.contract.supplier} for this kind of work. Would you like to use it?`:"Would you like to use the existing contract?", ex:()=>"That's usually the quickest way, because no new competition is needed.", choices:["Yes, use it","No, look wider"]},
   // ---- sourcing ----
   background:     {label:"Why now",         q:()=>"What's behind this need? Why now?", ex:()=>"For example: a new regulation, a growing team, or a system reaching end of life.", why:()=>"It helps suppliers propose the right approach."},
   acceptance:     {label:"Success looks like", q:()=>"How will you know the work has been done well?", ex:f=>f.demand_type==="contingent_labour"?"":`For example: ${f.category==="consulting"?"\"the new process is live in all countries and onboarding takes under 5 days\"":f.category==="marketing"?"\"the event runs on budget and guest feedback averages 4 out of 5\"":"\"it is live, tested and signed off by the business owner\""}.`},
@@ -346,7 +347,7 @@ function requiredFor(route, f){
   switch(route){
     case "catalogue":  return ["item","quantity","needed_by","location","cost_centre"];
     case "pcard":      return ["item","value","supplier","needed_by"];
-    case "contract":   return [...on(!hasSupplier(f),"supplier"),
+    case "contract":   return [...on(!contractAgreed(f),"contract_ok"),
                                ...(g ? ["item","quantity","value","needed_by","location"]
                                      : ["deliverables","value","duration","needed_by","location",...risk(),"acceptance"]),"cost_centre"];
     case "renewal":    return ["value","duration","renewal_change","performance",...risk(),...on(REL.ongoing(f),"service_levels"),"cost_centre"];
@@ -370,7 +371,7 @@ function requiredFor(route, f){
    ========================================================= */
 const BLANK_FACTS = {summary:null,category:null,demand_type:null,item:null,quantity:null,value:null,value_is_estimate:false,deliverables:null,duration:null,
   needed_by:null,location:null,supplier:null,supplier_reason:null,personal_data:null,ict_outsourcing:null,critical_service:null,offshore:null,
-  budget_approved:null,decline_contract:null,background:null,acceptance:null,evaluation_priority:null,supplier_requirements:null,current_supplier:null,
+  budget_approved:null,decline_contract:null,contract_ok:null,background:null,acceptance:null,evaluation_priority:null,supplier_requirements:null,current_supplier:null,
   volume:null,support_needs:null,data_details:null,criticality:null,subcontracting:null,pricing_model:null,service_levels:null,ip_ownership:null,performance:null,cost_centre:null,role:null,headcount:null,skills:null,day_rate:null,system_access:null,renewal_change:null,wants_renewal:null};
 const S = fresh();
 function fresh(){ return {completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
@@ -380,6 +381,7 @@ function fresh(){ return {completed:false, submitted:null, docKey:"", msgs:[], f
    ========================================================= */
 const catById = id => CATEGORIES.find(c=>c.id===id) || {id, name:id||"–", type:"services"};
 const known = v => v!==null && v!==undefined && v!=="";
+const contractAgreed = f => f.contract_ok===true || (S.det && S.det.contract && hasSupplier(f) && String(f.supplier).toLowerCase().includes(S.det.contract.supplier.toLowerCase().split(" ")[0]));
 const hasSupplier = f => known(f.supplier) && !/^(none|no|no preference|not sure|n\/a)$/i.test(String(f.supplier).trim());
 const yes = v => v===true || /^y/i.test(String(v));
 const userText = () => " "+S.msgs.filter(m=>m.role==="user").map(m=>m.text).join(" ").toLowerCase()+" ";
@@ -458,7 +460,8 @@ function refresh(){
   S.det = determine();
   const req = requiredFor(S.det.route, f);
   const needsValue = !["catalogue","contingent"].includes(S.det.route);
-  const order = needsValue && !known(f.value) ? ["value",...req.filter(k=>k!=="value")] : req;
+  let order = needsValue && !known(f.value) ? ["value",...req.filter(k=>k!=="value")] : req;
+  if(order.includes("contract_ok")) order=["contract_ok",...order.filter(k=>k!=="contract_ok")];
   S.missing = order.filter(k=>!known(f[k]));
 }
 const monthsOf = d => { const m=String(d||"").match(/(\d+)\s*(?:-|–|to)?\s*(\d+)?\s*(month|week|year)/i); if(!m) return 6; const n=Number(m[2]||m[1]); return /week/i.test(m[3])?n/4.3:/year/i.test(m[3])?n*12:n; };
@@ -523,12 +526,14 @@ Your job each turn:
 4. "choices": up to 4 very short answers only when your question is a closed one (yes/no, a duration band, a number of people). Otherwise [].
 
 Fact keys:
-summary (one plain sentence describing the need), category (one of: ${CATEGORIES.map(c=>c.id).join(", ")}), demand_type (goods | services | software | contingent_labour),
+summary (one plain sentence describing the need), category (one of: ${CATEGORIES.map(c=>`${c.id} = ${c.name}`).join("; ")}), demand_type (goods | services | software | contingent_labour),
+Category rules: "cloud" is hosting and infrastructure only (servers, storage, data centre). A business application used as a service (HR, payroll, CRM, finance, procurement tools), even if cloud-based or SaaS, is "software" with demand_type software.
 item, quantity (number), value (total ${CONFIG.currency}, number), value_is_estimate (bool), deliverables (one string), duration, needed_by (as they said it),
 location (delivery place or where the work happens), supplier (name, or "None"), supplier_reason, personal_data (true | false | "unsure"),
 ict_outsourcing (true | false | "unsure"), critical_service (bool), offshore (bool), budget_approved ("yes" | "no" | "partly"),
 role, headcount (number), skills, day_rate, system_access (true | false | "unsure"), renewal_change, wants_renewal (true if they want to renew or extend an existing contract),
-decline_contract (true if they do not want to use the existing contract supplier you asked about; if they agree, set supplier to that supplier's name),
+contract_ok (true only if the user explicitly agrees to use the existing contract you asked about; false if they decline. "No preference" is NOT agreement),
+decline_contract (true if they decline the existing contract),
 background (why it is needed now), acceptance (how success is judged), evaluation_priority, supplier_requirements, current_supplier ("None" if new),
 volume, support_needs, data_details (which data and where stored), criticality (what happens if it stops; also set critical_service true if clients or regulated activity are hit),
 subcontracting (true | false | "unsure"), pricing_model, service_levels, ip_ownership, performance (how the current supplier performed), cost_centre.
@@ -620,6 +625,9 @@ function mergeFacts(nf){
   if(S.f.category && !CATEGORIES.some(c=>c.id===S.f.category)) S.f.category=null;
   if(S.f.category && !S.f.demand_type) S.f.demand_type=catById(S.f.category).type;
   if(S.f.demand_type==="contingent_labour") S.f.category="contingent";
+  if(S.f.category==="cloud" && /\b(hr|payroll|crm|erp|finance|accounting|procurement|ticketing|learning management)\b[^.]*\b(system|tool|platform|software|application|suite)\b/i.test(userText())){ S.f.category="software"; S.f.demand_type="software"; }
+  if(nf.contract_ok===false) S.f.decline_contract=true;
+  if(nf.contract_ok===true && S.det && S.det.contract && !hasSupplier(S.f)) S.f.supplier=S.det.contract.supplier;
 }
 function giveUp(k){
   const f=S.f;
@@ -641,6 +649,7 @@ function offlineRead(text, asked){
     let best=null, score=0;
     for(const c of CATEGORIES){ const s=c.kw.filter(k=>all.includes(k)).length; if(s>score){score=s;best=c;} }
     if(/contractor|freelance|temporary staff|interim|day rate|\ba day\b|per day/.test(all) && /developer|engineer|analyst|manager|designer|tester|contractor|freelance|interim/.test(all)) best=catById("contingent");
+    if(best && best.id==="cloud" && /\b(hr|payroll|crm|erp|finance|accounting|procurement|ticketing)\b[^.]*\b(system|tool|platform|software|application)\b/.test(all)) best=catById("software");
     if(best){ f.category=best.id; f.demand_type=best.type; }
     else if(asked==="need" || text.split(/\s+/).length>3){ f.category="consulting"; f.demand_type="services"; }
     if(known(f.category)){
@@ -800,13 +809,15 @@ function extractAll(text, asked){
 }
 const fmtN = x => /^\d+$/.test(String(x)) ? Number(x).toLocaleString("en-GB") : x;
 const cap1 = x => x ? String(x).charAt(0).toUpperCase()+String(x).slice(1) : x;
-const CLOSED=["value","quantity","headcount","personal_data","ict_outsourcing","system_access","budget_approved","subcontracting"];
+const CLOSED=["contract_ok","value","quantity","headcount","personal_data","ict_outsourcing","system_access","budget_approved","subcontracting"];
 function readAnswer(k, text){
   const t=text.trim().toLowerCase();
   if(k==="value"){ const v=parseMoney(text); if(v!=null){S.f.value_is_estimate=false;return v;} if(/know|sure|idea|estimate/.test(t)){S.f.value_is_estimate=true;return defaultEstimate();} return null; }
   if(k==="quantity"||k==="headcount"){ const n=t.match(/\d+/); return n?+n[0]:(/more/.test(t)?"4+":null); }
   if(k==="criticality"){ if(/client|customer|regulat|payment|trading|can.?t|cannot|outage|down|serious/.test(t) && !/nothing serious|no impact|minor/.test(t)) S.f.critical_service=true; return text.trim(); }
   if(k==="current_supplier" && /^(no|none|new|it.?s new)/.test(t)) return "None";
+  if(k==="contract_ok"){ if(/^(y|yes|sure|ok|okay|happy|fine|please|go ahead|use)/.test(t) && !/^no/.test(t)){ if(S.det&&S.det.contract) S.f.supplier=S.det.contract.supplier; return true; }
+    if(/^(no|nope|not|look|rather)/.test(t)){ S.f.decline_contract=true; const named=ALL_SUPPLIERS.find(x=>t.includes(x.toLowerCase())); if(named) S.f.supplier=named; return false; } return null; }
   if(["personal_data","ict_outsourcing","system_access","subcontracting"].includes(k) && /not sure|unsure|don.?t know|no idea|maybe|possibly|perhaps|unclear|tbc|to be confirmed/.test(t)) return "unsure";
   if(["personal_data","ict_outsourcing","system_access","subcontracting"].includes(k)) return /^(y|yes|yeah|they will|it will)/.test(t)||/\bwill\b(?!.*\bnot\b)/.test(t)?true:/^(n|no|none|nope)\b|not /.test(t)?false:"unsure";
   if(k==="budget_approved") return /^y|approved|signed off|confirmed/.test(t)&&!/not|pending|awaiting/.test(t)?"yes":/part/.test(t)?"partly":"no";
