@@ -1288,7 +1288,7 @@ const AMOUNT_RE="(?:€|EUR\\s?)?\\d(?:[\\d,.]*\\d)?(?:\\s*(?:k|m|bn|million|tho
 const SCRUB={
   money:/€|£|\$\s?\d|\bEUR\b|\b\d+(?:[.,]\d+)?\s*(?:k|m|bn|million|thousand)\b|\bbudget\w*\b|\bcost cent(?:re|er)s?\b|\bbudget approval\b|\b(?:which|that|it|this) (?:is|has been|was) (?:already |not yet |partly )?(?:approved|signed off)\b|\bapproved budget\b|\bday rates?\b/i,
   route:/recommended route|buying route|sourcing (?:project|event)|quick quote|call-?off|\bp-?card\b|card purchase|catalogue order|existing (?:contract|framework)|framework (?:agreement|contract)|preferred suppliers?|three quotes|competing offers|procurement route|\bcompete\b/i,
-  risk:/\b(?:will|won.?t|will not|does not|doesn.?t|no|not|without)\b[^.]{0,40}\b(?:personal|client|customer) data\b|\boutsourc\w*|\bsubcontract\w*|\boffshor\w*|\bsystem access\b|\bif it stopped\b|\bICT review\b|\btreated as critical\b|\bdata protection review\b/i,
+  risk:/\b(?:will|won.?t|will not|does not|doesn.?t|no|not|without)\b[^.]{0,40}\b(?:personal|client|customer) data\b|\boutsourc\w*|\bsubcontract\w*|\boffshor\w*|\bsystem access\b|\bif it stopped\b|\bICT review\b|\btreated as critical\b|\bdata protection review\b|\b(?:hosted|stored|stores?|storing|held|holds?|hosting)\b[^.]{0,60}\b(?:in the (?:EU|UK|US)|EU|names|contacts|salar\w*|personal|client data|employee data)\b|\bGDPR\b|\brequester names\b|\bsupplier contacts\b/i,
   unknown:/\b(?:i|we) (?:don.?t|do not|dont) know\b|\bnot sure\b|\bunsure\b|\bnot given\b|\btbc\b|\btbd\b|\bto be confirmed\b|\bno idea\b/i,
   time:new RegExp(`\\b${MONTHS_RE}\\b|\\bMay\\s+\\d|\\b\\d{1,2}\\s+May\\b|\\bQ[1-4]\\b|\\b20\\d\\d\\b|\\basap\\b|as soon as possible|\\bnext (?:week|month|quarter|year)\\b|\\b(?:${CITIES.join("|")})\\b|\\bon[- ]site\\b`,"i")
 };
