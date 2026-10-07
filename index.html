@@ -549,7 +549,7 @@ function findIssue(changed){
       if((VAGUE.test(v.trim()) && !(k==="renewal_change"&&/no/i.test(v))) || tooShort)
         return {fact:k, issue:"too vague to act on", message:`Could you say a little more? "${v}" is hard for ${k==="supplier_reason"?"procurement to accept as a reason":"a supplier to work with"}. ${FACTS[k].ex(f)||FACTS[k].q(f)}`.trim()};
     }
-    if(k==="value" && known(v) && !f.value_is_estimate){
+    if(k==="value" && known(v)){
       const val=Number(v), mo=monthsOf(f.duration);
       if(route==="contingent" && known(f.day_rate)){
         const rate=parseMoney(f.day_rate), exp=rate&&rate<5000 ? rate*20*mo*(parseInt(f.headcount)||1) : null;
@@ -562,7 +562,7 @@ function findIssue(changed){
     }
     if(k==="personal_data" && f.personal_data===false){
       const m=ctx.match(/\b(hr system|hr platform|payroll|salar(?:y|ies)|employee (?:records|names|details)|customer (?:records|names|details|data)|client (?:records|names|details)|patients?|crm|recruit\w*|candidates?)\b/);
-      const what=m[1].replace(/\b(crm|hr)\b/g,x=>x.toUpperCase()).replace(/^(.)/,(x)=>/^(CRM|HR)/.test(m[1].toUpperCase())?x:x);
+      const what=m ? m[1].replace(/\b(crm|hr)\b/g,x=>x.toUpperCase()) : "";
       if(m) return {fact:k, issue:`"no personal data" although the request mentions ${what}`, message:`You said no personal data, but ${/^(CRM|HR)/.test(what)?"a "+what:what} usually involves names, contact details or salaries. Will the supplier see any of that?`, choices:["Yes","No, none at all"]};
     }
     if(k==="ict_outsourcing" && f.ict_outsourcing===false){
