@@ -502,7 +502,7 @@ async function callLLM(system, history){
   const d=await r.json(); if(!r.ok) throw new Error(d?.error?.message||`Groq error ${r.status}`);
   return parseJSON(d.choices?.[0]?.message?.content);
 }
-function parseJSON(t){ t=String(t||"").trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim(); try{return JSON.parse(t);}catch(e){const m=t.match(/\{[\s\S]*\}/); if(m) return JSON.parse(m[0]); throw new Error("The AI answer was not valid JSON.");} }
+function parseJSON(t){ t=String(t||"").trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim(); try{return JSON.parse(t);}catch(e){const m=t.match(/\{[\s\S]*\}/); if(m){ try{return JSON.parse(m[0]);}catch(e2){} } return {_raw:true, reply:t}; } }
 
 /* ---------- conversation prompt ---------- */
 function chatSystem(){
@@ -544,7 +544,8 @@ Active contracts: ${CONTRACTS.map(c=>`${c.title} with ${c.supplier} (${c.categor
 Preferred suppliers: ${Object.entries(PREFERRED).map(([k,v])=>`${k}: ${v.join(", ")}`).join("; ")}.
 Catalogue: ${CATALOGUE.map(c=>`${c.name} ${money(c.price)}`).join("; ")}.
 
-Return JSON only: {"facts":{...only keys you are setting...},"reply":"","choices":[],"complete":false}`;
+Return JSON only: {"facts":{...only keys you are setting...},"reply":"","asking":"the key from still_needed your question is about","choices":[],"complete":false}
+"asking" must be the key of the first unknown item in still_needed. Do not ask about anything else.`;
 }
 function stateBlock(){
   const f=S.f, still=S.missing.map(k=>({key:k,label:FACTS[k].label,ask:FACTS[k].q(f),example:(FACTS[k].ex(f)||"")}));
@@ -572,16 +573,16 @@ async function handleUser(text){
   if(S.sd && /^(make it|shorten|shorter|add more|rewrite|reword)|\b(summary|description|document)\b/i.test(text) && aiReady()) return refineSD(text);
   const asked=S.lastAsked; if(asked) S.asked[asked]=(S.asked[asked]||0)+1;
   S.msgs.push({role:"user",text}); S.choices=[]; S.busy=true; render();
-  let reply=null, choices=[], complete=false, note=null;
+  let reply=null, choices=[], complete=false, note=null, aiAsking=null;
   if(aiReady()){
     try{
-      const h=chatHistory(); h[h.length-1].content += stateBlock();
-      const out = await callLLM(chatSystem(), h);
+      const transcript=S.msgs.filter(m=>!m.kind).slice(0,-1).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
+      const out = await callLLM(chatSystem(), [{role:"user",content:`${transcript?`Conversation so far:\n${transcript}\n\n`:""}Latest user message:\n${text}${stateBlock()}\n\nAnswer with the JSON object only.`}]);
       mergeFacts(out.facts||{});
       // backup: closed answers the AI did not record are read directly
       if(asked && !known(S.f[asked]) && CLOSED.includes(asked)){ const v=readAnswer(asked,text); if(known(v) && v!=="unsure"||/sure|know/i.test(text)) S.f[asked]=v; }
       offlineRead(text, asked);   // backup: category, the answer to the question asked, and any other detail the AI did not record
-      reply=out.reply||null; choices=out.choices||[]; complete=!!out.complete;
+      reply=out._raw?null:(out.reply||null); choices=out.choices||[]; complete=!!out.complete; aiAsking=out.asking||null;
     }catch(e){
       const quota=e.quota||/quota|rate limit|429/i.test(e.message||""), slow=e.name==="TimeoutError"||e.name==="AbortError";
       const auth=/access code/i.test(e.message||"");
@@ -604,8 +605,9 @@ async function handleUser(text){
     render();
     await buildDoc();
   } else {
-    const next=S.missing[0];
-    const aiAskedOk = reply && !complete;
+    let next=S.missing[0];
+    const aiAskedOk = reply && !complete && aiAsking && S.missing.slice(0,2).includes(aiAsking);
+    if(aiAskedOk) next=aiAsking;
     let msg = aiAskedOk ? reply : offlineQuestion(next, prevRoute);
     S.msgs.push({role:"assistant",text:msg});
     const fc=FACTS[next].choices; const fcs=typeof fc==="function"?fc(S.f):fc;
