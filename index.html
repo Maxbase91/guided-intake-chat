@@ -758,6 +758,8 @@ Your job each turn:
    - Then ask about the FIRST item in still_needed that is still unknown after your update. One question at a time; you may combine it with the second item only when they naturally belong together (for example start date and duration).
    - If the user's answer already covers later items in still_needed, record those too so they are not asked again. Include a short, concrete example that fits their need, written into the sentence (for example "such as a current-state process map and a rollout plan").
    - 2 to 4 sentences. Warm, direct, plain English. No procurement jargon, no bullet lists, no headings.
+   - The reply is read by a business colleague. NEVER mention field names or internal terms (such as ict_outsourcing, tech_service, personal_data, still_needed, facts, JSON), values like true, false or null,
+     or what you "set" or "recorded" in which field. Say it in plain words instead, for example "Noted, the supplier will run it for you."
    - Never name or decide the buying route yourself. Never ask about something not in still_needed.
 3. If nothing in still_needed is unknown after your update, set "complete" true and reply with one sentence saying you have what you need.
 4. "choices": up to 4 very short answers only when your question is a closed one (yes/no, a duration band, a number of people). Otherwise [].
@@ -828,6 +830,14 @@ function chatHistory(){
 /* =========================================================
    7. CONVERSATION LOOP
    ========================================================= */
+// the AI must never show internal field names or values to the user; remove such sentences, or fall back to the standard question
+const INTERNAL_KEYS=new RegExp(`\\b(?:${Object.keys(BLANK_FACTS).filter(k=>k.includes("_")).join("|")}|still_needed|known_facts|already_checked|pending_check|route_so_far|facts?\\s*(?:object|json)|json)\\b`,"i");
+const INTERNAL_VALS=/\b(?:set|setting|recorded|marked|flagged|updated|stored)\b[^.?!]{0,40}\b(?:to|as)\s+(?:true|false|null|unsure)\b|(?:\b(?:is|as|to|equals)\s+|[=:]\s*)(?:true|false|null)\b/i;
+function cleanReply(t){
+  if(!t || typeof t!=="string") return t;
+  const sents=t.split(/(?<=[.!?])\s+/), kept=sents.filter(x=>!INTERNAL_KEYS.test(x) && !INTERNAL_VALS.test(x)).map(x=>x.replace(/\b[a-z]+(?:_[a-z]+)+\b/g,"").trim()).filter(Boolean);
+  return kept.length===sents.length ? t : (kept.join(" ").trim() || null);
+}
 class Stale extends Error{}
 const guard = cid => { if(S.cid!==cid) throw new Stale(); };   // the user started a new conversation meanwhile
 async function handleUser(text){
@@ -856,7 +866,7 @@ async function handleTurn(text, cid){
       if(!(pend && keepIt)) mergeFacts(out.facts||{}); else { const nf={...(out.facts||{})}; delete nf[pend.fact]; mergeFacts(nf); }
       if(asked && !known(S.f[asked]) && CLOSED.includes(asked)){ const v=readAnswer(asked,text); if(known(v) && v!=="unsure"||/sure|know/i.test(text)) S.f[asked]=v; }
       if(!(pend && keepIt)) offlineRead(text, asked);
-      reply=out._raw?null:(out.reply||null); choices=out.choices||[]; complete=!!out.complete; aiAsking=out.asking||null;
+      reply=out._raw?null:cleanReply(out.reply||null); if(reply && !/\?/.test(reply) && !out.complete) reply=null; choices=out.choices||[]; complete=!!out.complete; aiAsking=out.asking||null;
       if(out.assessment && out.assessment.ok===false && out.assessment.fact) aiCheck=out.assessment;
     }catch(e){
       if(e instanceof Stale) throw e; guard(cid);
@@ -897,7 +907,7 @@ async function handleTurn(text, cid){
   const aiOff = aiCheck && /off.?topic|unrelated|not related|does(?:n.?t| not) (?:answer|relate)|irrelevant|nothing to do/i.test(aiCheck.issue||"");
   if(!issue && aiOff && FACTS[aiCheck.fact] && !S.offChecked[aiCheck.fact] && aiCheck.fact!==(pend&&pend.fact)) issue=offTopicIssue(aiCheck.fact);
   if(!issue && aiCheck && S.challengeCount<3 && changed.includes(aiCheck.fact) && !S.challenged[aiCheck.fact] && FACTS[aiCheck.fact])
-    issue={fact:aiCheck.fact, issue:String(aiCheck.issue||"needs a second look").slice(0,140), message:String(aiCheck.follow_up||reply||"").trim()||`Could you double-check this? ${FACTS[aiCheck.fact].q(S.f)}`};
+    issue={fact:aiCheck.fact, issue:String(aiCheck.issue||"needs a second look").slice(0,140), message:String(cleanReply(aiCheck.follow_up||"")||reply||"").trim()||`Could you double-check this? ${FACTS[aiCheck.fact].q(S.f)}`};
   if(issue){
     if(issue.kind==="offtopic") S.offChecked[issue.fact]=true; else { S.challenged[issue.fact]=true; S.challengeCount++; }
     S.pending={fact:issue.fact, prev:S.f[issue.fact], issue:issue.issue, kind:issue.kind||""};
