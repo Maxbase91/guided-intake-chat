@@ -512,7 +512,7 @@ You only have a conversation. Fixed rules decide the buying route and which fact
 Your job each turn:
 1. Read the user's latest message and record EVERY fact it contains in "facts", for any key in the list below, not only the one you asked about.
    Business users often put many details into one message (budget, dates, place, data, supplier, success criteria). Capture all of them so they are never asked again. Use null for unknown. Never invent facts.
-   If they say they don't know the value, estimate a realistic total in ${CONFIG.currency}, set value_is_estimate true, and tell them your estimate and its basis.
+   If they say they don't know the value, estimate a realistic total in ${CONFIG.currency} (€, never £ or $), set value_is_estimate true, and tell them your estimate and its basis.
    Any answer counts, including "no", "not sure" or "none". Record it.
 2. Write "reply":
    - Start with a short, natural reaction to what they said (vary it; do not start with "Got it" every time). Show you understood, using their words.
@@ -1030,6 +1030,8 @@ const DOC_SYSTEM = () => `You write two things for a corporate procurement reque
    supplier situation, cost centre and the recommended route. Someone who reads only this paragraph must understand the whole request.
 2. "brd": the BUSINESS REQUIREMENTS DOCUMENT content, complete enough for the sourcing, risk and contract teams to work from without asking again.
 Rules: use every fact and every detail from the conversation. Never invent names, numbers or dates. Where something important is unknown, put it in open_points.
+Money: the currency is ${CONFIG.currency} (€). Quote the value exactly as given in value_display. Never recalculate or re-estimate amounts.
+Do not use internal labels such as "contingent labour" or category ids; use plain words. Do not rate the overall risk level yourself; describe the facts.
 You may propose sensible out-of-scope items, milestones, assumptions and evaluation weights that follow from the facts; mark proposals with "(proposed)".
 Requirements: clear, testable, one per line, written as "The supplier shall ..." or as a plain statement. Types: Service, Supply, Timing, Location, Service level, Acceptance, Data protection,
 Security, Resilience, Compliance, Supplier, Commercial, Contract, Resourcing, Skills. Priority: Must, Should or Could. 8 to 20 requirements.
@@ -1060,7 +1062,7 @@ async function buildDoc(){
   if(aiReady()){
     try{
       const convo=S.msgs.filter(m=>!m.kind).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
-      ai=await callLLM(DOC_SYSTEM(),[{role:"user",content:`Conversation:\n${convo}\n\nFacts: ${JSON.stringify(cleanFacts())}\nCategory: ${catById(S.f.category).name}\n`+
+      ai=await callLLM(DOC_SYSTEM(),[{role:"user",content:`Conversation:\n${convo}\n\nFacts: ${JSON.stringify({...cleanFacts(), value_display: known(S.f.value)?money(Number(S.f.value))+(S.f.value_is_estimate?" (estimate)":""):"unknown"})}\nCategory: ${catById(S.f.category).name}\n`+
         `Recommended route: ${CHANNELS[S.det.route].name}. ${S.det.why}\nChecks triggered: ${S.det.controls.map(c=>c[1]).join(", ")||"none"}\nExisting contract: ${S.det.contract?`${S.det.contract.title} with ${S.det.contract.supplier}`:"none"}\nPreferred suppliers: ${(PREFERRED[S.f.category]||[]).join(", ")||"none"}`}]);
       if(!ai || !ai.summary) throw new Error("empty");
     }catch(e){ ai=null; S.msgs.push({role:"assistant",kind:"sys",text:"The AI couldn't write the documents just now, so they are built from your answers."}); }
