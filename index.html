@@ -115,6 +115,37 @@ button,input,select,textarea{font:inherit;color:inherit}
 .ovr{border:1px dashed var(--warn);background:var(--warn-soft);border-radius:10px;padding:10px 12px;color:#6b3a06;margin-top:8px}
 .old{opacity:.6;font-size:13px;padding:10px 14px}
 .sec.lead{background:#fbfaf5;border-left:3px solid var(--amber);font-size:14.5px;line-height:1.6}
+.stepbar{display:flex;gap:4px;padding:10px 14px;border-bottom:1px solid var(--line);background:#fafbfd;overflow-x:auto;scrollbar-width:none}
+.stepbar:empty{display:none}
+.stepbar .st{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:99px;font-size:13px;color:var(--ink-3);white-space:nowrap;flex:none}
+.stepbar .st i{font-style:normal;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11.5px;font-weight:700;border:1.5px solid var(--line);background:#fff}
+.stepbar .st.done{color:var(--ink-2)} .stepbar .st.done i{background:var(--ok);border-color:var(--ok);color:#fff}
+.stepbar .st.cur{background:#fff;color:var(--navy);font-weight:600;box-shadow:var(--shadow)} .stepbar .st.cur i{background:var(--navy);border-color:var(--navy);color:#fff}
+.stepbar .st small{font-weight:400;color:var(--ink-3);font-size:11.5px}
+.stepbar .sep{flex:none;width:14px;height:1.5px;background:var(--line);align-self:center}
+.stagemark{display:flex;align-items:center;gap:10px;margin:18px 0 14px;color:var(--ink-3);font-size:12px}
+.stagemark:before,.stagemark:after{content:"";flex:1;height:1px;background:var(--line)}
+.stagemark b{color:var(--navy);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.stagemark span{display:block;text-align:center;line-height:1.4}
+.recap{border:1px solid var(--line);border-radius:14px;background:#fff;max-width:min(560px,85%);overflow:hidden;box-shadow:var(--shadow)}
+.recap .rh{padding:10px 14px;background:var(--ok-soft);color:var(--ok);font-weight:600;font-size:13px}
+.recap .rb{padding:8px 14px 10px}
+.recap .rr{display:flex;gap:10px;font-size:13.5px;padding:3px 0}
+.recap .rr span:first-child{color:var(--ink-3);width:120px;flex:none}
+.recap .rf{font-size:12.5px;color:var(--ink-3);padding:0 14px 10px}
+.recap.mini{box-shadow:none;background:#f8faf9;border-color:#e3efe9}
+.recap.mini .rh{background:transparent;font-weight:500;padding:7px 12px}
+.m.a .bub.chk{background:var(--amber-soft);border:1px solid #f3dfa6}
+.m.a .bub.chk:before{content:"Quick check · ";font-weight:600;color:var(--amber-ink)}
+.sec.qual .qhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13.5px;color:var(--ink-2)}
+.qbadge{font-weight:700;font-size:12.5px;padding:3px 10px;border-radius:99px}
+.q-strong,.q-good{background:var(--ok-soft);color:var(--ok)} .q-fair{background:var(--warn-soft);color:var(--warn)} .q-needs{background:var(--bad-soft);color:var(--bad)}
+.qlist{list-style:none;margin:8px 0 0;padding:0}
+.qlist li{display:flex;gap:8px;font-size:13.5px;padding:3px 0}
+.qlist li:before{flex:none;width:18px;text-align:center;font-weight:700}
+.qlist li.warn:before{content:"!";color:var(--warn)} .qlist li.info:before{content:"i";color:var(--info)} .qlist li.ok:before{content:"✓";color:var(--ok)}
+.side .grp{font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:12px 0 2px;display:flex;justify-content:space-between}
+.side .grp em{font-style:normal;color:var(--ok);letter-spacing:0;text-transform:none}
 .sec.chips{display:flex;flex-wrap:wrap;gap:6px}
 .sec.chips span{background:var(--line-2);border-radius:99px;padding:3px 10px;font-size:12.5px;color:var(--ink-2)}
 .sec.brdlink{display:flex;gap:12px;align-items:center;justify-content:space-between;background:#f6f8fd}
@@ -189,6 +220,7 @@ body.doc-open{overflow:hidden}
 
 <div class="app">
   <section class="chat">
+    <div class="stepbar" id="stepbar"></div>
     <div class="msgs" id="msgs"></div>
     <div class="qr" id="qr"></div>
     <form class="comp" id="comp">
@@ -332,7 +364,6 @@ const FACTS = {
   service_levels: {label:"Service levels",  q:()=>"Which service levels matter to you?", ex:f=>f.category==="facilities"?"For example: daily cleaning before 8am and issues fixed within 24 hours.":"For example: 99.9% availability, a response within 4 hours, or a monthly report."},
   ip_ownership:   {label:"Who owns the work", q:()=>"Should we own what the supplier creates, such as designs, code or materials?", ex:()=>"", choices:["Yes, we own it","Shared use is fine","Not sure"]},
   performance:    {label:"Supplier so far", q:f=>`How has ${hasSupplier(f)?f.supplier:"the supplier"} performed so far?`, ex:()=>"Anything to fix in the renewal is useful to know.", choices:["Very well","Okay","Some issues"]},
-  cost_centre:    {label:"Cost centre",     q:()=>"Last one: which cost centre or budget pays for this?", ex:()=>"A cost centre number or the budget owner's name is enough."}
 };
 const GOODSLIKE = f => f.demand_type==="goods" || f.demand_type==="software";
 // relevance rules: an extra question is only asked when it matters
@@ -344,30 +375,47 @@ const REL = {
   volume:   f => ["training","facilities","telecom","marketing"].includes(f.category),
   subcon:   f => yes(f.personal_data) || yes(f.ict_outsourcing),
 };
+// Only what the requester must answer for each route. Anything procurement or the supplier can supply
+// (payment model, subcontractors, certifications, evaluation weights, cost centre) is not asked.
+// It is still picked up and used if the requester mentions it.
 function requiredFor(route, f){
   const g=GOODSLIKE(f), sw=f.demand_type==="software", on=(c,k)=>c?[].concat(k):[];
-  const risk = () => ["personal_data", ...on(REL.pd(f),"data_details")];
+  const data = () => ["personal_data", ...on(REL.pd(f),"data_details")];
   switch(route){
-    case "catalogue":  return ["item","quantity","needed_by","location","cost_centre"];
-    case "pcard":      return ["item","value","supplier","needed_by"];
-    case "contract":   return [...on(!contractAgreed(f),"contract_ok"),
-                               ...(g ? ["item","quantity","value","needed_by","location"]
-                                     : ["deliverables","value","duration","needed_by","location",...risk(),"acceptance"]),"cost_centre"];
-    case "renewal":    return ["value","duration","renewal_change","performance",...risk(),...on(REL.ongoing(f),"service_levels"),"cost_centre"];
-    case "quote":      return g ? ["item","quantity","value","needed_by","location","support_needs",...on(sw,risk()),"supplier","cost_centre"]
-                                : ["deliverables","value","duration","needed_by","location",...on(REL.volume(f),"volume"),...risk(),"acceptance","pricing_model","supplier","cost_centre"];
+    case "catalogue":  return ["item","quantity","needed_by","location"];
+    case "pcard":      return ["item","value"];
+    case "contract":   return g ? ["item","quantity",...on(!contractAgreed(f),"contract_ok"),"value","needed_by"]
+                                : ["deliverables",...on(!contractAgreed(f),"contract_ok"),"needed_by","duration","value",...data()];
+    case "renewal":    return ["renewal_change","duration","value",...data()];
+    case "quote":      return g ? ["item","quantity","needed_by",...on(!sw,"location"),"value","supplier",...on(sw,data())]
+                                : ["deliverables",...on(REL.volume(f),"volume"),"needed_by","value","supplier",...data()];
     case "sourcing":   return g
-      ? ["item","quantity","background","value","needed_by","location","support_needs",
-         ...on(sw,[...risk(),"ict_outsourcing","criticality",...on(REL.subcon(f),"subcontracting"),"service_levels","pricing_model"]),
-         "supplier_requirements","current_supplier","evaluation_priority","supplier",...on(hasSupplier(f),"supplier_reason"),"budget_approved","cost_centre"]
-      : ["deliverables","background","value","duration","needed_by","location",...on(REL.volume(f),"volume"),
-         ...risk(),"ict_outsourcing",...on(REL.techy(f),"criticality"),...on(REL.subcon(f),"subcontracting"),...on(REL.ongoing(f),"service_levels"),
-         ...on(REL.creates(f),"ip_ownership"),"acceptance","pricing_model","supplier_requirements","current_supplier","evaluation_priority",
-         "supplier",...on(hasSupplier(f),"supplier_reason"),"budget_approved","cost_centre"];
-    case "contingent": return ["role","deliverables","headcount","skills","duration","needed_by","location","day_rate","system_access",...on(REL.pd(f),"data_details"),"cost_centre"];
+      ? ["item","quantity","background","needed_by",...on(!sw,"location"),"value","supplier",...on(hasSupplier(f),"supplier_reason"),"budget_approved",
+         ...on(sw,[...data(),"ict_outsourcing",...on(REL.techy(f)&&yes(f.ict_outsourcing),"criticality")]),...on(sw&&yes(f.ict_outsourcing),"service_levels")]
+      : ["deliverables","background",...on(REL.volume(f),"volume"),"needed_by","duration","value","supplier",...on(hasSupplier(f),"supplier_reason"),"budget_approved",
+         ...data(),"ict_outsourcing",...on(REL.techy(f)&&yes(f.ict_outsourcing),"criticality"),
+         "acceptance",...on(REL.ongoing(f)&&yes(f.ict_outsourcing),"service_levels"),...on(REL.creates(f),"ip_ownership")];
+    case "contingent": return ["role","headcount","skills","deliverables","needed_by","duration","location","day_rate","system_access",...on(REL.pd(f),"data_details")];
   }
   return [];
 }
+
+// Stages group the questions so the requester sees a short, clear path. Only stages with questions for the route are shown.
+const STAGES=[
+  {id:"need",    name:"Your need",            intro:"First, what you need and roughly what it costs.",
+   facts:["need","item","quantity","deliverables","role","headcount","skills","volume","renewal_change","value","day_rate","contract_ok","background"]},
+  {id:"timing",  name:"Timing and place",     intro:"Now, when and where.", facts:["needed_by","duration","location"]},
+  {id:"supplier",name:"Supplier and approval",intro:"A quick word on the supplier and the budget approval.", facts:["supplier","supplier_reason","budget_approved"]},
+  {id:"risk",    name:"Data and systems",     intro:"A few checks on data and systems. They decide which reviews are needed.", facts:["personal_data","data_details","system_access","ict_outsourcing","criticality"]},
+  {id:"success", name:"Success",              intro:"Last: how we'll know it went well.", facts:["acceptance","service_levels","ip_ownership"]},
+  {id:"review",  name:"Review",               intro:"Here's the route, your summary and the requirements document.", facts:[]}
+];
+const stageOf = k => { const i=STAGES.findIndex(st=>st.facts.includes(k)); return i<0?0:i; };
+const posIn = k => { const st=STAGES[stageOf(k)]; return st.facts.indexOf(k); };
+const stageById = id => STAGES.find(st=>st.id===id);
+const stageFacts = id => (S.req||[]).filter(k=>stageById(id).facts.includes(k));
+const stageDone = id => id==="review" ? !!S.completed : stageFacts(id).every(k=>known(S.f[k]));
+const currentStage = () => S.missing.length && S.det ? STAGES[stageOf(S.missing[0])].id : (S.det?"review":"need");
 
 /* =========================================================
    4. STATE
@@ -375,10 +423,10 @@ function requiredFor(route, f){
 const BLANK_FACTS = {summary:null,category:null,demand_type:null,item:null,quantity:null,value:null,value_is_estimate:false,deliverables:null,duration:null,
   needed_by:null,location:null,supplier:null,supplier_reason:null,personal_data:null,ict_outsourcing:null,critical_service:null,offshore:null,
   budget_approved:null,decline_contract:null,contract_ok:null,background:null,acceptance:null,evaluation_priority:null,supplier_requirements:null,current_supplier:null,
-  volume:null,support_needs:null,data_details:null,criticality:null,subcontracting:null,pricing_model:null,service_levels:null,ip_ownership:null,performance:null,cost_centre:null,role:null,headcount:null,skills:null,day_rate:null,system_access:null,renewal_change:null,wants_renewal:null};
+  volume:null,support_needs:null,data_details:null,criticality:null,subcontracting:null,pricing_model:null,service_levels:null,ip_ownership:null,performance:null,role:null,headcount:null,skills:null,day_rate:null,system_access:null,renewal_change:null,wants_renewal:null};
 let CONV_SEQ=0;
 const S = fresh();
-function fresh(){ return {cid:++CONV_SEQ, completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
+function fresh(){ return {cid:++CONV_SEQ, curStage:null, stageIds:[], recapped:{}, req:[], challenged:{}, challengeCount:0, flags:[], pending:null, completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
 
 /* =========================================================
    5. RULES ENGINE (deterministic)
@@ -463,11 +511,95 @@ function refresh(){
   if(S.det.route==="contingent" && !known(f.value) && known(f.day_rate)){ const v=parseMoney(f.day_rate); if(v) f.value = v<5000 ? v*20*monthsOf(f.duration) * (parseInt(f.headcount)||1) : v; if(v) f.value_is_estimate=v<5000; }
   S.det = determine();
   const req = requiredFor(S.det.route, f);
-  const needsValue = !["catalogue","contingent"].includes(S.det.route);
-  let order = needsValue && !known(f.value) ? ["value",...req.filter(k=>k!=="value")] : req;
-  if(order.includes("contract_ok")) order=["contract_ok",...order.filter(k=>k!=="contract_ok")];
+  S.req = req;
+  S.stageIds = STAGES.filter(st=>st.id==="review"||req.some(k=>st.facts.includes(k))).map(st=>st.id);
+  const order = [...req].sort((a,b)=>(stageOf(a)-stageOf(b))||(posIn(a)-posIn(b)));
   S.missing = order.filter(k=>!known(f[k]));
 }
+/* ---------- answer quality checks (rules; the AI adds its own view on top) ---------- */
+const MONTHS=["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+function parseWhen(str){
+  const t=String(str||"").toLowerCase().trim(), now=new Date(), d0=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  if(!t) return null;
+  if(/\b(asap|as soon as possible|immediately|urgent(ly)?|right away|now)\b/.test(t)) return d0;
+  if(/next week/.test(t)) return new Date(+d0+7*864e5);
+  if(/next month/.test(t)) return new Date(now.getFullYear(),now.getMonth()+1,1);
+  if(/next quarter/.test(t)) return new Date(now.getFullYear(),Math.floor(now.getMonth()/3)*3+3,1);
+  if(/next year/.test(t)) return new Date(now.getFullYear()+1,0,1);
+  let m=t.match(/(\d{4})-(\d{2})-(\d{2})/); if(m) return new Date(+m[1],+m[2]-1,+m[3]);
+  m=t.match(/\b(\d{1,2})[./](\d{1,2})[./](\d{2,4})\b/); if(m) return new Date(+m[3]<100?2000+ +m[3]:+m[3],+m[2]-1,+m[1]);
+  m=t.match(/\bq([1-4])(?:\s*(\d{4}))?/); if(m){ let y=m[2]?+m[2]:now.getFullYear(); let d=new Date(y,(+m[1]-1)*3,1); if(!m[2]&&d<d0) d=new Date(y+1,(+m[1]-1)*3,1); return d; }
+  m=t.match(/\b(?:(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?)?(?:(end|mid|early|beginning)\s+(?:of\s+)?)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?:\s+(\d{1,2})(?:st|nd|rd|th)?)?(?:\s+(\d{4}))?/);
+  if(m){ const mi=MONTHS.indexOf(m[3]); let day=+(m[1]||m[4]||1); if(m[2]==="end") day=28; if(m[2]==="mid") day=15;
+    let y=m[5]?+m[5]:now.getFullYear(); let d=new Date(y,mi,day); if(!m[5] && d < new Date(+d0-20*864e5)) d=new Date(y+1,mi,day); return d; }
+  return null;
+}
+const LEAD_DAYS={catalogue:3,pcard:1,contract:7,renewal:20,quote:14,sourcing:45,contingent:14};
+const words = v => String(v||"").trim().split(/\s+/).filter(Boolean).length;
+const VAGUE=/^(tbd|tbc|n\/?a|not sure|don'?t know|idk|stuff|things|everything|various|whatever|same|as usual|-|\?+|ok|okay|yes|no)\.?$/i;
+
+// returns {fact, issue, message, choices} for the first real problem in what changed this turn, or null
+function findIssue(changed){
+  const f=S.f, route=S.det&&S.det.route, ctx=userText();
+  for(const k of changed){
+    if(S.challenged[k]) continue;
+    const v=f[k];
+    if(["deliverables","acceptance","background","data_details","skills","supplier_reason","renewal_change","item"].includes(k) && typeof v==="string"){
+      const tooShort = ["deliverables","acceptance","background"].includes(k) ? words(v)<2 : k==="supplier_reason" ? words(v)<3 : false;
+      if((VAGUE.test(v.trim()) && !(k==="renewal_change"&&/no/i.test(v))) || tooShort)
+        return {fact:k, issue:"too vague to act on", message:`Could you say a little more? "${v}" is hard for ${k==="supplier_reason"?"procurement to accept as a reason":"a supplier to work with"}. ${FACTS[k].ex(f)||FACTS[k].q(f)}`.trim()};
+    }
+    if(k==="value" && known(v) && !f.value_is_estimate){
+      const val=Number(v), mo=monthsOf(f.duration);
+      if(route==="contingent" && known(f.day_rate)){
+        const rate=parseMoney(f.day_rate), exp=rate&&rate<5000 ? rate*20*mo*(parseInt(f.headcount)||1) : null;
+        if(exp && Math.abs(val-exp)/exp>0.5) return {fact:k, issue:`doesn't match the day rate (about ${money(exp)} expected)`, message:`Just to check: at ${f.day_rate} for ${parseInt(f.headcount)||1} ${parseInt(f.headcount)>1?"people":"person"} over ${f.duration||"the assignment"}, I'd expect about ${money(exp)}. You said ${money(val)}. Which is right?`, choices:[`About ${money(exp)}`,`${money(val)} is right`]};
+      }
+      const bigWork = ["consulting","it-services","legal","cloud"].includes(f.category) || (f.category==="software" && /\b(system|platform|replace|implementation|erp|crm)\b/.test(ctx));
+      if(bigWork && val<5000) return {fact:k, issue:`looks low for ${catById(f.category).name.toLowerCase()} work`, message:`Just to check: ${money(val)} is low for ${catById(f.category).name.toLowerCase()} work like this. Is that the total budget, or should it be higher?`, choices:["Yes, that's the total"]};
+      if(known(f.duration) && mo>=3 && val<3000 && !GOODSLIKE(f)) return {fact:k, issue:`looks low for ${f.duration} of work`, message:`Just to check: ${money(val)} for ${f.duration} of work looks low. Is that the total budget?`, choices:["Yes, that's the total"]};
+      if(val>20000000) return {fact:k, issue:"very large amount", message:`Just to confirm: the total is ${money(val)}?`, choices:["Yes, that's right"]};
+    }
+    if(k==="personal_data" && f.personal_data===false){
+      const m=ctx.match(/\b(hr system|hr platform|payroll|salar(?:y|ies)|employee (?:records|names|details)|customer (?:records|names|details|data)|client (?:records|names|details)|patients?|crm|recruit\w*|candidates?)\b/);
+      const what=m[1].replace(/\b(crm|hr)\b/g,x=>x.toUpperCase()).replace(/^(.)/,(x)=>/^(CRM|HR)/.test(m[1].toUpperCase())?x:x);
+      if(m) return {fact:k, issue:`"no personal data" although the request mentions ${what}`, message:`You said no personal data, but ${/^(CRM|HR)/.test(what)?"a "+what:what} usually involves names, contact details or salaries. Will the supplier see any of that?`, choices:["Yes","No, none at all"]};
+    }
+    if(k==="ict_outsourcing" && f.ict_outsourcing===false){
+      const m=ctx.match(/\b(cloud[- ]based|saas|hosted|hosting|online platform|managed service)\b/);
+      if(m) return {fact:k, issue:`"no IT run for us" although it is ${m[1]}`, message:`You mentioned it's ${m[1]}, which usually means the supplier runs it for us. Will they host or run it?`, choices:["Yes","No"]};
+    }
+    if(k==="needed_by" && known(v) && route){
+      const d=parseWhen(v); if(!d) continue;
+      const days=Math.round((d-new Date())/864e5);
+      if(days< -1) return {fact:k, issue:"date in the past", message:`${v} seems to be in the past. When should it start?`};
+      if(days < (LEAD_DAYS[route]||0)) return {fact:k, issue:`tight: ${CHANNELS[route].name.toLowerCase()} usually takes ${CHANNELS[route].days} working days`, message:`That's ${days<=1?"very soon":`in about ${days} days`}. A ${CHANNELS[route].name.toLowerCase()} usually takes ${CHANNELS[route].days} working days. Is ${v} a fixed deadline, or can it move a little?`, choices:["It's fixed","It can move"], kind:"date"};
+    }
+  }
+  return null;
+}
+
+// overall assessment of the intake: completeness, clarity, consistency
+function computeQuality(aiRemarks){
+  const f=S.f, route=S.det.route, req=S.req||[], pts=[];
+  const label=k=>FACTS[k]?FACTS[k].label:k;
+  for(const fl of S.flags){
+    if(fl.status==="confirmed") pts.push({lvl:"warn",text:`${label(fl.fact)}: ${fl.issue}. Confirmed by you, so the buyer may ask again.`});
+    else if(fl.status==="flexible") pts.push({lvl:"info",text:`Start date is flexible (${fl.issue}).`});
+    else if(fl.status==="corrected") pts.push({lvl:"ok",text:`${label(fl.fact)} clarified during the intake.`});
+  }
+  req.filter(k=>f[k]==="Not given"||f[k]==="unsure").forEach(k=>pts.push({lvl:"warn",text:`${label(k)}: still to be clarified.`}));
+  if(f.value_is_estimate && !["catalogue"].includes(route)) pts.push({lvl:"info",text:`The budget of ${money(Number(f.value))} is an estimate.`});
+  if(route==="sourcing" && f.budget_approved && f.budget_approved!=="yes") pts.push({lvl:"warn",text:"Budget not yet approved. Sourcing can only start once it is."});
+  if(known(f.needed_by) && !S.flags.some(x=>x.fact==="needed_by")){ const d=parseWhen(f.needed_by); if(d){ const days=(d-new Date())/864e5; if(days<(LEAD_DAYS[route]||0)) pts.push({lvl:"info",text:`Tight timeline: ${CHANNELS[route].name.toLowerCase()} usually takes ${CHANNELS[route].days} working days.`}); } }
+  (aiRemarks||[]).filter(x=>typeof x==="string"&&x.trim()).slice(0,2).forEach(x=>pts.push({lvl:"info",text:x.trim().replace(/\.?$/,".")}));
+  const answered=req.filter(k=>known(f[k])&&f[k]!=="Not given"&&f[k]!=="unsure").length, complete=req.length?Math.round(answered/req.length*100):100;
+  const warn=pts.filter(p=>p.lvl==="warn").length, info=pts.filter(p=>p.lvl==="info").length;
+  const score=Math.max(35,Math.min(100,100-15*warn-5*info-Math.round((100-complete)/2)));
+  const rating=score>=90?"Strong":score>=75?"Good":score>=55?"Fair":"Needs work";
+  return {score,rating,complete,points:pts};
+}
+
 const monthsOf = d => { const m=String(d||"").match(/(\d+)\s*(?:-|–|to)?\s*(\d+)?\s*(month|week|year)/i); if(!m) return 6; const n=Number(m[2]||m[1]); return /week/i.test(m[3])?n/4.3:/year/i.test(m[3])?n*12:n; };
 
 /* =========================================================
@@ -534,6 +666,13 @@ Your job each turn:
    - Never name or decide the buying route yourself. Never ask about something not in still_needed.
 3. If nothing in still_needed is unknown after your update, set "complete" true and reply with one sentence saying you have what you need.
 4. "choices": up to 4 very short answers only when your question is a closed one (yes/no, a duration band, a number of people). Otherwise [].
+5. Quality check of the user's latest answer, in "assessment": {"fact":"key of the item they answered","ok":true,"issue":"","follow_up":""}.
+   Set ok to false ONLY when the answer is clearly too vague to act on ("stuff", "the usual"), contradicts earlier facts, or is implausible
+   (for example a budget far too low for the work described, a start date that has passed, "no personal data" for an HR or payroll system).
+   Reasonable answers are ok, even if short. Never challenge an item listed in already_checked.
+   When ok is false, "reply" must be only a short, friendly follow-up that names the issue and asks to confirm or correct it. Do not ask the next item in that case.
+6. If pending_check is set, the user is answering your earlier check on that item: update the fact if they corrected it, keep it if they confirmed it.
+Keep the conversation light: ask only what is in still_needed, and never ask about cost centres, payment models, subcontractors, certifications or evaluation weights unless the user raises them.
 
 Fact keys:
 summary (one plain sentence describing the need), category (one of: ${CATEGORIES.map(c=>`${c.id} = ${c.name}`).join("; ")}), demand_type (goods | services | software | contingent_labour),
@@ -546,12 +685,12 @@ contract_ok (true only if the user explicitly agrees to use the existing contrac
 decline_contract (true if they decline the existing contract),
 background (why it is needed now), acceptance (how success is judged), evaluation_priority, supplier_requirements, current_supplier ("None" if new),
 volume, support_needs, data_details (which data and where stored), criticality (what happens if it stops; also set critical_service true if clients or regulated activity are hit),
-subcontracting (true | false | "unsure"), pricing_model, service_levels, ip_ownership, performance (how the current supplier performed), cost_centre.
+subcontracting (true | false | "unsure"), pricing_model, service_levels, ip_ownership, performance (how the current supplier performed).
 External workers or contractors are demand_type contingent_labour.
 
 ${contextLines()}
 
-Return JSON only: {"facts":{...only keys you are setting...},"reply":"","asking":"the key from still_needed your question is about","choices":[],"complete":false}
+Return JSON only: {"facts":{...only keys you are setting...},"reply":"","asking":"the key from still_needed your question is about","choices":[],"complete":false,"assessment":{"fact":"","ok":true,"issue":"","follow_up":""}}
 "asking" must be the key of the first unknown item in still_needed. Do not ask about anything else.`;
 }
 function contextLines(){
@@ -563,10 +702,12 @@ function contextLines(){
     (pref.length?`\nPreferred suppliers: ${pref.join(", ")}.`:"")+
     (cat.length?`\nCatalogue: ${cat.map(x=>`${x.name} ${money(x.price)}`).join("; ")}.`:"");
 }
-function stateBlock(){
-  const f=S.f, still=S.missing.map((k,i)=>i<3?{key:k,label:FACTS[k].label,ask:FACTS[k].q(f),example:(FACTS[k].ex(f)||"")}:{key:k,label:FACTS[k].label});
+function stateBlock(pend){
+  const f=S.f, still=S.missing.map((k,i)=>i<3?{key:k,label:FACTS[k].label,stage:STAGES[stageOf(k)].name,ask:FACTS[k].q(f),example:(FACTS[k].ex(f)||"")}:{key:k,label:FACTS[k].label});
   return `\n\n[STATE]\nknown_facts: ${JSON.stringify(Object.fromEntries(Object.entries(f).filter(([k,v])=>known(v)&&v!==false)))}\n`+
     (S.det?`route_so_far: ${CHANNELS[S.det.route].name}\n`:"")+
+    `already_checked: ${JSON.stringify(Object.keys(S.challenged||{}))}\n`+
+    (pend?`pending_check: ${JSON.stringify({fact:pend.fact,issue:pend.issue,previous_value:pend.prev})}\n`:"")+
     `still_needed (ask the first unknown one): ${JSON.stringify(still)}`;
 }
 function chatHistory(){
@@ -597,34 +738,72 @@ async function handleTurn(text, cid){
   if(S.sd && /^(make it|shorten|shorter|add more|rewrite|reword)|\b(summary|description|document)\b/i.test(text) && aiReady()) return refineSD(text);
   const asked=S.lastAsked; if(asked) S.asked[asked]=(S.asked[asked]||0)+1;
   S.msgs.push({role:"user",text}); S.choices=[]; S.busy=true; render();
-  let reply=null, choices=[], complete=false, note=null, aiAsking=null;
+  const before={...S.f};
+  // the user is answering a check we raised on an earlier answer
+  const pend=S.pending; S.pending=null;
+  const t=text.trim().toLowerCase();
+  const keepIt = pend && (/^(yes|yep|yeah|correct|that'?s (right|correct)|right|confirmed?|it is|keep( it)?|as i said|it'?s fixed|fixed|hard deadline|that'?s fine|fine)\b/.test(t) || /is right$/.test(t)) && !/\d/.test(t.replace(/^[^\d]*right/,"")) && words(text)<=6;
+  if(pend && !keepIt && pend.kind!=="date") S.f[pend.fact]=null;
+  let reply=null, choices=[], complete=false, note=null, aiAsking=null, aiCheck=null;
   if(aiReady()){
     try{
       const transcript=S.msgs.filter(m=>!m.kind).slice(0,-1).slice(-8).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
-      const out = await callLLM(chatSystem(), [{role:"user",content:`${transcript?`Conversation so far:\n${transcript}\n\n`:""}Latest user message:\n${text}${stateBlock()}\n\nAnswer with the JSON object only.`}]);
+      const out = await callLLM(chatSystem(), [{role:"user",content:`${transcript?`Conversation so far:\n${transcript}\n\n`:""}Latest user message:\n${text}${stateBlock(pend)}\n\nAnswer with the JSON object only.`}]);
       guard(cid);
-      mergeFacts(out.facts||{});
-      // backup: closed answers the AI did not record are read directly
+      if(!(pend && keepIt)) mergeFacts(out.facts||{}); else { const nf={...(out.facts||{})}; delete nf[pend.fact]; mergeFacts(nf); }
       if(asked && !known(S.f[asked]) && CLOSED.includes(asked)){ const v=readAnswer(asked,text); if(known(v) && v!=="unsure"||/sure|know/i.test(text)) S.f[asked]=v; }
-      offlineRead(text, asked);   // backup: category, the answer to the question asked, and any other detail the AI did not record
+      if(!(pend && keepIt)) offlineRead(text, asked);
       reply=out._raw?null:(out.reply||null); choices=out.choices||[]; complete=!!out.complete; aiAsking=out.asking||null;
+      if(out.assessment && out.assessment.ok===false && out.assessment.fact) aiCheck=out.assessment;
     }catch(e){
       if(e instanceof Stale) throw e; guard(cid);
       const quota=e.quota||/quota|rate limit|429/i.test(e.message||""), slow=e.name==="TimeoutError"||e.name==="AbortError";
       const auth=/access code/i.test(e.message||"");
       note = auth ? "This demo needs an access code for the AI. Open Rules and enter it. Until then I'm using standard questions." : quota ? "The AI has reached its usage limit, so I'm using standard questions for now." : slow ? "The AI took too long, so I'm using standard questions for now." : "The AI services aren't answering right now, so I'm using standard questions for now.";
-      offlineRead(text, asked);
+      if(!(pend && keepIt)) offlineRead(text, asked);
     }
-  } else offlineRead(text, asked);
+  } else if(!(pend && keepIt)) offlineRead(text, asked);
 
-  // never loop: if the same thing was asked twice and is still unknown, move on
+  // close the check: keep, correct or (for dates) mark as flexible
+  if(pend){
+    if(pend.kind==="date"){
+      const nd = parseWhen(text) && !/fixed|can move|flexible|later/.test(t) ? text.trim() : null;
+      if(nd && nd!==pend.prev){ S.f.needed_by=cap1(nd); S.flags.push({fact:pend.fact,issue:pend.issue,status:"corrected"}); }
+      else { S.f.needed_by=pend.prev; S.flags.push({fact:pend.fact,issue:pend.issue,status:/move|flexible|later/.test(t)?"flexible":"confirmed"}); }
+    } else {
+      if(!known(S.f[pend.fact])) S.f[pend.fact]=pend.prev;
+      S.flags.push({fact:pend.fact,issue:pend.issue,status: JSON.stringify(S.f[pend.fact])===JSON.stringify(pend.prev)?"confirmed":"corrected"});
+    }
+  }
+
   if(asked && !known(S.f[asked]) && (S.asked[asked]||0)>=2) giveUp(asked);
-  const prevRoute=S.det&&S.det.route;
+  const prevRoute=S.det&&S.det.route, prevStages=[...(S.stageIds||[])];
   refresh();
   if(note) S.msgs.push({role:"assistant",kind:"sys",text:note});
 
+  // quality check of what changed this turn: rules first, then the AI's view; one challenge per item, three per conversation
+  const changed=Object.keys(FACTS).filter(k=>known(S.f[k]) && JSON.stringify(before[k])!==JSON.stringify(S.f[k]) && (S.req||[]).concat(["value","needed_by"]).includes(k) && !(pend&&pend.fact===k));
+  if(changed.some(k=>["day_rate","duration","headcount","deliverables","quantity"].includes(k)) && known(S.f.value) && !changed.includes("value")) changed.push("value");
+  if(prevRoute && S.det && prevRoute!==S.det.route && known(S.f.needed_by) && !changed.includes("needed_by")) changed.push("needed_by");
+  let issue = S.challengeCount<3 ? findIssue(changed) : null;
+  if(!issue && aiCheck && S.challengeCount<3 && changed.includes(aiCheck.fact) && !S.challenged[aiCheck.fact] && FACTS[aiCheck.fact])
+    issue={fact:aiCheck.fact, issue:String(aiCheck.issue||"needs a second look").slice(0,140), message:String(aiCheck.follow_up||reply||"").trim()||`Could you double-check this? ${FACTS[aiCheck.fact].q(S.f)}`};
+  if(issue){
+    S.challenged[issue.fact]=true; S.challengeCount++;
+    S.pending={fact:issue.fact, prev:S.f[issue.fact], issue:issue.issue, kind:issue.kind||""};
+    S.msgs.push({role:"assistant",text:issue.message, check:true});
+    S.choices=issue.choices||[]; S.lastAsked=issue.fact;
+    S.busy=false; render(); return;
+  }
+
+  // the route changed and needs more stages: say why, briefly
+  const added=S.stageIds.filter(id=>!prevStages.includes(id)&&id!=="review");
+  if(prevStages.length && added.length && S.msgs.filter(m=>m.role==="user").length>1)
+    S.msgs.push({role:"assistant",kind:"sys",text:`This now goes through a ${CHANNELS[S.det.route].name.toLowerCase()}, so I've added a few questions on ${added.map(id=>stageById(id).name.toLowerCase()).join(" and ")}.`});
+
   if(!S.missing.length){
-    const lead = S.completed ? "Updated. Here are the revised route, summary and requirements document." : `${complete && reply ? reply.replace(/\s*$/,"") : wrapUp()} Below are the route I recommend, the service description summary and the full business requirements document. Please check them before you submit.`;
+    stageTransition("review");
+    const lead = S.completed ? "Updated. Here are the revised route, summary and requirements document." : `${complete && reply && !aiCheck ? reply.replace(/\s*$/,"") : wrapUp()} Below are the route I recommend, the service description summary and the full business requirements document. Please check them before you submit.`;
     S.msgs.push({role:"assistant",text:lead});
     showRecommendation();
     S.lastAsked=null; S.completed=true;
@@ -633,15 +812,27 @@ async function handleTurn(text, cid){
     catch(e){ if(e instanceof Stale) throw e; console.error(e); S.msgs.push({role:"assistant",kind:"sys",text:"Something went wrong while writing the documents. Please tell me to try again."}); }
   } else {
     let next=S.missing[0];
-    const aiAskedOk = reply && !complete && aiAsking && S.missing.slice(0,2).includes(aiAsking);
+    const aiAskedOk = reply && !complete && !aiCheck && aiAsking && S.missing.slice(0,2).includes(aiAsking) && stageOf(aiAsking)===stageOf(S.missing[0]);
     if(aiAskedOk) next=aiAsking;
-    let msg = aiAskedOk ? reply : offlineQuestion(next, prevRoute);
+    const newStage=STAGES[stageOf(next)].id, stageChanged=newStage!==S.curStage;
+    stageTransition(newStage);
+    let msg = aiAskedOk ? reply : offlineQuestion(next, prevRoute, stageChanged);
     S.msgs.push({role:"assistant",text:msg});
     const fc=FACTS[next].choices; const fcs=typeof fc==="function"?fc(S.f):fc;
     S.choices = aiAskedOk && choices.length ? choices.slice(0,4) : (fcs||[]);
     S.lastAsked=next;
   }
   S.busy=false; render();
+}
+
+// moving to another stage: a recap card for the stages just finished, then a short stage marker
+function stageTransition(newStage){
+  if(newStage===S.curStage) return;
+  const done=S.stageIds.filter(id=>id!=="review" && !S.recapped[id] && stageFacts(id).length && stageDone(id));
+  if(done.length){ S.msgs.push({role:"assistant",kind:"recap",stages:done,facts:{...S.f},req:[...S.req]}); done.forEach(id=>S.recapped[id]=true); }
+  const idx=S.stageIds.indexOf(newStage)+1;
+  S.msgs.push({role:"assistant",kind:"stage",stage:newStage,idx,total:S.stageIds.length});
+  S.curStage=newStage;
 }
 
 const BOOL_KEYS=["personal_data","ict_outsourcing","critical_service","offshore","system_access","subcontracting","wants_renewal","decline_contract","contract_ok","value_is_estimate"];
@@ -836,8 +1027,7 @@ function extractAll(text, asked){
   const ba=t.match(/budget (?:is |has been )?(?:already )?(approved|signed off|confirmed)|approved budget|budget (?:is )?(?:not (?:yet )?approved|pending|awaiting)|no budget yet|partly approved/);
   const ba2=!ba && t.match(/budget[^.;]{0,40}?\b(not (?:yet )?approved|approved|signed off|confirmed)\b/);
   if(ba||ba2){ const x=(ba||ba2)[0]; o.budget_approved=/not|pending|awaiting|no budget/.test(x)?"no":/partly/.test(x)?"partly":"yes"; }
-  const cc=raw.match(/\b(?:cost cent(?:re|er)|cc)\s*(?:is|:|#|no\.?|number)?\s*([A-Z]{0,4}-?\d{2,}[\w-]*)/i)||raw.match(/\b(CC-?\d{2,}[\w-]*)/i);
-  if(cc) o.cost_centre=cc[1].toUpperCase();
+  // cost centre is not collected in this version
   const su=sentWith(/warrant|install|maintenance|support contract|on-site support|set[- ]?up/);
   if(su && GOODSLIKE(f)) o.support_needs=cap1(clean(su.replace(/^.*?\b(?:with|need|including|plus)\s+/i,"")));
   // --- renewals
@@ -892,7 +1082,7 @@ function defaultEstimate(){
   return {goods:5000,contingent_labour:150000}[f.demand_type]||100000;
 }
 const listJoin=a=>a.length<2?a.join(""):a.slice(0,-1).join(", ")+" and "+a[a.length-1];
-function offlineQuestion(k, prevRoute){
+function offlineQuestion(k, prevRoute, stageChanged){
   const f=S.f, F=FACTS[k];
   let intro="";
   if(!prevRoute && S.det){
@@ -902,7 +1092,7 @@ function offlineQuestion(k, prevRoute){
     const req=requiredFor(S.det.route,f), got=req.filter(k=>known(f[k]));
     if(got.length>=3) intro += `Thanks for the detail, I've already noted the ${listJoin(got.slice(0,6).map(k=>FACTS[k].label.toLowerCase()))}${got.length>6?" and more":""}. ${S.missing.length===1?"Just one more thing.":`Just ${S.missing.length} more things.`} `;
   } else {
-    const acks=["Thanks.","Okay, noted.","That helps.","Understood."]; intro=acks[Object.values(S.asked).reduce((a,b)=>a+b,0)%acks.length]+" ";
+    const acks=["Thanks.","Okay, noted.","That helps.","Understood."]; intro=stageChanged?"":acks[Object.values(S.asked).reduce((a,b)=>a+b,0)%acks.length]+" ";
     if(k==="value" && known(f.duration)) intro="";
   }
   const why = F.why ? " "+F.why(f) : "", ex = F.ex(f) ? " "+F.ex(f) : "";
@@ -951,7 +1141,6 @@ function offlineSummary(){
   else if((PREFERRED[f.category]||[]).length && !["catalogue","contingent"].includes(D.route)) P.push(`Preferred suppliers for this category are ${PREFERRED[f.category].join(" and ")}.`);
   if(g("current_supplier")) P.push(g("current_supplier")==="None"?"This is a new need, not a replacement.":inSaid(String(g("current_supplier")).split(" (")[0])?"":`Today this is provided by ${g("current_supplier")}.`);
   if(g("performance")) P.push(`The current supplier has performed: ${lf(g("performance"))}.`);
-  if(g("cost_centre")) P.push(`Cost centre: ${g("cost_centre")}.`);
   P.push(`Recommended route: ${ch.name}. ${D.why}`);
   const shortT=x=>{x=String(x||"").replace(/\.$/,""); if(x.length<=70) return x; x=x.slice(0,70); return x.slice(0,x.lastIndexOf(" "))+"…";};
   const head = f.demand_type==="contingent_labour" ? `${g("headcount")||1} × ${g("role")||"external worker"}` : (g("item")||g("deliverables")||g("summary"));
@@ -1014,7 +1203,7 @@ function offlineBRD(risk){
   const evaluation = route==="contingent" ? [["Skills match",50],["Day rate",30],["Availability",20]].map(([criterion,w])=>({criterion,weight:w+"%"}))
     : ["quote","sourcing"].includes(route) ? (W[g("evaluation_priority")]||W["A balance"]).map(([criterion,w])=>({criterion,weight:w+"%"})) : [];
   // stakeholders
-  const stakeholders=[{role:"Requester",who:"You (business owner of the need)"},{role:"Budget owner",who:g("cost_centre")?`Owner of cost centre ${g("cost_centre")}`:"To be confirmed"},
+  const stakeholders=[{role:"Requester",who:"You (business owner of the need)"},{role:"Budget owner",who:"The requester's budget owner"},
     {role:"Procurement",who:{catalogue:"Not needed, standard catalogue",pcard:"Not needed, card purchase",contract:"Contract owner",renewal:"Contract owner and category buyer",quote:"Requester gets quotes, procurement reviews",sourcing:"Category buyer (leads the sourcing event)",contingent:"Managed service provider"}[route]}];
   if(yes(f.personal_data)||yes(f.system_access)) stakeholders.push({role:"Data protection",who:"Data protection officer"});
   if(yes(f.ict_outsourcing)||yes(f.system_access)) stakeholders.push({role:"IT security",who:"Information security team"});
@@ -1026,7 +1215,7 @@ function offlineBRD(risk){
     ...(yes(f.system_access)?["System accounts set up before the start"]:[]),...(/on.?site/i.test(f.location||"")&&!goods?["Building access for the supplier"]:[])];
   const open_points=Object.entries(f).filter(([k,v])=>(v==="Not given"||v==="unsure")&&FACTS[k]).map(([k])=>`${FACTS[k].label}: to be confirmed`);
   const commercials=[known(f.value)&&`Estimated value: ${money(Number(f.value))}${f.value_is_estimate?" (estimate)":""}`, g("pricing_model")&&`Payment model: ${g("pricing_model")}`,
-    g("day_rate")&&`Rate: ${g("day_rate")}`, g("duration")&&`Contract term: ${g("duration")}`, g("budget_approved")&&`Budget approved: ${cap(g("budget_approved"))}`, g("cost_centre")&&`Cost centre: ${g("cost_centre")}`,
+    g("day_rate")&&`Rate: ${g("day_rate")}`, g("duration")&&`Contract term: ${g("duration")}`, g("budget_approved")&&`Budget approved: ${cap(g("budget_approved"))}`,
     g("ip_ownership")&&`Ownership of work: ${g("ip_ownership")}`, D.contract&&["contract","renewal"].includes(route)&&`Existing contract: ${D.contract.title} with ${D.contract.supplier} (${D.contract.id}), ends ${fmtDate(D.contract.expires)}`,
     hasSupplier(f)?`Supplier: ${f.supplier}${g("supplier_reason")?` (${g("supplier_reason")})`:""}`:(PREFERRED[f.category]||[]).length?`Supplier: open; preferred are ${PREFERRED[f.category].join(", ")}`:null,
     g("current_supplier")&&g("current_supplier")!=="None"&&`Current provider: ${g("current_supplier")}`, g("performance")&&`Current supplier performance: ${g("performance")}`].filter(Boolean);
@@ -1048,7 +1237,7 @@ function offlineBRD(risk){
 const DOC_SYSTEM = () => `You write two things for a corporate procurement request, based on the conversation and the facts:
 1. "summary": the SERVICE DESCRIPTION SUMMARY. One holistic paragraph of 150 to 230 words (60 to 100 for a simple catalogue or card purchase) in plain English that brings everything together:
    what is needed and why, scope and deliverables, timing, location, volume, budget and payment, how success is judged, the risk profile (data, systems, criticality, subcontracting, offshoring),
-   supplier situation, cost centre and the recommended route. Someone who reads only this paragraph must understand the whole request.
+   supplier situation and the recommended route. Someone who reads only this paragraph must understand the whole request.
 2. "brd": the BUSINESS REQUIREMENTS DOCUMENT content, complete enough for the sourcing, risk and contract teams to work from without asking again.
 Rules: use every fact and every detail from the conversation. Never invent names, numbers or dates. Where something important is unknown, put it in open_points.
 Money: the currency is ${CONFIG.currency} (€). Quote the value exactly as given in value_display. Never recalculate or re-estimate amounts.
@@ -1063,7 +1252,8 @@ Return JSON only:
   "requirements":[{"type":"","text":"","priority":"Must"}],"deliverables":[""],"milestones":[{"milestone":"","timing":""}],
   "timeline":"","location":"","volumes":"","service_levels":[""],"supplier_requirements":[""],"risk_and_compliance":[""],
   "commercials":[""],"evaluation":[{"criterion":"","weight":"40%"}],"stakeholders":[{"role":"","who":""}],
-  "assumptions":[""],"dependencies":[""],"open_points":[""]}}`;
+  "assumptions":[""],"dependencies":[""],"open_points":[""]},
+ "quality_remarks":["at most 3 short remarks a buyer would raise: gaps, inconsistencies or risks in this request; empty if none"]}`;
 
 const nonEmpty = v => Array.isArray(v) ? v.filter(x=>x&&(typeof x!=="object"||Object.values(x).some(Boolean))).length>0 : !!(v&&String(v).trim());
 function mergeBRD(base, ai){
@@ -1090,6 +1280,7 @@ async function buildDoc(cid=S.cid){
     }catch(e){ if(e instanceof Stale) throw e; guard(cid); ai=null; S.msgs.push({role:"assistant",kind:"sys",text:"The AI couldn't write the documents just now, so they are built from your answers."}); }
   }
   S.sd = {title:(ai&&ai.title)||base.title, summary:guardSummary(ai&&ai.summary)||base.summary, brd:mergeBRD(offlineBRD(base.risk), ai&&ai.brd), _ai:!!ai, _date:new Date()};
+  S.quality = computeQuality(ai&&Array.isArray(ai.quality_remarks)?ai.quality_remarks:[]);
   S.docKey=key; S.brdEdited=null;
   S.msgs.push({role:"assistant",kind:"sd"});
 }
@@ -1127,6 +1318,7 @@ function payload(){
     conversation:S.msgs.filter(m=>!m.kind).map(m=>({role:m.role,text:m.text})),
     decision:S.det?{route:S.det.route, chosen:S.override||S.det.route, override:!!S.override, justification:($("#just")||{}).value||null, why:S.det.why,
       required_facts:requiredFor(S.det.route,S.f), contract:S.det.contract?.id||null, controls:S.det.controls.map(c=>c[1]), next_steps:S.det.steps, thresholds:CONFIG.thresholds}:null,
+    quality:S.quality||null, answer_checks:S.flags,
     service_description_summary:S.sd&&S.sd.summary, business_requirements:S.sd&&S.sd.brd, title:S.sd&&S.sd.title, source:S.sd&&S.sd._ai?CONFIG.provider:"rules"};
 }
 function download(){ const b=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=`intake-${Date.now()}.json`; a.click(); }
@@ -1170,15 +1362,35 @@ function render(){
   $("#qr").innerHTML=S.busy?"":S.choices.map(q=>`<button>${esc(q)}</button>`).join("");
   $("#qr").querySelectorAll("button").forEach(b=>b.onclick=()=>handleUser(b.textContent));
   $("#send").disabled=S.busy;
+  renderStepbar();
   renderSide();
   requestAnimationFrame(()=>box.scrollTop=box.scrollHeight);
+}
+function renderStepbar(){
+  const el=$("#stepbar");
+  if(!S.det || !S.stageIds.length){ el.innerHTML=""; return; }
+  const cur=S.completed?"review":currentStage();
+  el.innerHTML=S.stageIds.map((id,i)=>{
+    const st=stageById(id), done=id==="review"?!!S.submitted:(stageDone(id)&&id!==cur), isCur=id===cur;
+    const left=isCur&&id!=="review"?stageFacts(id).filter(k=>!known(S.f[k])).length:0;
+    return `${i?'<span class="sep"></span>':""}<span class="st ${done?"done":""} ${isCur?"cur":""}"><i>${done?"✓":i+1}</i>${esc(st.name)}${left?` <small>${left} left</small>`:""}</span>`;
+  }).join("");
+  const c=el.querySelector(".cur"); if(c) el.scrollLeft=Math.max(0,c.offsetLeft-40);
+}
+function recapHTML(m, expanded){
+  const names=m.stages.map(id=>stageById(id).name);
+  if(!expanded) return `<div class="recap mini"><div class="rh">✓ ${esc(names.join(" · "))}</div></div>`;
+  const rows=m.stages.flatMap(id=>m.req.filter(k=>stageById(id).facts.includes(k)&&known(m.facts[k])).map(k=>`<div class="rr"><span>${esc(FACTS[k].label)}</span><span>${esc(show(k,m.facts[k]))}</span></div>`));
+  return `<div class="recap"><div class="rh">✓ ${esc(names.join(" and "))}: here's what I have</div><div class="rb">${rows.join("")}</div><div class="rf">Anything wrong? Just tell me, for example "the budget is 60k".</div></div>`;
 }
 function msgHTML(m,i,lastRec,lastSd){
   if(m.role==="user") return `<div class="m u"><div class="bub">${esc(m.text)}</div></div>`;
   if(m.kind==="sys") return `<div class="sys">${esc(m.text)}</div>`;
+  if(m.kind==="stage"){ const st=stageById(m.stage); return `<div class="stagemark"><span><b>Step ${m.idx} of ${m.total} · ${esc(st.name)}</b><br>${esc(st.intro)}</span></div>`; }
+  if(m.kind==="recap"){ const lastRecap=S.msgs.map((x,j)=>x.kind==="recap"?j:-1).filter(j=>j>=0).pop(); return `<div class="m a"><div class="av">G</div>${recapHTML(m, i===lastRecap)}</div>`; }
   if(m.kind==="rec") return `<div class="m a"><div class="av">G</div><div class="wide">${i===lastRec?recHTML(m.rec):`<div class="card old">Earlier recommendation: ${esc(CHANNELS[m.rec.route].name)}. Updated below.</div>`}</div></div>`;
   if(m.kind==="sd")  return i===lastSd?`<div class="m a"><div class="av">G</div><div class="wide">${sdHTML()}</div></div>`:"";
-  return `<div class="m a"><div class="av">G</div><div class="bub">${md(m.text)}</div></div>`;
+  return `<div class="m a"><div class="av">G</div><div class="bub${m.check?" chk":""}">${md(m.text)}</div></div>`;
 }
 function recHTML(R){
   const c=CHANNELS[R.route], f=R.f;
@@ -1209,10 +1421,18 @@ function sdHTML(){
   return `<div class="card sd"><div class="sd-h"><small>Service description summary · click the text to edit</small><div class="t" contenteditable data-sd="title">${esc(d.title||"Untitled")}</div></div>
     <div class="sec lead"><div contenteditable data-sd="summary">${esc(d.summary)}</div></div>
     <div class="sec chips">${chips.map(c=>`<span>${esc(c)}</span>`).join("")}</div>
+    ${qualityHTML()}
     <div class="sec brdlink"><div><b>Business requirements document</b><br><span class="muted">${n} requirements, risk and compliance, commercial terms, evaluation, approvals${S.sd._ai?"":" · built from your answers"}</span></div>
       <button class="btn btn-a" data-act="brd">Open document</button></div>
     <div class="acts">${S.submitted?`<span class="muted">Submitted as <b>${esc(S.submitted)}</b></span>`:`<button class="btn btn-p" data-act="submit">Looks right, submit</button>`}
       <button class="lnk" data-act="copy">Copy summary</button><span class="muted">Something to change? Just tell me.</span></div></div>`;
+}
+function qualityHTML(){
+  const q=S.quality; if(!q) return "";
+  const cls={Strong:"q-strong",Good:"q-good",Fair:"q-fair","Needs work":"q-needs"}[q.rating];
+  const pts=q.points.filter(p=>p.lvl!=="ok"), oks=q.points.filter(p=>p.lvl==="ok").length;
+  return `<div class="sec qual"><div class="qhead"><span class="qbadge ${cls}">${q.rating}</span><span>Quality check · ${q.score}/100 · ${q.complete}% of the needed details given${oks?` · ${oks} answer${oks>1?"s":""} clarified`:""}</span></div>
+    ${pts.length?`<ul class="qlist">${pts.slice(0,5).map(p=>`<li class="${p.lvl}">${esc(p.text)}</li>`).join("")}</ul>`:`<ul class="qlist"><li class="ok">No gaps or inconsistencies found.</li></ul>`}</div>`;
 }
 function sdText(){ return `${S.sd.title}\n\n${S.sd.summary}`; }
 
@@ -1247,9 +1467,9 @@ function brdHTML(){
     <tr><td>Date</td><td>${date}</td></tr><tr><td>Category</td><td>${esc(catById(f.category).name)} (${esc(DEMAND_TYPES[f.demand_type]||"")})</td></tr>
     <tr><td>Recommended route</td><td>${esc(ch.name)}${S.override?` (override, standard route: ${esc(CHANNELS[D.route].name)})`:""}</td></tr>
     <tr><td>Estimated value</td><td>${known(f.value)?money(Number(f.value))+(f.value_is_estimate?" (estimate)":""):"To be confirmed"}</td></tr>
-    <tr><td>Cost centre</td><td>${esc(f.cost_centre&&f.cost_centre!=="Not given"?f.cost_centre:"To be confirmed")}</td></tr>
   </table>
   ${H("Service description summary")}<div class="lead">${esc(d.summary)}</div>
+  ${S.quality?H("Intake quality check")+`<p><b>${esc(S.quality.rating)}</b>, ${S.quality.score}/100. ${S.quality.complete}% of the details needed for this route were given.</p>`+(S.quality.points.length?`<table><tr><th style="width:90px">Type</th><th>Point</th></tr>${S.quality.points.map(p=>`<tr><td>${p.lvl==="warn"?"To check":p.lvl==="ok"?"Clarified":"Note"}</td><td>${esc(p.text)}</td></tr>`).join("")}</table>`:"<p>No gaps or inconsistencies found.</p>"):""}
   ${sec("Background and business need",B.background?`<p>${esc(B.background)}</p>`:"")}
   ${sec("Objectives and success criteria",(L(B.objectives).length?`<h3>Objectives</h3>${ul(B.objectives)}`:"")+(L(B.success_criteria).length?`<h3>Success criteria</h3>${ul(B.success_criteria)}`:""))}
   ${sec("Scope",`<div class="two"><div><h3>In scope</h3>${ul(B.scope_in)||"<p class='small'>To be confirmed</p>"}</div><div><h3>Out of scope</h3>${ul(B.scope_out)}</div></div>`)}
@@ -1263,7 +1483,7 @@ function brdHTML(){
   ${sec("Buying route and evaluation",`<p><b>${esc(ch.name)}</b>, typically ${ch.days} working days. ${esc(D.why)}</p>`+(L(B.evaluation).length?`<h3>How offers are compared</h3><table><tr><th>Criterion</th><th style="width:90px">Weight</th></tr>${B.evaluation.filter(e=>e&&e.criterion).map(e=>`<tr><td>${esc(e.criterion)}</td><td>${esc(e.weight||"")}</td></tr>`).join("")}</table>`:""))}
   ${sec("Stakeholders",L(B.stakeholders).length?`<table><tr><th>Role</th><th>Who</th></tr>${B.stakeholders.filter(x=>x&&x.role).map(x=>`<tr><td>${esc(x.role)}</td><td>${esc(x.who||"")}</td></tr>`).join("")}</table>`:"")}
   ${sec("Assumptions, dependencies and open points",(L(B.assumptions).length?`<h3>Assumptions</h3>${ul(B.assumptions)}`:"")+(L(B.dependencies).length?`<h3>Dependencies</h3>${ul(B.dependencies)}`:"")+(L(B.open_points).length?`<h3>Open points</h3>${ul(B.open_points)}`:""))}
-  ${sec("Approvals and next steps",`<h3>Approvals</h3><table><tr><th>Approval</th><th>By</th><th style="width:110px">Status</th></tr><tr><td>Business need and budget</td><td>${esc(f.cost_centre&&f.cost_centre!=="Not given"?"Owner of cost centre "+f.cost_centre:"Budget owner")}</td><td>${f.budget_approved==="yes"?"Approved":"Pending"}</td></tr>${D.controls.filter(c=>c[0]!=="i"||/Approval|Confirm|Renewal/.test(c[1])).map(([k,t])=>`<tr><td>${esc(t)}</td><td>${esc(/Data/.test(t)?"Data protection":/ICT|Offshoring|Subcontractor/.test(t)?"Risk and IT security":/Non-preferred|Single-source|Material/.test(t)?"Procurement":/Approval to source/.test(t)?"Budget owner and procurement":/Renewal/.test(t)?"Contract owner and procurement":"Contract owner")}</td><td>Pending</td></tr>`).join("")}</table><h3>Next steps</h3><ol>${D.steps.map(x=>`<li>${esc(x)}</li>`).join("")}</ol>`)}
+  ${sec("Approvals and next steps",`<h3>Approvals</h3><table><tr><th>Approval</th><th>By</th><th style="width:110px">Status</th></tr><tr><td>Business need and budget</td><td>Budget owner</td><td>${f.budget_approved==="yes"?"Approved":"Pending"}</td></tr>${D.controls.filter(c=>c[0]!=="i"||/Approval|Confirm|Renewal/.test(c[1])).map(([k,t])=>`<tr><td>${esc(t)}</td><td>${esc(/Data/.test(t)?"Data protection":/ICT|Offshoring|Subcontractor/.test(t)?"Risk and IT security":/Non-preferred|Single-source|Material/.test(t)?"Procurement":/Approval to source/.test(t)?"Budget owner and procurement":/Renewal/.test(t)?"Contract owner and procurement":"Contract owner")}</td><td>Pending</td></tr>`).join("")}</table><h3>Next steps</h3><ol>${D.steps.map(x=>`<li>${esc(x)}</li>`).join("")}</ol>`)}
   <h2>Appendix A. Details captured in the intake</h2><table class="kv">${facts}</table>
   <h2>Appendix B. Intake conversation</h2><div class="conv small">${convo}</div>
   </div>`;
@@ -1305,16 +1525,19 @@ function bind(){
 function renderSide(){
   const f=S.f, D=S.det;
   if(!D){ $("#side").innerHTML=`<div class="panel"><div class="eyebrow">Your request</div><p class="muted" style="margin:8px 0 0">Start by describing what you need. The route and what's needed for it appear here.</p></div>${sideNote()}`; return; }
-  const req=requiredFor(D.route,f), needsValue=!["catalogue","contingent"].includes(D.route)&&!req.includes("value");
-  const list=[...(needsValue?["value"]:[]),...req];
-  const done=list.filter(k=>known(f[k])).length, pct=Math.round(done/list.length*100);
+  const req=S.req||[], done=req.filter(k=>known(f[k])).length, pct=req.length?Math.round(done/req.length*100):100;
+  const groups=S.stageIds.filter(id=>id!=="review").map(id=>{
+    const ks=stageFacts(id); const all=ks.every(k=>known(f[k]));
+    return `<div class="grp"><span>${esc(stageById(id).name)}</span>${all?"<em>✓ done</em>":""}</div>`+
+      ks.map(k=>{const ok=known(f[k]), nx=!ok&&S.missing[0]===k; return `<div class="fact ${ok?"ok":""} ${nx?"next":""}"><span class="ic">${ok?"✓":""}</span><span class="k">${FACTS[k].label}</span><span class="v">${ok?esc(show(k,f[k])):nx?"asking now":"—"}</span></div>`;}).join("");
+  }).join("");
   $("#side").innerHTML=`<div class="panel">
       <div class="eyebrow">Route ${S.missing.length?"so far":""}</div>
       <div class="route">${CHANNELS[S.override||D.route].name}</div>
       <div class="prov">${S.missing.length?"May change as you answer":"Ready"} · ${esc(catById(f.category).name)}</div>
       <div class="prog"><i style="width:${pct}%"></i></div>
-      <div class="muted" style="margin-bottom:8px">${done} of ${list.length} details for this route</div>
-      ${list.map(k=>{const ok=known(f[k]), nx=!ok&&S.missing[0]===k; return `<div class="fact ${ok?"ok":""} ${nx?"next":""}"><span class="ic">${ok?"✓":""}</span><span class="k">${FACTS[k].label}</span><span class="v">${ok?esc(show(k,f[k])):nx?"asking now":"—"}</span></div>`;}).join("")}
+      <div class="muted">${done} of ${req.length} details for this route</div>
+      ${groups}
     </div>${sideNote()}`;
 }
 const sideNote=()=>`<div class="panel muted">The route and the details it needs come from fixed rules (editable under Rules). The AI only runs the conversation and writes the description.</div>`;
