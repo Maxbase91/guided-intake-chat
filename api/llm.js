@@ -46,17 +46,19 @@ const cooldown = new Map();             // "provider:model" -> until timestamp
 let groqListCache = null;               // { ids, at }
 
 // how long the provider asks us to wait, in seconds ("try again in 7.6s", "retry in 8h25m57s", retry-after header)
-function retrySeconds(e) {
+function retrySeconds(e, fallbackS = DEFAULT_COOLDOWN_S) {
   const m = String(e && e.message || "");
   let s = null;
   const a = m.match(/try again in\s+([\d.]+)\s*s/i); if (a) s = parseFloat(a[1]);
   const b = m.match(/retry in\s+(?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?/i); if (!s && b && (b[1] || b[2] || b[3])) s = (+b[1] || 0) * 3600 + (+b[2] || 0) * 60 + (parseFloat(b[3]) || 0);
   if (!s && e && e.retryAfter) s = e.retryAfter;
   if (!s && /per ?day|daily|RPD/i.test(m)) s = 3600;
-  return Math.min(Math.max(s || DEFAULT_COOLDOWN_S, 3), 6 * 3600);
+  return Math.min(Math.max(s || fallbackS, 1), 6 * 3600);
 }
-const cool = (key, e) => cooldown.set(key, Date.now() + retrySeconds(e) * 1000);
-const coolingFor = (key) => Math.max(0, ((cooldown.get(key) || 0) - Date.now()) / 1000);
+const cool = (key, e, fallbackS) => cooldown.set(key, Date.now() + retrySeconds(e, fallbackS) * 1000);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let IGNORE_COOLDOWN = false;            // the status check always tests for real
+const coolingFor = (key) => IGNORE_COOLDOWN ? 0 : Math.max(0, ((cooldown.get(key) || 0) - Date.now()) / 1000);
 
 const short = (m) => String(m || "").replace(/\s+/g, " ").slice(0, 160);
 
@@ -164,7 +166,7 @@ async function mistralCandidates() {
     try {
       const r = await fetch("https://api.mistral.ai/v1/models", { signal: AbortSignal.timeout(8000), headers: { Authorization: `Bearer ${process.env.MISTRAL_API_KEY}` } });
       const d = await r.json().catch(() => ({}));
-      if (r.ok) { ids = (d.data || []).map((m) => m.id); mistralListCache = { ids, at: Date.now() }; }
+      if (r.ok) { ids = (d.data || []).map((m) => m.id); mistralListCache = { ids, at: Date.now() }; await sleep(1100); }
     } catch (e) { ids = null; }
   }
   const wanted = [process.env.MISTRAL_MODEL, ...MISTRAL_PREFERRED].filter(Boolean);
@@ -202,11 +204,19 @@ async function callMistral(system, history, info, deadline) {
     if (Date.now() > deadline) break;
     tried++; info.model = model;
     try {
-      try { return await callMistralWith(model, system, history); }
-      catch (e) { if (e.status === 400 && /json|response_format/i.test(e.message)) return await callMistralWith(model, system, history, false); throw e; }
+      const attempt = async () => {
+        try { return await callMistralWith(model, system, history); }
+        catch (e) { if (e.status === 400 && /json|response_format/i.test(e.message)) return await callMistralWith(model, system, history, false); throw e; }
+      };
+      try { return await attempt(); }
+      catch (e) {
+        // the free plan allows about one request per second: wait a moment and try the same model once more
+        if (isQuota(e) && Date.now() + 1500 < deadline) { await sleep(Math.min(Math.max((retrySeconds(e, 1.2)) * 1000, 1200), 5000)); return await attempt(); }
+        throw e;
+      }
     } catch (e) {
       last = e;
-      if (isQuota(e)) cool(`mistral:${model}`, e);
+      if (isQuota(e)) cool(`mistral:${model}`, e, 3);
       else if (isModelMissing(e) || e.status === 401 || e.status === 403) cooldown.set(`mistral:${model}`, Date.now() + 6 * 3600 * 1000);
     }
   }
@@ -255,15 +265,17 @@ module.exports = async (req, res) => {
     const code = req.headers["x-access-code"] || q.code;
     if (process.env.ACCESS_CODE && code !== process.env.ACCESS_CODE) return res.status(401).json({ error: "Access code required" });
     const checks = [];
+    IGNORE_COOLDOWN = true;
     for (const a of steps) {
       const t0 = Date.now();
       try {
         const r = await runAttempt(a, 'Reply with the JSON object {"ok":true}', [{ role: "user", content: "ping, answer in json" }]);
         checks.push({ ...r.info, ok: true, ms: Date.now() - t0 });
       } catch (e) {
-        checks.push({ provider: a.provider, model: a.model, ok: false, ms: Date.now() - t0, error: short(e.message), quota: isQuota(e) });
+        checks.push({ provider: a.provider, model: a.model, ok: false, ms: Date.now() - t0, error: short(e.message), status: e.status || null, quota: isQuota(e) });
       }
     }
+    IGNORE_COOLDOWN = false;
     let groqRotation = null, mistralRotation = null;
     try { if (process.env.GROQ_API_KEY) groqRotation = await groqCandidates(); } catch (e) {}
     try { if (process.env.MISTRAL_API_KEY) mistralRotation = await mistralCandidates(); } catch (e) {}
