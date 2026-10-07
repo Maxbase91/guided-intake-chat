@@ -874,8 +874,9 @@ function offlineSummary(){
   P.push(`${cap(String(g("summary")||g("item")||c.name).replace(/\.$/,""))}.`);
   const said=String(g("summary")||"").toLowerCase(), inSaid=x=>x&&said.includes(String(x).toLowerCase().replace(/\.$/,"").slice(0,40));
   if(g("background") && !inSaid(g("background"))) P.push(`It is needed because ${lf(g("background")).replace(/\.$/,"")}.`);
-  if(f.demand_type==="contingent_labour") P.push(`We need ${g("headcount")||1} ${g("role")||"external worker"}${(+g("headcount")||1)>1?"s":""}${g("skills")?` with ${g("skills")}`:""}${g("deliverables")?`, working on ${lf(g("deliverables"))}`:""}.`);
-  else if(g("deliverables")) P.push(`The supplier is expected to deliver ${lf(g("deliverables")).replace(/\.$/,"")}.`);
+  if(f.demand_type==="contingent_labour" && !(g("role") && said.includes(String(g("role")).toLowerCase().split(" ").pop()))) P.push(`We need ${g("headcount")||1} ${g("role")||"external worker"}${(+g("headcount")||1)>1?"s":""}${g("skills")?` with ${g("skills")}`:""}${g("deliverables")?`, working on ${lf(g("deliverables"))}`:""}.`);
+  else if(f.demand_type==="contingent_labour"){ if(g("deliverables") && !inSaid(g("deliverables"))) P.push(`They will work on ${lf(g("deliverables")).replace(/\.$/,"")}.`); }
+  else if(g("deliverables") && !inSaid(g("deliverables"))) P.push(`The supplier is expected to deliver ${lf(g("deliverables")).replace(/\.$/,"")}.`);
   else if(g("quantity") && !said.includes(fmtN(g("quantity")).toLowerCase()) && !said.includes(String(g("quantity")))) P.push(f.demand_type==="software"?`It is for ${fmtN(g("quantity"))} users.`:`The order is ${fmtN(g("quantity"))} × ${g("item")||"items"}.`);
   const loc=g("location"), onsite=loc&&/^on.?site/i.test(loc);
   if(GOODSLIKE(f)){ const sw=f.demand_type==="software"; if(g("needed_by")||loc||g("support_needs")) P.push(`${g("needed_by")?`It is needed ${sw?"live ":""}by ${g("needed_by")}`:"It is needed"}${loc&&!inSaid(loc)?(onsite?", delivered on site":sw?`, for ${loc}`:`, delivered to ${loc}`):""}${g("support_needs")?`, with ${lf(g("support_needs"))}`:""}.`); }
@@ -976,7 +977,7 @@ function offlineBRD(risk){
     hasSupplier(f)?`Supplier: ${f.supplier}${g("supplier_reason")?` (${g("supplier_reason")})`:""}`:(PREFERRED[f.category]||[]).length?`Supplier: open; preferred are ${PREFERRED[f.category].join(", ")}`:null,
     g("current_supplier")&&g("current_supplier")!=="None"&&`Current provider: ${g("current_supplier")}`, g("performance")&&`Current supplier performance: ${g("performance")}`].filter(Boolean);
   return {
-    background: [g("background")&&cap(g("background")).replace(/\.?$/,"."), g("current_supplier")&&g("current_supplier")!=="None"?`Today this is provided by ${g("current_supplier")}.`:g("current_supplier")==="None"?"This is a new need.":null].filter(Boolean).join(" ") || (g("summary")||""),
+    background: [g("background")&&cap(g("background")).replace(/\.?$/,"."), g("current_supplier")&&g("current_supplier")!=="None"?`Today this is provided by ${g("current_supplier")}.`:g("current_supplier")==="None"?"This is a new need.":null].filter(Boolean).join(" "),
     objectives: [g("deliverables")?`Get ${lf(g("deliverables"))}${g("needed_by")?` from ${g("needed_by")}`:""}.`:f.demand_type==="software"?`Have ${lf(g("item")||c.name)} live${g("quantity")?` for ${fmtN(g("quantity"))} users`:""}${g("needed_by")?` by ${g("needed_by")}`:""}.`:goods?`Have ${g("quantity")?fmtN(g("quantity"))+" × ":""}${lf(g("item")||c.name)} available${g("needed_by")?` by ${g("needed_by")}`:""}.`:cont?`Fill ${g("headcount")||1} ${lf(g("role")||"role")} position(s) on time.`:null,
                  g("background")?`Address the need: ${lf(g("background")).replace(/\.$/,"")}.`:null, known(f.value)?`Stay within the budget of ${money(Number(f.value))}.`:null].filter(Boolean),
     success_criteria: split(g("acceptance")).length?split(g("acceptance")):["Deliverables accepted in writing by the requester"],
