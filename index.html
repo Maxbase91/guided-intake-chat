@@ -473,7 +473,7 @@ const monthsOf = d => { const m=String(d||"").match(/(\d+)\s*(?:-|–|to)?\s*(\d
    ========================================================= */
 let SERVER=null;
 const aiReady = () => CONFIG.provider==="server" ? !!SERVER : (["gemini","groq"].includes(CONFIG.provider) && !!CONFIG.keys[CONFIG.provider]);
-const providerLabel = () => CONFIG.provider==="server" ? (((SERVER&&SERVER.last)||(SERVER&&SERVER.provider))==="groq"?"Groq":"Gemini") : CONFIG.provider==="gemini"?"Gemini":"Groq";
+const providerLabel = () => CONFIG.provider==="server" ? ({gemini:"Gemini",groq:"Groq",mistral:"Mistral"}[(SERVER&&SERVER.last)||(SERVER&&SERVER.provider)]||"Server") : CONFIG.provider==="gemini"?"Gemini":"Groq";
 async function detectServer(){
   if(!/^https?:$/.test(location.protocol)) return;
   try{ const r=await fetch("/api/llm"); if(!r.ok) return; const d=await r.json(); if(d&&d.ok) SERVER=d; }catch(e){}
@@ -1309,8 +1309,8 @@ const sideNote=()=>`<div class="panel muted">The route and the details it needs 
 function openSettings(){
   const T=CONFIG.thresholds, hosted=!!SERVER;
   const aiOn=CONFIG.provider!=="offline";
-  const names={gemini:"Gemini",groq:"Groq"};
-  const chain=hosted?[SERVER.providers.gemini&&"Gemini",SERVER.providers.groq&&"Groq"].filter(Boolean):[];
+  const names={gemini:"Gemini",groq:"Groq",mistral:"Mistral"};
+  const chain=hosted?[SERVER.providers.gemini&&"Gemini",SERVER.providers.groq&&"Groq",SERVER.providers.mistral&&"Mistral"].filter(Boolean):[];
   $("#drawerRoot").innerHTML=`<div class="scrim" id="scrim"></div><div class="drawer">
     <header><h3>Rules</h3><button class="btn btn-g" id="close">Close</button></header>
     <div class="body">

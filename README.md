@@ -9,19 +9,19 @@ All reference data (catalogue, contracts, preferred suppliers) is mock data. Use
 ## How it is built
 
 - `index.html` is the whole front end. No build step.
-- `api/llm.js` is a Vercel serverless function. It holds the API key and forwards calls to Gemini or Groq. The key never reaches the browser.
+- `api/llm.js` is a Vercel serverless function. It holds the API keys and forwards calls to Gemini, Groq or Mistral. Keys never reach the browser.
 - The buying channel is decided in the browser by deterministic rules. The AI never picks the channel.
 
 ## Deploy on Vercel
 
 1. Import this repo in Vercel. Framework preset: **Other**. No build command.
 2. Add environment variables under **Settings → Environment Variables**:
-   - `GEMINI_API_KEY` (from https://aistudio.google.com/apikey), or `GROQ_API_KEY` (from https://console.groq.com/keys)
+   - Any of `GEMINI_API_KEY` (https://aistudio.google.com/apikey), `GROQ_API_KEY` (https://console.groq.com/keys), `MISTRAL_API_KEY` (https://console.mistral.ai, free Experiment plan; it may use requests for training, so dummy data only)
    - Optional: `ACCESS_CODE` to stop strangers using your key. Visitors are asked for it once.
-   - Optional: `LLM_PROVIDER` (`gemini` or `groq`, which goes first), `GEMINI_MODEL`, `GROQ_MODEL` (if missing or unavailable, the best Groq model on the account is picked automatically)
+   - Optional: `LLM_PROVIDER` (`gemini`, `groq` or `mistral`, which goes first), `GEMINI_MODEL`, `GROQ_MODEL`, `MISTRAL_MODEL` (if missing or unavailable, the best available model is picked automatically)
    - Check all providers at `/api/llm?check=1&code=YOUR_ACCESS_CODE` (shows each model and the Groq rotation)
 
-With both keys set, Gemini goes first; when a model hits its limit the server moves to the next one and rotates across several Groq models (Groq limits apply per model). If everything is briefly limited, the page waits the few seconds the provider asks for and retries once, then falls back to rule-based questions.
+Default order: Gemini, then Groq, then Mistral. When a model hits its limit the server moves to the next one and rotates across several Groq and Mistral models (their limits apply per model). If everything is briefly limited, the page waits the few seconds the provider asks for and retries once, then falls back to rule-based questions.
 3. Redeploy so the variables take effect.
 
 The page checks `/api/llm` on load. If the server has a key, it shows **AI on · Server**. Without one, it runs offline keyword rules.

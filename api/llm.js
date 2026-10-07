@@ -2,11 +2,13 @@
 //
 // Environment variables (Vercel > Project > Settings > Environment Variables):
 //   GEMINI_API_KEY         Google AI Studio key
-//   GROQ_API_KEY           Groq key (set one or both)
-//   LLM_PROVIDER           optional: "gemini" or "groq" goes first (default: Gemini first if set)
+//   GROQ_API_KEY           Groq key
+//   MISTRAL_API_KEY        Mistral key (free "Experiment" plan works; set any one or more)
+//   LLM_PROVIDER           optional: "gemini", "groq" or "mistral" goes first (default order: Gemini, Groq, Mistral)
 //   GEMINI_MODEL           optional, default "gemini-2.5-flash"
 //   GEMINI_FALLBACK_MODEL  optional, default "gemini-2.5-flash-lite"
 //   GROQ_MODEL             optional; if missing or unavailable, the best model the account can use is picked automatically
+//   MISTRAL_MODEL          optional; default rotation mistral-medium-latest, mistral-small-latest, open-mistral-nemo
 //   ACCESS_CODE            optional: callers must send it in the x-access-code header
 //
 // GET /api/llm             -> which providers are configured (no secrets)
@@ -30,6 +32,9 @@ const GROQ_PREFERRED = [
   "openai/gpt-oss-20b",
   "llama-3.1-8b-instant",
 ];
+
+// Mistral models, best first. Each has its own rate limit, so they rotate like Groq.
+const MISTRAL_PREFERRED = ["mistral-medium-latest", "mistral-small-latest", "open-mistral-nemo"];
 
 class LlmError extends Error { constructor(msg, status) { super(msg); this.status = status; } }
 const isQuota = (e) => e && (e.status === 429 || /quota|rate limit|resource_exhausted|too many requests/i.test(e.message || ""));
@@ -151,19 +156,85 @@ async function callGroq(system, history, info, deadline) {
   throw e;
 }
 
+let mistralListCache = null;
+async function mistralCandidates() {
+  let ids = null;
+  if (mistralListCache && Date.now() - mistralListCache.at < 30 * 60 * 1000) ids = mistralListCache.ids;
+  else {
+    try {
+      const r = await fetch("https://api.mistral.ai/v1/models", { signal: AbortSignal.timeout(8000), headers: { Authorization: `Bearer ${process.env.MISTRAL_API_KEY}` } });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) { ids = (d.data || []).map((m) => m.id); mistralListCache = { ids, at: Date.now() }; }
+    } catch (e) { ids = null; }
+  }
+  const wanted = [process.env.MISTRAL_MODEL, ...MISTRAL_PREFERRED].filter(Boolean);
+  return [...new Set(ids ? wanted.filter((w) => ids.includes(w)).concat(ids.length && !wanted.some((w) => ids.includes(w)) ? ids.filter((i) => /small|medium|large|nemo/.test(i)).slice(0, 2) : []) : wanted)];
+}
+
+async function callMistralWith(model, system, history, jsonMode = true) {
+  const r = await fetch("https://api.mistral.ai/v1/chat/completions", {
+    method: "POST",
+    signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.MISTRAL_API_KEY}` },
+    body: JSON.stringify({
+      model, temperature: 0.3, max_tokens: 4000,
+      ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+      messages: [{ role: "system", content: system }, ...history.map((m) => ({ role: m.role, content: m.content }))],
+    }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const msg = d?.message || d?.error?.message || d?.detail || `Mistral error ${r.status}`;
+    const e = new LlmError(typeof msg === "string" ? msg : JSON.stringify(msg), r.status);
+    e.retryAfter = parseFloat(r.headers?.get?.("retry-after")) || null; throw e;
+  }
+  const c = d.choices?.[0]?.message?.content;
+  const text = (Array.isArray(c) ? c.map((x) => x.text || "").join("") : (c || "")).trim();
+  if (!text) throw new LlmError("Mistral returned an empty answer", 502);
+  return text;
+}
+
+async function callMistral(system, history, info, deadline) {
+  const models = await mistralCandidates();
+  let last = null, tried = 0;
+  for (const model of models) {
+    if (coolingFor(`mistral:${model}`) > 0) continue;
+    if (Date.now() > deadline) break;
+    tried++; info.model = model;
+    try {
+      try { return await callMistralWith(model, system, history); }
+      catch (e) { if (e.status === 400 && /json|response_format/i.test(e.message)) return await callMistralWith(model, system, history, false); throw e; }
+    } catch (e) {
+      last = e;
+      if (isQuota(e)) cool(`mistral:${model}`, e);
+      else if (isModelMissing(e) || e.status === 401 || e.status === 403) cooldown.set(`mistral:${model}`, Date.now() + 6 * 3600 * 1000);
+    }
+  }
+  const w = models.map((m) => coolingFor(`mistral:${m}`)).filter((x) => x > 0 && x < 3600);
+  const e = last || new LlmError(tried ? "Mistral could not answer" : "All Mistral models are at their usage limit", tried ? 502 : 429);
+  if (w.length) e.waitFor = Math.min(...w);
+  throw e;
+}
+
 function plan() {
   const gem = !!process.env.GEMINI_API_KEY, groq = !!process.env.GROQ_API_KEY;
   const gMain = process.env.GEMINI_MODEL || "gemini-2.5-flash";
   const gFb = process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash-lite";
   const gemini = gem ? [{ provider: "gemini", model: gMain }, ...(gFb !== gMain ? [{ provider: "gemini", model: gFb }] : [])] : [];
   const groqs = groq ? [{ provider: "groq", model: "rotating" }] : [];
-  const groqFirst = (process.env.LLM_PROVIDER || "").toLowerCase() === "groq";
-  return groqFirst ? [...groqs, ...gemini] : [...gemini, ...groqs];
+  const mistrals = process.env.MISTRAL_API_KEY ? [{ provider: "mistral", model: "rotating" }] : [];
+  const order = { gemini, groq: groqs, mistral: mistrals };
+  const firstPick = (process.env.LLM_PROVIDER || "").toLowerCase();
+  const names = ["gemini", "groq", "mistral"];
+  const seq = names.includes(firstPick) ? [firstPick, ...names.filter((n) => n !== firstPick)] : names;
+  return seq.flatMap((n) => order[n]);
 }
 
 async function runAttempt(a, system, history, deadline = Date.now() + TOTAL_BUDGET_MS) {
   const info = { provider: a.provider, model: a.model };
-  const text = a.provider === "gemini" ? await callGemini(system, history, a.model) : await callGroq(system, history, info, deadline);
+  const text = a.provider === "gemini" ? await callGemini(system, history, a.model)
+    : a.provider === "groq" ? await callGroq(system, history, info, deadline)
+    : await callMistral(system, history, info, deadline);
   return { text, info };
 }
 
@@ -176,7 +247,7 @@ module.exports = async (req, res) => {
     const base = {
       ok: steps.length > 0,
       provider: first || null,
-      providers: { gemini: !!process.env.GEMINI_API_KEY, groq: !!process.env.GROQ_API_KEY },
+      providers: { gemini: !!process.env.GEMINI_API_KEY, groq: !!process.env.GROQ_API_KEY, mistral: !!process.env.MISTRAL_API_KEY },
       accessRequired: !!process.env.ACCESS_CODE,
     };
     const q = req.query || {};
@@ -193,15 +264,17 @@ module.exports = async (req, res) => {
         checks.push({ provider: a.provider, model: a.model, ok: false, ms: Date.now() - t0, error: short(e.message), quota: isQuota(e) });
       }
     }
-    let groqRotation = null; try { if (process.env.GROQ_API_KEY) groqRotation = await groqCandidates(); } catch (e) {}
-    return res.status(200).json({ ...base, checks, groqRotation });
+    let groqRotation = null, mistralRotation = null;
+    try { if (process.env.GROQ_API_KEY) groqRotation = await groqCandidates(); } catch (e) {}
+    try { if (process.env.MISTRAL_API_KEY) mistralRotation = await mistralCandidates(); } catch (e) {}
+    return res.status(200).json({ ...base, checks, groqRotation, mistralRotation });
   }
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   if (process.env.ACCESS_CODE && req.headers["x-access-code"] !== process.env.ACCESS_CODE) {
     return res.status(401).json({ error: "Access code required" });
   }
-  if (!steps.length) return res.status(500).json({ error: "No API key configured on the server. Set GEMINI_API_KEY or GROQ_API_KEY in Vercel." });
+  if (!steps.length) return res.status(500).json({ error: "No API key configured on the server. Set GEMINI_API_KEY, GROQ_API_KEY or MISTRAL_API_KEY in Vercel." });
 
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
