@@ -18,7 +18,8 @@ All reference data (catalogue, contracts, preferred suppliers) is mock data. Use
 2. Add environment variables under **Settings → Environment Variables**:
    - `GEMINI_API_KEY` (from https://aistudio.google.com/apikey), or `GROQ_API_KEY` (from https://console.groq.com/keys)
    - Optional: `ACCESS_CODE` to stop strangers using your key. Visitors are asked for it once.
-   - Optional: `LLM_PROVIDER` (`gemini` or `groq`), `GEMINI_MODEL`, `GROQ_MODEL`
+   - Optional: `LLM_PROVIDER` (`gemini` or `groq`, which goes first), `GEMINI_MODEL`, `GROQ_MODEL` (if missing or unavailable, the best Groq model on the account is picked automatically)
+   - Check all providers at `/api/llm?check=1&code=YOUR_ACCESS_CODE`
 3. Redeploy so the variables take effect.
 
 The page checks `/api/llm` on load. If the server has a key, it shows **AI on · Server**. Without one, it runs offline keyword rules.
