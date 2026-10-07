@@ -24,7 +24,7 @@ function pickProvider() {
 class LlmError extends Error { constructor(msg, status) { super(msg); this.status = status; } }
 const isQuota = (e) => e && (e.status === 429 || /quota|rate limit|resource_exhausted/i.test(e.message || ""));
 const isTimeout = (e) => e && (e.name === "TimeoutError" || e.name === "AbortError" || e.status === 408);
-const CALL_TIMEOUT_MS = 20000; // per model call; then the next fallback is tried
+const CALL_TIMEOUT_MS = 27000; // per model call; two attempts fit in the 60s function limit
 
 async function callGemini(system, history, model = process.env.GEMINI_MODEL || "gemini-2.5-flash") {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
