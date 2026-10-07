@@ -8,7 +8,7 @@
 //   GEMINI_MODEL           optional, default "gemini-2.5-flash"
 //   GEMINI_FALLBACK_MODEL  optional, default "gemini-2.5-flash-lite"
 //   GROQ_MODEL             optional; if missing or unavailable, the best model the account can use is picked automatically
-//   MISTRAL_MODEL          optional; default rotation mistral-medium-latest, mistral-small-latest, open-mistral-nemo
+//   MISTRAL_MODEL          optional; default rotation ministral-14b, ministral-8b, then mistral-small/medium
 //   ACCESS_CODE            optional: callers must send it in the x-access-code header
 //
 // GET /api/llm             -> which providers are configured (no secrets)
@@ -34,7 +34,8 @@ const GROQ_PREFERRED = [
 ];
 
 // Mistral models, best first. Each has its own rate limit, so they rotate like Groq.
-const MISTRAL_PREFERRED = ["mistral-medium-latest", "mistral-small-latest", "open-mistral-nemo"];
+// On the free Experiment plan the Ministral models answer; Small/Medium are kept last in case the plan changes.
+const MISTRAL_PREFERRED = ["ministral-14b-latest", "ministral-8b-latest", "mistral-small-latest", "mistral-medium-latest"];
 
 class LlmError extends Error { constructor(msg, status) { super(msg); this.status = status; } }
 const isQuota = (e) => e && (e.status === 429 || /quota|rate limit|resource_exhausted|too many requests/i.test(e.message || ""));
@@ -170,7 +171,7 @@ async function mistralCandidates() {
     } catch (e) { ids = null; }
   }
   const wanted = [process.env.MISTRAL_MODEL, ...MISTRAL_PREFERRED].filter(Boolean);
-  return [...new Set(ids ? wanted.filter((w) => ids.includes(w)).concat(ids.length && !wanted.some((w) => ids.includes(w)) ? ids.filter((i) => /small|medium|large|nemo/.test(i)).slice(0, 2) : []) : wanted)];
+  return [...new Set(ids ? wanted.filter((w) => ids.includes(w)).concat(ids.length && !wanted.some((w) => ids.includes(w)) ? ids.filter((i) => /ministral|small|medium|large|nemo/.test(i)).slice(0, 2) : []) : wanted)];
 }
 
 async function callMistralWith(model, system, history, jsonMode = true) {
@@ -315,6 +316,9 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: "Invalid or oversized request" });
   }
 
+  // Testing aid: with the access code, x-force-provider limits the run to one provider
+  const force = String(req.headers["x-force-provider"] || "").toLowerCase();
+  if (force) { const only = steps.filter((a) => a.provider === force); if (only.length) steps.splice(0, steps.length, ...only); }
   // Try every configured model in order. Any failure moves on to the next one.
   const started = Date.now(), failures = [], deadline = started + TOTAL_BUDGET_MS;
   const waits = [];

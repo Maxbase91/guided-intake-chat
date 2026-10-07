@@ -215,6 +215,7 @@ const CONFIG = {
   keys: { gemini: "", groq: "" },
   models: { gemini: "gemini-2.5-flash", groq: "llama-3.3-70b-versatile" },
   accessCode: "",                         // only if ACCESS_CODE is set on Vercel
+  forceProvider: new URLSearchParams(location.search).get("ai") || "",   // testing: ?ai=mistral uses only that provider
   currency: "EUR",
   thresholds: { pcardMax: 2500, quickQuoteMax: 50000, materialityMin: 1000000, renewalWindowDays: 180 }
 };
@@ -485,7 +486,7 @@ function resolveProvider(){
 async function callLLM(system, history, retried){
   const p=CONFIG.provider, key=CONFIG.keys[p], model=CONFIG.models[p];
   if(p==="server"){
-    const r=await fetch("/api/llm",{method:"POST",signal:AbortSignal.timeout(58000),headers:{"Content-Type":"application/json","x-access-code":CONFIG.accessCode||""},body:JSON.stringify({system,history})});
+    const r=await fetch("/api/llm",{method:"POST",signal:AbortSignal.timeout(58000),headers:{"Content-Type":"application/json","x-access-code":CONFIG.accessCode||"",...(CONFIG.forceProvider?{"x-force-provider":CONFIG.forceProvider}:{})},body:JSON.stringify({system,history})});
     const d=await r.json().catch(()=>({}));
     if(r.status===401) throw new Error("Access code missing or wrong. Enter it under Rules.");
     // short per-minute limit: wait the few seconds the provider asks for, then try once more
