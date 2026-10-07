@@ -376,8 +376,9 @@ const BLANK_FACTS = {summary:null,category:null,demand_type:null,item:null,quant
   needed_by:null,location:null,supplier:null,supplier_reason:null,personal_data:null,ict_outsourcing:null,critical_service:null,offshore:null,
   budget_approved:null,decline_contract:null,contract_ok:null,background:null,acceptance:null,evaluation_priority:null,supplier_requirements:null,current_supplier:null,
   volume:null,support_needs:null,data_details:null,criticality:null,subcontracting:null,pricing_model:null,service_levels:null,ip_ownership:null,performance:null,cost_centre:null,role:null,headcount:null,skills:null,day_rate:null,system_access:null,renewal_change:null,wants_renewal:null};
+let CONV_SEQ=0;
 const S = fresh();
-function fresh(){ return {completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
+function fresh(){ return {cid:++CONV_SEQ, completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
 
 /* =========================================================
    5. RULES ENGINE (deterministic)
@@ -580,13 +581,16 @@ function chatHistory(){
 /* =========================================================
    7. CONVERSATION LOOP
    ========================================================= */
+class Stale extends Error{}
+const guard = cid => { if(S.cid!==cid) throw new Stale(); };   // the user started a new conversation meanwhile
 async function handleUser(text){
   text=text.trim(); if(!text||S.busy) return;
-  try{ await handleTurn(text); }
-  catch(e){ console.error(e); S.msgs.push({role:"assistant",kind:"sys",text:"Something went wrong on my side. Please send that again."}); }
-  finally{ S.busy=false; render(); }
+  const cid=S.cid;
+  try{ await handleTurn(text, cid); }
+  catch(e){ if(e instanceof Stale) return; console.error(e); if(S.cid===cid) S.msgs.push({role:"assistant",kind:"sys",text:"Something went wrong on my side. Please send that again."}); }
+  finally{ if(S.cid===cid){ S.busy=false; render(); } }
 }
-async function handleTurn(text){
+async function handleTurn(text, cid){
   if(S.sd && /^(make it|shorten|shorter|add more|rewrite|reword)|\b(summary|description|document)\b/i.test(text) && aiReady()) return refineSD(text);
   const asked=S.lastAsked; if(asked) S.asked[asked]=(S.asked[asked]||0)+1;
   S.msgs.push({role:"user",text}); S.choices=[]; S.busy=true; render();
@@ -595,12 +599,14 @@ async function handleTurn(text){
     try{
       const transcript=S.msgs.filter(m=>!m.kind).slice(0,-1).slice(-8).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
       const out = await callLLM(chatSystem(), [{role:"user",content:`${transcript?`Conversation so far:\n${transcript}\n\n`:""}Latest user message:\n${text}${stateBlock()}\n\nAnswer with the JSON object only.`}]);
+      guard(cid);
       mergeFacts(out.facts||{});
       // backup: closed answers the AI did not record are read directly
       if(asked && !known(S.f[asked]) && CLOSED.includes(asked)){ const v=readAnswer(asked,text); if(known(v) && v!=="unsure"||/sure|know/i.test(text)) S.f[asked]=v; }
       offlineRead(text, asked);   // backup: category, the answer to the question asked, and any other detail the AI did not record
       reply=out._raw?null:(out.reply||null); choices=out.choices||[]; complete=!!out.complete; aiAsking=out.asking||null;
     }catch(e){
+      if(e instanceof Stale) throw e; guard(cid);
       const quota=e.quota||/quota|rate limit|429/i.test(e.message||""), slow=e.name==="TimeoutError"||e.name==="AbortError";
       const auth=/access code/i.test(e.message||"");
       note = auth ? "This demo needs an access code for the AI. Open Rules and enter it. Until then I'm using standard questions." : quota ? "The AI has reached its usage limit, so I'm using standard questions for now." : slow ? "The AI took too long, so I'm using standard questions for now." : "The AI services aren't answering right now, so I'm using standard questions for now.";
@@ -620,8 +626,8 @@ async function handleTurn(text){
     showRecommendation();
     S.lastAsked=null; S.completed=true;
     render();
-    try{ await buildDoc(); }
-    catch(e){ console.error(e); S.msgs.push({role:"assistant",kind:"sys",text:"Something went wrong while writing the documents. Please tell me to try again."}); }
+    try{ await buildDoc(cid); }
+    catch(e){ if(e instanceof Stale) throw e; console.error(e); S.msgs.push({role:"assistant",kind:"sys",text:"Something went wrong while writing the documents. Please tell me to try again."}); }
   } else {
     let next=S.missing[0];
     const aiAskedOk = reply && !complete && aiAsking && S.missing.slice(0,2).includes(aiAsking);
@@ -1066,7 +1072,7 @@ function mergeBRD(base, ai){
   return out;
 }
 
-async function buildDoc(){
+async function buildDoc(cid=S.cid){
   const key=JSON.stringify(S.f)+S.det.route;
   if(S.sd && S.docKey===key){ S.msgs.push({role:"assistant",kind:"sd"}); return; }
   const base=offlineSummary();
@@ -1076,8 +1082,9 @@ async function buildDoc(){
       const convo=S.msgs.filter(m=>!m.kind).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
       ai=await callLLM(DOC_SYSTEM(),[{role:"user",content:`Conversation:\n${convo}\n\nFacts: ${JSON.stringify({...cleanFacts(), value_display: known(S.f.value)?money(Number(S.f.value))+(S.f.value_is_estimate?" (estimate)":""):"unknown"})}\nCategory: ${catById(S.f.category).name}\n`+
         `Recommended route: ${CHANNELS[S.det.route].name}. ${S.det.why}\nChecks triggered: ${S.det.controls.map(c=>c[1]).join(", ")||"none"}\nExisting contract: ${S.det.contract?`${S.det.contract.title} with ${S.det.contract.supplier}`:"none"}\nPreferred suppliers: ${(PREFERRED[S.f.category]||[]).join(", ")||"none"}`}]);
+      guard(cid);
       if(!ai || !ai.summary) throw new Error("empty");
-    }catch(e){ ai=null; S.msgs.push({role:"assistant",kind:"sys",text:"The AI couldn't write the documents just now, so they are built from your answers."}); }
+    }catch(e){ if(e instanceof Stale) throw e; guard(cid); ai=null; S.msgs.push({role:"assistant",kind:"sys",text:"The AI couldn't write the documents just now, so they are built from your answers."}); }
   }
   S.sd = {title:(ai&&ai.title)||base.title, summary:guardSummary(ai&&ai.summary)||base.summary, brd:mergeBRD(offlineBRD(base.risk), ai&&ai.brd), _ai:!!ai, _date:new Date()};
   S.docKey=key; S.brdEdited=null;
@@ -1095,11 +1102,14 @@ function guardSummary(t){
 const cleanFacts = () => Object.fromEntries(Object.entries(S.f).filter(([k,v])=>known(v)&&k!=="decline_contract").map(([k,v])=>[k,v===true?"yes":v===false?"no":v]));
 
 async function refineSD(text){
+  const cid=S.cid;
   S.msgs.push({role:"user",text}); S.busy=true; render();
   try{ const d=await callLLM(DOC_SYSTEM(),[{role:"user",content:`Current summary and requirements document: ${JSON.stringify({title:S.sd.title,summary:S.sd.summary,brd:S.sd.brd})}\nChange request: ${text}\nReturn the full updated JSON in the same shape. Keep the summary holistic.`}]);
+       if(S.cid!==cid) return;
        S.sd={...S.sd,title:d.title||S.sd.title,summary:d.summary||S.sd.summary,brd:mergeBRD(S.sd.brd,d.brd)}; S.brdEdited=null;
        S.msgs.push({role:"assistant",text:"Done, both the summary and the requirements document are updated."}); S.msgs.push({role:"assistant",kind:"sd"}); }
-  catch(e){ S.msgs.push({role:"assistant",kind:"sys",text:"The AI couldn't update it just now. You can edit the text directly."}); }
+  catch(e){ if(S.cid!==cid) return; S.msgs.push({role:"assistant",kind:"sys",text:"The AI couldn't update it just now. You can edit the text directly."}); }
+  if(S.cid!==cid) return;
   S.busy=false; render();
 }
 function submit(){
@@ -1352,7 +1362,7 @@ function openSettings(){
 /* =========================================================
    11. WIRING
    ========================================================= */
-function reset(){ Object.assign(S,fresh()); render(); $("#inp").focus(); }
+function reset(){ Object.keys(S).forEach(k=>delete S[k]); Object.assign(S,fresh()); render(); $("#inp").focus(); }
 const inp=$("#inp");
 inp.addEventListener("input",()=>{inp.style.height="auto";inp.style.height=Math.min(inp.scrollHeight,160)+"px";});
 inp.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("#comp").requestSubmit();}});
