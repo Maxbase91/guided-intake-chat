@@ -647,6 +647,7 @@ function wrapUp(){
 /* ---------- reading answers without AI (also a backup when the AI misses something) ---------- */
 function offlineRead(text, asked){
   const f=S.f, t=text.toLowerCase(), all=userText();
+  if((!asked || asked==="need") && known(f.category) && f.demand_type!=="contingent_labour"){ f.summary=f.summary||firstSentence(text); if(!known(f.item)) f.item=itemFrom(text); }
   if(!known(f.category) || asked==="need"){
     let best=null, score=0;
     for(const c of CATEGORIES){ const s=c.kw.filter(k=>all.includes(k)).length; if(s>score){score=s;best=c;} }
@@ -666,7 +667,9 @@ function fillUnknown(o){ for(const [k,v] of Object.entries(o)) if(known(v) && !k
 const firstSentence = t => { const x=t.split(/(?<=[.!?])\s+/)[0].trim(); return x.length>200?x.slice(0,197)+"…":x; };
 function itemFrom(text){
   let x=text.split(/[.;\n]/)[0].replace(/^\s*(?:hi|hello)[,!]?\s*/i,"").replace(/^(?:please\s+)?(?:we|i)(?:'d| would)?\s+(?:need|want|like|would like|are looking for|am looking for)\s+(?:to (?:buy|get|order|have)\s+)?/i,"").replace(/^please\s+/i,"").replace(/^(?:need|looking for)\s+/i,"");
-  x=x.split(/,|\s+(?:for|to replace|because|since|by|in|from|starting|with a budget|at around|around|about)\s+/i)[0].replace(/^\d[\d,]*\s+(?:x\s+)?/,"").trim();
+  x=x.split(/,|\s+(?:to replace|because|since|by|in|from|starting|with a budget|at around|around|about)\s+/i)[0];
+  if(!/\b(?:ticket|licen[cs]e|subscription|membership|seat|place)s?\s+for\b/i.test(x)) x=x.split(/\s+for\s+/i)[0];
+  x=x.replace(/^\d[\d,]*\s+(?:x\s+)?/,"").trim();
   return x.length>2 && x.length<90 ? x.charAt(0).toUpperCase()+x.slice(1) : null;
 }
 

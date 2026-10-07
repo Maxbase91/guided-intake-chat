@@ -24,6 +24,8 @@ function pickProvider() {
 class LlmError extends Error { constructor(msg, status) { super(msg); this.status = status; } }
 const isQuota = (e) => e && (e.status === 429 || /quota|rate limit|resource_exhausted/i.test(e.message || ""));
 const isTimeout = (e) => e && (e.name === "TimeoutError" || e.name === "AbortError" || e.status === 408);
+// overloaded or temporary server errors: worth trying the next model
+const isBusy = (e) => e && ((e.status >= 500 && e.status < 600) || /high demand|overloaded|unavailable|try again later|internal error/i.test(e.message || ""));
 const CALL_TIMEOUT_MS = 27000; // per model call; two attempts fit in the 60s function limit
 
 async function callGemini(system, history, model = process.env.GEMINI_MODEL || "gemini-2.5-flash") {
@@ -114,7 +116,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({ text, provider: name });
     } catch (e) {
       last = e;
-      if (!isQuota(e) && !isTimeout(e)) break;
+      if (!isQuota(e) && !isTimeout(e) && !isBusy(e)) break;
     }
   }
   const quota = isQuota(last), slow = isTimeout(last);
