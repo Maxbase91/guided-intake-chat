@@ -482,12 +482,14 @@ function resolveProvider(){
   if(CONFIG.provider!=="auto") return;
   CONFIG.provider = SERVER ? "server" : CONFIG.keys.gemini ? "gemini" : CONFIG.keys.groq ? "groq" : "offline";
 }
-async function callLLM(system, history){
+async function callLLM(system, history, retried){
   const p=CONFIG.provider, key=CONFIG.keys[p], model=CONFIG.models[p];
   if(p==="server"){
     const r=await fetch("/api/llm",{method:"POST",signal:AbortSignal.timeout(58000),headers:{"Content-Type":"application/json","x-access-code":CONFIG.accessCode||""},body:JSON.stringify({system,history})});
     const d=await r.json().catch(()=>({}));
     if(r.status===401) throw new Error("Access code missing or wrong. Enter it under Rules.");
+    // short per-minute limit: wait the few seconds the provider asks for, then try once more
+    if(r.status===429 && !retried && d.retryAfter && d.retryAfter<=20){ await new Promise(res=>setTimeout(res,(d.retryAfter+1)*1000)); return callLLM(system, history, true); }
     if(!r.ok){ const e=new Error(d.error||`Server error ${r.status}`); e.quota=r.status===429||!!d.quota; throw e; }
     if(SERVER && d.provider) SERVER.last=d.provider;
     return parseJSON(d.text);
@@ -542,16 +544,22 @@ volume, support_needs, data_details (which data and where stored), criticality (
 subcontracting (true | false | "unsure"), pricing_model, service_levels, ip_ownership, performance (how the current supplier performed), cost_centre.
 External workers or contractors are demand_type contingent_labour.
 
-Context you may use in remarks:
-Active contracts: ${CONTRACTS.map(c=>`${c.title} with ${c.supplier} (${c.category}, ends ${c.expires})`).join("; ")}.
-Preferred suppliers: ${Object.entries(PREFERRED).map(([k,v])=>`${k}: ${v.join(", ")}`).join("; ")}.
-Catalogue: ${CATALOGUE.map(c=>`${c.name} ${money(c.price)}`).join("; ")}.
+${contextLines()}
 
 Return JSON only: {"facts":{...only keys you are setting...},"reply":"","asking":"the key from still_needed your question is about","choices":[],"complete":false}
 "asking" must be the key of the first unknown item in still_needed. Do not ask about anything else.`;
 }
+function contextLines(){
+  const c=S.f.category;
+  if(!c) return "Context: none yet (category unknown).";
+  const ctr=CONTRACTS.filter(x=>x.category===c), pref=PREFERRED[c]||[], cat=GOODSLIKE(S.f)?CATALOGUE:[];
+  return "Context you may use in remarks:"+
+    (ctr.length?`\nActive contracts for this category: ${ctr.map(x=>`${x.title} with ${x.supplier} (ends ${x.expires})`).join("; ")}.`:"\nNo active contract for this category.")+
+    (pref.length?`\nPreferred suppliers: ${pref.join(", ")}.`:"")+
+    (cat.length?`\nCatalogue: ${cat.map(x=>`${x.name} ${money(x.price)}`).join("; ")}.`:"");
+}
 function stateBlock(){
-  const f=S.f, still=S.missing.map(k=>({key:k,label:FACTS[k].label,ask:FACTS[k].q(f),example:(FACTS[k].ex(f)||"")}));
+  const f=S.f, still=S.missing.map((k,i)=>i<3?{key:k,label:FACTS[k].label,ask:FACTS[k].q(f),example:(FACTS[k].ex(f)||"")}:{key:k,label:FACTS[k].label});
   return `\n\n[STATE]\nknown_facts: ${JSON.stringify(Object.fromEntries(Object.entries(f).filter(([k,v])=>known(v)&&v!==false)))}\n`+
     (S.det?`route_so_far: ${CHANNELS[S.det.route].name}\n`:"")+
     `still_needed (ask the first unknown one): ${JSON.stringify(still)}`;
@@ -584,7 +592,7 @@ async function handleTurn(text){
   let reply=null, choices=[], complete=false, note=null, aiAsking=null;
   if(aiReady()){
     try{
-      const transcript=S.msgs.filter(m=>!m.kind).slice(0,-1).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
+      const transcript=S.msgs.filter(m=>!m.kind).slice(0,-1).slice(-8).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
       const out = await callLLM(chatSystem(), [{role:"user",content:`${transcript?`Conversation so far:\n${transcript}\n\n`:""}Latest user message:\n${text}${stateBlock()}\n\nAnswer with the JSON object only.`}]);
       mergeFacts(out.facts||{});
       // backup: closed answers the AI did not record are read directly
