@@ -24,7 +24,7 @@ All reference data (catalogue, contracts, preferred suppliers) is mock data. Use
 Default order: Gemini, then Groq, then Mistral. When a model hits its limit the server moves to the next one and rotates across several Groq and Mistral models (their limits apply per model). If everything is briefly limited, the page waits the few seconds the provider asks for and retries once, then falls back to rule-based questions.
 3. Redeploy so the variables take effect.
 
-The page checks `/api/llm` on load. If the server has a key, it shows **AI on · Server**. Without one, it runs offline keyword rules.
+The page checks `/api/llm` on load. If the server has a key, the pill shows **AI on**, and after the first answer it names the provider that actually replied (Gemini, Groq or Mistral). Hover over it to see the fallback order. Without a key, it runs offline keyword rules.
 
 ## Run locally
 

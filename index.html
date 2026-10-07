@@ -475,7 +475,10 @@ const monthsOf = d => { const m=String(d||"").match(/(\d+)\s*(?:-|–|to)?\s*(\d
    ========================================================= */
 let SERVER=null;
 const aiReady = () => CONFIG.provider==="server" ? !!SERVER : (["gemini","groq"].includes(CONFIG.provider) && !!CONFIG.keys[CONFIG.provider]);
-const providerLabel = () => CONFIG.provider==="server" ? ({gemini:"Gemini",groq:"Groq",mistral:"Mistral"}[(SERVER&&SERVER.last)||(SERVER&&SERVER.provider)]||"Server") : CONFIG.provider==="gemini"?"Gemini":"Groq";
+const PNAMES={gemini:"Gemini",groq:"Groq",mistral:"Mistral"};
+// only name a provider once it has actually answered; before that we don't know who will (limits are checked per call)
+const providerLabel = () => CONFIG.provider==="server" ? (SERVER&&SERVER.last ? PNAMES[SERVER.last]||SERVER.last : "") : CONFIG.provider==="gemini"?"Gemini":"Groq";
+const providerChain = () => SERVER ? ["gemini","groq","mistral"].filter(k=>SERVER.providers&&SERVER.providers[k]).map(k=>PNAMES[k]).join(" → ") : "";
 async function detectServer(){
   if(!/^https?:$/.test(location.protocol)) return;
   try{ const r=await fetch("/api/llm"); if(!r.ok) return; const d=await r.json(); if(d&&d.ok) SERVER=d; }catch(e){}
@@ -1149,7 +1152,9 @@ const TRIES=[
 ];
 function render(){
   $("#aiDot").className="dot"+(aiReady()?" on":"");
-  $("#aiLabel").textContent=aiReady()?`AI on · ${providerLabel()}`:"Offline rules";
+  const pl=providerLabel();
+  $("#aiLabel").textContent=aiReady()?(pl?`AI on · ${pl}`:"AI on"):"Offline rules";
+  $("#aiLabel").parentElement.title=aiReady()&&SERVER?`Fallback order: ${providerChain()}.${pl?` Last answer from ${pl}.`:" The first answer shows which one is used."}`:"";
   const box=$("#msgs");
   if(!S.msgs.length){
     box.innerHTML=`<div class="welcome"><h1>What do you need to buy?</h1>
