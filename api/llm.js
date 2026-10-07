@@ -276,10 +276,25 @@ module.exports = async (req, res) => {
       }
     }
     IGNORE_COOLDOWN = false;
+    // Mistral detail: each model on its own, with Mistral's raw reply (no secrets)
+    let mistralDetail = null;
+    if (process.env.MISTRAL_API_KEY && q.check === "mistral") {
+      mistralDetail = [];
+      for (const model of ["mistral-small-latest", "mistral-medium-latest", "open-mistral-nemo", "ministral-8b-latest"]) {
+        await sleep(1500);
+        const r = await fetch("https://api.mistral.ai/v1/chat/completions", { method: "POST", signal: AbortSignal.timeout(15000),
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.MISTRAL_API_KEY}` },
+          body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: "user", content: "Say ok" }] }) }).catch((e) => ({ status: 0, text: async () => String(e) }));
+        const body = await r.text();
+        const hdr = (n) => (r.headers && r.headers.get ? r.headers.get(n) : null);
+        mistralDetail.push({ model, status: r.status, body: body.slice(0, 200),
+          limits: { rps: hdr("x-ratelimit-limit-req-second") || hdr("ratelimitbysize-limit"), tokensMinute: hdr("x-ratelimit-limit-tokens-minute"), tokensMonth: hdr("x-ratelimit-limit-tokens-month"), remainingMonth: hdr("x-ratelimit-remaining-tokens-month") } });
+      }
+    }
     let groqRotation = null, mistralRotation = null;
     try { if (process.env.GROQ_API_KEY) groqRotation = await groqCandidates(); } catch (e) {}
     try { if (process.env.MISTRAL_API_KEY) mistralRotation = await mistralCandidates(); } catch (e) {}
-    return res.status(200).json({ ...base, checks, groqRotation, mistralRotation });
+    return res.status(200).json({ ...base, checks, groqRotation, mistralRotation, ...(mistralDetail ? { mistralDetail } : {}) });
   }
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
