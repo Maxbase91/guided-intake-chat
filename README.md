@@ -1,6 +1,6 @@
 # Guided Intake Chat
 
-A conversational procurement intake prototype. The user describes a need in plain language. Fixed rules pick one of seven buying routes (catalogue, card purchase, contract call-off, contract renewal, quick quote, sourcing project, external workers) and define exactly which details each route needs. The AI runs the conversation: one question at a time, with a concrete example, reading the answers. It never decides the route.
+A conversational procurement intake prototype. The user describes a need in plain language. Fixed rules pick one of three buying routes: catalogue, contract call-off (including external workers through the staffing contract) or new demand. New demand is business-led sourcing with three quotes up to €50,000 and procurement-led sourcing with an RFP above it and define exactly which details each route needs. The AI runs the conversation: one question at a time, with a concrete example, reading the answers. It never decides the route.
 
 The chat runs in stages shown in a step bar at the top (Your need → Timing and place → Supplier and approval → Risk and data → Success criteria → Review). Only stages with open questions for the chosen route appear. When a stage is finished, a short recap card shows what was captured, and the side panel groups the details by stage.
 
@@ -51,3 +51,9 @@ Thresholds sit in `CONFIG.thresholds` and can also be changed live in the **Rule
 ## Answer checks against nonsense and repeats
 
 An answer that has nothing to do with the question (a recipe, a joke) is caught by rules and by the AI, and the question is asked again once. If the second answer is still unrelated, the detail is recorded as not given and listed as an open point; it never reaches the description. One answer can fill several details (for example the problem, who it is for, today's solution and the impact of delay), and nothing the user already said is asked again. Chat replies never show internal field names or values.
+
+## Executive service description (new demand)
+
+New demand gets the format of an executive service description: a headline (name, tagline and 50–100 words), an executive description of 150–250 words and a service summary table (service name, target audience, supported functions, business problem solved, key capabilities, key benefits, unique selling points, KPIs / success measures, regulatory / governance benefits). Business-led demand gets the same parts, shorter. Catalogue orders and call-offs keep a short description.
+
+For the profile points (audience, functions, benefits, unique selling points, KPIs, regulatory benefits) the chat suggests an answer tailored to the request; the user accepts it in one tap or changes it. Above the threshold each point is a separate question, below it they are bundled into one. Each answer gets a small score (for example "Answer quality 9/10").
