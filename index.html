@@ -854,7 +854,9 @@ function computeQuality(aiRemarks){
   (aiRemarks||[]).filter(x=>typeof x==="string"&&x.trim()&&!/^(none|n\/a|no (issues|concerns|remarks)|nothing)\b/i.test(x.trim())).slice(0,2).forEach(x=>pts.push({lvl:"info",text:x.trim().replace(/\.?$/,".")}));
   const answered=req.filter(k=>known(f[k])&&f[k]!=="Not given"&&f[k]!=="unsure").length, complete=req.length?Math.round(answered/req.length*100):100;
   const warn=pts.filter(p=>p.lvl==="warn").length, info=pts.filter(p=>p.lvl==="info").length;
-  const score=Math.max(35,Math.min(100,100-15*warn-5*info-Math.round((100-complete)/2)));
+  let secPen=0;
+  if(S.sd&&S.sd.detail){ const R=sectionQuality(); secPen=Math.min(30, 3*R.filter(r=>r.status==="Partial"||r.status==="To be determined").length + 8*R.filter(r=>r.status==="Risk").length); }
+  const score=Math.max(35,Math.min(100,100-15*warn-5*info-Math.round((100-complete)/2)-secPen));
   const rating=score>=90?"Strong":score>=75?"Good":score>=55?"Fair":"Needs work";
   return {score,rating,complete,points:pts};
 }
@@ -1352,8 +1354,14 @@ function setFromSuggestion(k, v){
   const f=S.f;
   if(BUNDLES[k]){
     String(v).split(/\n+/).forEach(line=>{ const m=line.match(/^\s*[-•*]?\s*([^:]{3,45}):\s*(.+)$/); if(!m) return; const lab=m[1].trim().toLowerCase();
-      const hit=BUNDLES[k].find(([L])=>lab===L.toLowerCase()||lab.startsWith(L.toLowerCase().split(/[ /]/)[0])) ; const key=hit?hit[1]:PROFILE_KEYS[lab];
+      const hit=BUNDLES[k].find(([L])=>lab===L.toLowerCase()||lab.startsWith(L.toLowerCase().split(/[ /]/)[0])); let key=hit?hit[1]:PROFILE_KEYS[lab];
+      if(!key){ const syn=[[/regulat|governance benefit|control benefit/,"reg_benefits"],[/selling|usp|different/,"usp"],[/benefit/,"benefits"],[/audience|users?\b|who/,"users"],[/function|teams? supported/,"functions"],
+          [/kpi|key performance|success measure|measure/,"kpis"],[/service level|sla/,"service_levels"],[/acceptance|criteria/,"acceptance"],[/review|sign|testing/,"acc_review"],[/support/,"support_model"],[/hours|window/,"service_hours"],[/tool|system/,"tools"],
+          [/meeting|governance/,"gov_meetings"],[/report/,"reporting"],[/change/,"change_mgmt"],[/escalat/,"escalation"],[/dependenc|we (?:need|provide)|our respons/,"our_deps"],[/assum/,"prov_assumptions"]];
+        const m2=syn.find(([re,kk])=>re.test(lab) && BUNDLES[k].some(([,x])=>x===kk)); key=m2?m2[1]:null; }
       if(key && (!known(f[key])||isTBD(f[key]))) f[key]=m[2].trim().replace(/\.$/,""); });
+    // nothing could be matched: keep the text with the first point rather than losing it
+    if(!BUNDLES[k].some(([,x])=>known(f[x])&&!isTBD(f[x]))) f[BUNDLES[k][0][1]]=String(v).replace(/\n+/g,"; ");
     f[k]="Confirmed"; return;
   }
   f[k]=String(v).replace(/\.$/,"");
@@ -2303,13 +2311,13 @@ function qualityHTML(){
   const oks=q.points.filter(p=>p.lvl==="ok").length, items=[];
   q.points.filter(p=>p.lvl!=="ok").forEach(p=>items.push({lvl:p.lvl,html:esc(p.text)}));
   if(S.sd&&S.sd.detail) sectionQuality().filter(r=>["Partial","To be determined","Risk"].includes(r.status)&&r.sec!=="Open points")
-    .forEach(r=>items.push({lvl:r.status==="Risk"?"warn":"info", html:`<b>${esc(r.sec)}</b>: ${esc(r.issue||r.status.toLowerCase())}${r.fix?`. ${esc(r.fix)}`:""}`}));
+    .forEach(r=>items.push({lvl:r.status==="Risk"?"warn":"info", html:`<span><b>${esc(r.sec)}</b>: ${esc(r.issue||r.status.toLowerCase())}${r.fix?`. ${esc(r.fix)}`:""}</span>`}));
   const seen=new Set(), list=items.filter(x=>{ const k=x.html.replace(/<[^>]+>/g,"").toLowerCase().slice(0,60); if(seen.has(k)) return false; seen.add(k); return true; });
-  const secs=new Set(items.map(x=>(x.html.match(/^<b>([^<]+)<\/b>/)||[])[1]).filter(Boolean).map(x=>x.toLowerCase()));
+  const secs=new Set(items.map(x=>(x.html.match(/^<span><b>([^<]+)<\/b>/)||[])[1]).filter(Boolean).map(x=>x.toLowerCase()));
   const open=(S.sd&&S.sd.detail&&S.sd.detail.open_points||[]).filter(x=>!seen.has(String(x).toLowerCase().slice(0,60)) && !secs.has(String(x).split(":")[0].trim().toLowerCase()));
   return `<div class="sec qual"><div class="qhead"><span class="qbadge ${cls}">${q.rating}</span><span>Quality check · ${q.score}/100 · ${q.complete}% of the needed details given${oks?` · ${oks} answer${oks>1?"s":""} clarified`:""}</span></div>
-    ${list.length?`<h5 class="qh">To improve</h5><ul class="qlist">${list.map(p=>`<li class="${p.lvl}">${p.html}</li>`).join("")}</ul>`:""}
-    ${open.length?`<h5 class="qh">Still open (${open.length})</h5><ul class="qlist">${open.map(x=>`<li class="info">${esc(x)}</li>`).join("")}</ul>`:""}
+    ${list.length?`<h5 class="qh">To improve</h5><ul class="qlist">${list.map(p=>`<li class="${p.lvl}">${/^<span>/.test(p.html)?p.html:`<span>${p.html}</span>`}</li>`).join("")}</ul>`:""}
+    ${open.length?`<h5 class="qh">Still open (${open.length})</h5><ul class="qlist">${open.map(x=>`<li class="info"><span>${esc(x)}</span></li>`).join("")}</ul>`:""}
     ${!list.length&&!open.length?`<ul class="qlist"><li class="ok">No gaps or inconsistencies found.</li></ul>`:""}</div>`;
 }
 function sdText(){ const d=S.sd.desc||{};
