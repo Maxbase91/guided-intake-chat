@@ -67,6 +67,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 .av{width:30px;height:30px;border-radius:9px;background:var(--navy);color:var(--amber);display:grid;place-items:center;flex:none;font-weight:700;font-size:13px}
 .bub{max-width:min(600px,85%);padding:11px 15px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word}
 .m.u .bub{background:var(--navy);color:#fff;border-bottom-right-radius:5px}
+.classcard{max-width:min(600px,85%);border:1px solid var(--line);border-radius:14px;padding:10px 14px;background:#fff;font-size:13.5px}
+.classcard .ch{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}.classcard .cr{margin:4px 0}
+.classcard .cc{color:var(--ink-3);font-size:12px}.classcard .cm{display:inline-block;margin-left:6px;padding:0 8px;border-radius:99px;background:var(--line-2);font-size:12px;font-weight:600}
+.classcard .cx{color:var(--ink-2);font-size:12.5px;margin-top:2px}.classcard .cf{color:var(--ink-3);font-size:12px;margin-top:6px}
 .ucol{display:flex;flex-direction:column;align-items:flex-end;max-width:min(600px,85%)}.ucol .bub{max-width:100%}
 .ascore{font-size:11px;margin-top:4px;padding:1px 8px;border-radius:99px;font-weight:600}
 .ascore.shi{color:#1d6b43;background:#e6f4ec}.ascore.smid{color:#8a5d00;background:#fdf3dc}.ascore.slo{color:#b42318;background:#fdecea}
@@ -153,6 +157,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 .ds{margin:0 0 10px}.ds:last-child{margin:0}.ds h5{margin:0 0 2px;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--amber-ink)}
 .ds p{margin:0;font-size:14.5px;line-height:1.55}
 .ds.narr{margin-top:14px;padding-top:12px;border-top:1px dashed #e6d9b0}
+.sec.srq .cmp{margin:4px 0 8px;font-size:14px;line-height:1.55}.sec.srq .shortv{background:var(--line-2);border-radius:10px;padding:8px 10px;font-size:13px}.sec.srq .shortv p{margin:3px 0 0}
+.sec.srq .cpy{display:flex;gap:14px;margin-top:6px}.qcounts{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px}.qc{font-size:12px;padding:2px 9px;border-radius:99px;font-weight:600}
+.qc.ok{background:#e6f4ec;color:#1d6b43}.qc.pa{background:#fdf3dc;color:#8a5d00}.qc.tb{background:#eef1f8;color:#3c4a6b}.qc.rk{background:#fdecea;color:#b42318}.qc.na{background:#f3f4f6;color:#6b7280}
 .ds .hl{font-size:15px;margin-bottom:4px}.ds .exec p{margin:0 0 8px}.ds .exec p:last-child{margin:0}
 .sumt{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:4px;background:#fff}.sumt td{border:1px solid #ece3c6;padding:6px 9px;vertical-align:top;line-height:1.45}
 .sumt td:first-child{width:32%;color:var(--ink-3);font-weight:600;background:#fdfaf0}.ds ul{margin:2px 0 0;padding-left:18px;font-size:14.5px;line-height:1.5}
@@ -280,6 +287,7 @@ const CATEGORIES = [
   {id:"market-data", name:"Market data",                   type:"software", kw:["market data","data feed","terminal","ratings data"]},
   {id:"training",    name:"Training and learning",         type:"services", kw:["training","course","workshop","coaching","certification"]},
   {id:"office",      name:"Office supplies and furniture", type:"goods",    kw:["paper","stationery","toner","chair","desk","supplies","furniture"]},
+  {id:"bpo",         name:"Business process services",    type:"services", kw:["invoice processing","accounts payable","payroll service","payroll processing","back office","call centre","contact centre","kyc operations","process our","processing of","claims handling","document processing"]},
   {id:"telecom",     name:"Telecom",                       type:"services", kw:["mobile contract","telecom","network","sim card","connectivity"]}
 ];
 const DEMAND_TYPES = {goods:"Goods", services:"Services", software:"Software", contingent_labour:"External workers"};
@@ -308,6 +316,49 @@ const PREFERRED = {
   "cloud":["Contoso Cloud"],"consulting":["Lakeshore Advisory","Blue Yonder Partners"],"legal":["Wingtip Legal"],
   "marketing":["Coho Creative"],"facilities":["BrightClean"],"contingent":["Tailspin Talent"],
   "market-data":["Datum Feeds"],"training":["Litware Learning"],"office":["Contoso Office"],"telecom":["Fabrikam Mobile"]
+};
+/* Level 4 category taxonomy (mock; replace with the real list). cat links each entry to a buying category. */
+const L4 = [
+  {code:"L4-1101", name:"IT hardware and peripherals", cat:"it-hardware", kw:["laptop","monitor","headset","printer","docking","smartphone","hardware","device"], desc:"Purchase of computers, screens, phones and accessories for colleagues."},
+  {code:"L4-1201", name:"Software licences (installed)", cat:"software", kw:["licence","license","on-premise","installed","perpetual"], desc:"Licences for software installed and run by us."},
+  {code:"L4-1202", name:"Software as a service", cat:"software", kw:["saas","cloud-based","subscription","platform","tool","workflow","portal","system","orchestrat","hosted"], desc:"Business applications the provider hosts and runs, used by us over the internet."},
+  {code:"L4-1301", name:"Application development and maintenance", cat:"it-services", kw:["develop","build","implementation","integration","migration","testing","maintenance","enhancement","bug"], desc:"Building, changing, testing and maintaining software for us."},
+  {code:"L4-1302", name:"IT managed services and service desk", cat:"it-services", kw:["managed service","service desk","help desk","helpdesk","operations","run and maintain","monitoring"], desc:"Running and supporting IT systems or a service desk for us on an ongoing basis."},
+  {code:"L4-1401", name:"Cloud infrastructure and hosting", cat:"cloud", kw:["cloud","hosting","aws","azure","data centre","server","storage","iaas","paas"], desc:"Computing, storage and hosting capacity provided by the provider."},
+  {code:"L4-1501", name:"Telecom and network services", cat:"telecom", kw:["mobile","telecom","network","sim","connectivity","lines"], desc:"Mobile, fixed-line and network connectivity services."},
+  {code:"L4-1601", name:"Market data and research", cat:"market-data", kw:["market data","data feed","terminal","ratings","research","prices"], desc:"Market prices, reference data, ratings and research delivered as a feed or terminal."},
+  {code:"L4-2101", name:"Management and strategy consulting", cat:"consulting", kw:["strategy","operating model","redesign","transformation","process","assessment","advisory","consult"], desc:"Advice and support on strategy, organisation, processes and change."},
+  {code:"L4-2102", name:"Technology consulting", cat:"consulting", kw:["it strategy","architecture","technology","digital","it operating model","cyber","security assessment"], desc:"Advice on technology strategy, architecture and technology change."},
+  {code:"L4-2201", name:"Legal services", cat:"legal", kw:["legal","lawyer","counsel","litigation","opinion","law firm"], desc:"Legal advice, opinions and representation from external counsel."},
+  {code:"L4-2301", name:"Marketing, events and hospitality", cat:"marketing", kw:["event","dinner","conference","agency","campaign","marketing","sponsorship","ticket","venue","catering for"], desc:"Event organisation, hospitality, campaigns and marketing agencies."},
+  {code:"L4-2401", name:"Training and learning", cat:"training", kw:["training","course","workshop","coaching","learning","certification"], desc:"Courses, coaching and learning content for colleagues."},
+  {code:"L4-2501", name:"Facility management, cleaning and catering", cat:"facilities", kw:["cleaning","facility","facilities","maintenance of","catering","security guard","office move"], desc:"Cleaning, catering, building maintenance and other facility services."},
+  {code:"L4-2601", name:"Office supplies and furniture", cat:"office", kw:["stationery","paper","toner","chair","desk","furniture","supplies"], desc:"Office supplies, furniture and consumables."},
+  {code:"L4-2701", name:"Contingent workforce and contractors", cat:"contingent", kw:["contractor","temporary","freelance","interim","day rate","developer","consultant"], desc:"External individuals working under our direction for a period."},
+  {code:"L4-2801", name:"Business process services", cat:"bpo", kw:["invoice processing","accounts payable","payroll","back office","call centre","contact centre","kyc","claims","document processing","processing"], desc:"The provider runs a business process for us on an ongoing basis, such as invoice processing or payroll."}
+];
+/* Legal entities (mock) and the regulatory rule set that decides "outsourcing or not" for each. Versioned; replace with the real entity-to-regulator matrix. */
+const RULESET_VERSION = "Prototype rule set, October 2026";
+const ENTITIES = [
+  {id:"EU", name:"EU banking entity (Germany)", country:"Germany", fw:"EU", re:/frankfurt|germany|berlin|munich|hamburg|cologne|düsseldorf|stuttgart|europe\b/i, abbr:/\bEU\b/},
+  {id:"UK", name:"UK banking entity (London)", country:"United Kingdom", fw:"UK", re:/london|united kingdom|england|britain|edinburgh/i, abbr:/\bUK\b/},
+  {id:"SG", name:"Singapore branch", country:"Singapore", fw:"SG", re:/singapore/i},
+  {id:"HK", name:"Hong Kong branch", country:"Hong Kong", fw:"HK", re:/hong kong/i},
+  {id:"US", name:"US entity (New York)", country:"United States", fw:"US", re:/new york|united states|america/i, abbr:/\b(?:US|USA)\b/},
+  {id:"AU", name:"Australia branch", country:"Australia", fw:"AU", re:/sydney|melbourne|australia/i},
+  {id:"CA", name:"Canada branch", country:"Canada", fw:"CA", re:/toronto|canada/i}
+];
+const FRAMEWORKS = {
+  EU:{regulator:"European Banking Authority", instrument:"EBA Guidelines on outsourcing arrangements (EBA/GL/2019/02)", short:"EBA/GL/2019/02", test:"binary",
+      watch:"EBA/GL/2026/09 on third-party risk for non-ICT services: finalised, not yet applicable; replaces EBA/GL/2019/02 once applicable."},
+  UK:{regulator:"Prudential Regulation Authority", instrument:"PRA Supervisory Statement SS2/21, Outsourcing and third party risk management", short:"PRA SS2/21", test:"binary",
+      watch:"Updated SS2/21 (published March 2026) becomes effective on 18 March 2027."},
+  SG:{regulator:"Monetary Authority of Singapore", instrument:"MAS Notice 658 and MAS Guidelines on Outsourcing (Banks)", short:"MAS Notice 658", test:"binary"},
+  HK:{regulator:"Hong Kong Monetary Authority", instrument:"HKMA Supervisory Policy Manual SA-2, Outsourcing", short:"HKMA SA-2", test:"binary", newCounts:true},
+  AU:{regulator:"Australian Prudential Regulation Authority", instrument:"APRA CPS 230 Operational Risk Management", short:"APRA CPS 230", test:"material"},
+  CA:{regulator:"Office of the Superintendent of Financial Institutions", instrument:"OSFI Guideline B-10, Third-Party Risk Management", short:"OSFI B-10", test:"binary"},
+  US:{regulator:"Federal Reserve, OCC and FDIC", instrument:"Interagency Guidance on Third-Party Relationships: Risk Management (2023)", short:"US Interagency Guidance 2023", test:"thirdparty",
+      watch:"Proposed replacement guidance; comments due 16 November 2026. Not yet effective."}
 };
 const ALL_SUPPLIERS = [...new Set([...CONTRACTS.map(c=>c.supplier),...Object.values(PREFERRED).flat(),...CATALOGUE.map(c=>c.supplier)])];
 
@@ -343,12 +394,28 @@ const FACTS = {
   deliverables:   {label:"Deliverables",    q:f=>f.demand_type==="contingent_labour"?"What will they work on?":"What should the supplier deliver?", ex:f=>f.demand_type==="contingent_labour"?"For example: \"building the new payments API with our team\".":`For example: ${DELIV_EX[f.category]||DELIV_EX._}.`},
   duration:       {label:"Duration",        q:f=>f.wants_renewal?"How long should the renewed contract run?":"How long will the work run?", ex:()=>"", choices:["Under 3 months","3–6 months","6–12 months","Over a year"]},
   needed_by:      {label:"Start / delivery",q:f=>["goods","software"].includes(f.demand_type)?"When do you need it?":"When should it start?", ex:()=>"A date or \"as soon as possible\" is fine."},
-  location:       {label:"Location",        q:f=>["goods","software"].includes(f.demand_type)?"Where should it be delivered?":"Where will the work happen?", ex:f=>["goods","software"].includes(f.demand_type)?"An office or building is enough.":"", choices:f=>["goods","software"].includes(f.demand_type)?null:["On site","Remote, same country","Remote, other country"]},
+  location:       {label:"Where and how",   q:f=>["goods","software"].includes(f.demand_type)?"Where should it be delivered?":"Where and how will the work be done?", ex:f=>["goods","software"].includes(f.demand_type)?"An office or building is enough.":"For example: \"remotely from the provider's offices in Poland\" or \"on our premises in London\".", choices:f=>["goods","software"].includes(f.demand_type)?null:["Remote","On our premises","At the provider's site","Offshore or another country"]},
   supplier:       {label:"Supplier",        q:f=>S.det&&S.det.route==="contract"&&S.det.contract&&!hasSupplier(f)?`We already have the ${S.det.contract.title} with ${S.det.contract.supplier} for this kind of work. Are you happy to use them?`:"Do you already have a supplier in mind?", ex:f=>S.det&&S.det.route==="contract"&&!hasSupplier(f)?"That's usually the quickest way, because no new competition is needed.":`It's fine to say no.${(PREFERRED[f.category]||[]).length?` Our preferred ones for this are ${PREFERRED[f.category].join(" and ")}.`:""}`, choices:f=>S.det&&S.det.route==="contract"&&!hasSupplier(f)?["Yes, use them","No, someone else"]:["No preference"]},
   supplier_reason:{label:"Why this supplier",q:f=>`Why ${f.supplier} in particular?`, ex:()=>"For example: they built the current system, or nobody else offers it.", why:()=>"Without a reason, a purchase this size needs competing offers."},
-  personal_data:  {label:"Personal data",   q:()=>"Will the supplier see personal or client data? If so, which data, and where will it be stored?", ex:()=>"For example: \"yes, employee names and salaries, stored in the EU\" or simply \"no\".", why:()=>"If so, a data protection review is added.", choices:["Yes","No","Not sure"]},
-  tech_service:   {label:"Technology or data service", q:()=>"Will the supplier provide, run or support technology or data for us?", ex:()=>"For example: software, cloud, hosting, IT support, data feeds or IT people.", why:()=>"It tells us whether an ICT review is needed.", choices:["Yes","No","Not sure"]},
-  ict_outsourcing:{label:"Runs it for us",  q:()=>"Will the supplier run something for us on an ongoing basis that we would otherwise do ourselves?", ex:()=>"For example: hosting a system, running payroll or operating a service desk.", why:()=>"If so, an outsourcing review is added.", choices:["Yes","No","Not sure"]},
+  personal_data:  {label:"Data and system access", q:()=>"Will the provider see or access any of our or our clients' data, systems, money or accounts? If so, which, and with what access?", ex:()=>"For example: \"read access to employee names and salaries in our HR test system, stored in the EU\", or simply \"no access\".", choices:["No access","Not sure"]},
+  tech_service:   {label:"Technology involved", q:()=>"Will the provider supply or run any technology for this, for example software, a system they host, IT support or data feeds?", ex:()=>"", choices:["Yes","No","Not sure"]},
+  ict_outsourcing:{label:"Runs it for us",  q:()=>"Will the provider run something for us on an ongoing basis that we would otherwise do ourselves?", ex:()=>"", choices:["Yes","No","Not sure"]},
+  // ---- scope, service and governance (new demand) ----
+  scope_in:       {label:"What the provider does", q:f=>f.demand_type==="contingent_labour"?"What will they work on, and what should they deliver?":"What exactly must the provider do, and what must they deliver?", ex:f=>f.demand_type==="contingent_labour"?"For example: \"build the new payments API with our team and hand over documented code\".":"List the main activities and outputs, for example: \"process all supplier invoices within 3 days, answer supplier queries, and send a monthly report\"."},
+  scope_out:      {label:"Out of scope",    sug:true, q:()=>"What is not part of the service? Clear exclusions avoid misunderstandings later.", ex:()=>""},
+  acceptance_pack:{label:"Acceptance and sign-off", sug:true, q:()=>"How will the work be checked and accepted, and who signs it off?", ex:()=>""},
+  qualifications: {label:"Staff qualifications", sug:true, q:()=>"What skills, experience or qualifications must the provider's people have?", ex:()=>""},
+  kpis_pack:      {label:"Service levels and KPIs", sug:true, q:f=>isOngoing(f)?"Which service levels and KPIs should apply?":"How will you measure success? Which KPIs?", ex:()=>""},
+  service_model:  {label:"Support and tools", sug:true, q:()=>"How will the technology be supported: support model, service hours and tools?", ex:()=>""},
+  governance:     {label:"Governance and reporting", sug:true, q:()=>"How should the service be governed? Here's a standard set of meetings, reports, change and escalation rules.", ex:()=>""},
+  supplier_terms: {label:"Supplier standard terms", q:f=>`Will the service rely on any of ${hasSupplier(f)?f.supplier:"the provider"}'s standard terms, policies or online documents?`, ex:()=>"Online terms can change without notice, so they need a fixed copy.", choices:["No","Yes","Not sure"]},
+  entity:         {label:"Legal entity",    q:()=>"Which part of the organisation will use this and sign the contract?", ex:()=>"This decides which regulator's rules apply.", choices:["UK banking entity (London)","EU banking entity (Germany)","US entity (New York)","Another entity"]},
+  in_house:       {label:"Done by our teams today", q:()=>"Is this something our own teams do today, or would normally do themselves?", ex:()=>"This is the key question for whether it counts as outsourcing.", choices:["Yes, our teams do it today","We'd normally do it ourselves","No, we'd always buy this in","Not sure"]},
+  deps_pack:      {label:"Dependencies and assumptions", sug:true, q:()=>"What will we need to provide, and what is the provider assuming?", ex:()=>""},
+  other_risks:    {label:"Anything else",   q:()=>"Anything else I should know, for example risks, constraints or a hand-over from today's provider?", ex:()=>"", choices:["Nothing else"]},
+  confirm_derived:{label:"Checked by you",  q:()=>"Please check what I've worked out.", ex:()=>""},
+  audience_fn:    {label:"Audience and functions", sug:true, q:()=>"Who is it for, and which teams or functions does it support?", ex:()=>""},
+  value_props:    {label:"Benefits and selling points", sug:true, q:()=>"What makes it different, what are the main benefits, and does it bring regulatory or control benefits?", ex:()=>""},
   budget_approved:{label:"Budget approved", q:()=>"Is the budget already approved?", ex:()=>"", why:()=>"Sourcing only starts once the budget is confirmed.", choices:["Yes","Not yet","Partly"]},
   role:           {label:"Role",            q:()=>"What role do you need to fill?", ex:()=>"For example: \"senior Java developer\" or \"interim project manager\"."},
   headcount:      {label:"People",          q:()=>"How many people?", ex:()=>"", choices:["1","2","3","More"]},
@@ -368,11 +435,11 @@ const FACTS = {
   current_solution:{label:"Today and why external", q:f=>f.demand_type==="contingent_labour"?"Why can't our own staff cover this?":"What do you use today, and why can't it be done internally?", ex:f=>f.demand_type==="contingent_labour"?"For example: \"the team is fully booked and nobody has payments experience\".":"For example: \"spreadsheets and email today, and we have no team to build this\"."},
   impact_delay:   {label:"If it doesn't go ahead", q:()=>"What happens if this doesn't go ahead, or is delayed?", ex:()=>"Think of operations, regulators, clients or cost. For example: \"we miss the audit deadline\" or \"manual work continues, nothing serious\"."},
   must_haves:     {label:"Must-haves",      q:f=>f.demand_type==="software"?"What must it be able to do, and how will you judge that it works?":"What are the must-haves? Three to five are enough.", ex:f=>f.demand_type==="software"?"For example: \"approval workflows, a supplier portal and single sign-on; it works if requests are approved within 2 days\".":"For example: \"14-inch screen, 16 GB memory and a 3-year warranty\"."},
-  acceptance:     {label:"KPIs / success measures", sug:f=>!!(S.det&&NEW_DEMAND(S.det.route)), q:f=>S.det&&NEW_DEMAND(S.det.route)?"How will you measure success? Which KPIs?":"How will you know the work has been done well?", ex:f=>S.det&&NEW_DEMAND(S.det.route)?"":`For example: ${f.category==="consulting"?"\"the new process is live in all countries and onboarding takes under 5 days\"":f.category==="marketing"?"\"the event runs on budget and guest feedback averages 4 out of 5\"":"\"it is live, tested and signed off by the business owner\""}.`},
+  acceptance:     {label:"Acceptance criteria", q:()=>"How will you know the work has been done well?", ex:f=>`For example: ${f.category==="consulting"?"\"the new process is live in all countries and onboarding takes under 5 days\"":f.category==="marketing"?"\"the event runs on budget and guest feedback averages 4 out of 5\"":"\"it is live, tested and signed off by the business owner\""}.`},
   evaluation_priority:{label:"Most important", q:()=>"When we compare offers, what matters most to you?", ex:()=>"", choices:["Best price","Best quality","Fastest delivery","A balance"]},
   supplier_requirements:{label:"Supplier must have", q:()=>"Must the supplier have any certifications or specific experience?", ex:f=>["it-services","cloud","software","market-data"].includes(f.category)?"For example: ISO 27001 certification, or experience in financial services.":"For example: at least three similar projects, or a team that speaks German."},
   current_supplier:{label:"Today's provider", q:()=>"Is this replacing or continuing something you have today?", ex:()=>"If so, who provides it now? \"No, it's new\" is fine."},
-  volume:         {label:"Volume",          q:f=>f.category==="training"?"How many people will take part?":f.category==="facilities"?"How many sites or how much floor space?":f.category==="telecom"?"How many users or lines?":"How many people, sites or users is this for?", ex:()=>""},
+  volume:         {label:"Volume",          q:f=>f.category==="bpo"?"Roughly how many items per month, for example invoices, requests or cases?":f.category==="training"?"How many people will take part?":f.category==="facilities"?"How many sites or how much floor space?":f.category==="telecom"?"How many users or lines?":"How many people, sites or users is this for?", ex:()=>""},
   support_needs:  {label:"Install & support", q:()=>"Do you need installation, warranty or ongoing support with it?", ex:()=>"For example: on-site installation and a 3-year warranty."},
   // ---- risk ----
   data_details:   {label:"Data involved",   q:()=>"What kind of data will they see, and where would it be stored?", ex:()=>"For example: \"employee names and salaries, stored in the EU\".", why:()=>"This shapes the data protection review."},
@@ -394,46 +461,55 @@ const REL = {
   techy:    f => yes(f.ict_outsourcing) || ["cloud","it-services","software","market-data","telecom"].includes(f.category),
   ongoing:  f => yes(f.ict_outsourcing) || ["facilities","cloud","telecom","software","market-data"].includes(f.category),
   creates:  f => ["it-services","consulting","marketing"].includes(f.category) || (f.category==="software" && /build|develop|custom/.test(userText())),
-  volume:   f => ["training","facilities","telecom","marketing"].includes(f.category),
+  volume:   f => ["training","facilities","telecom","marketing","bpo"].includes(f.category),
   subcon:   f => yes(f.personal_data) || yes(f.ict_outsourcing),
 };
 // Only what the requester must answer for each route. Anything procurement or the supplier can supply
 // (payment model, subcontractors, certifications, evaluation weights, cost centre) is not asked.
 // It is still picked up and used if the requester mentions it.
 function requiredFor(route, f){
-  const g=GOODSLIKE(f), sw=f.demand_type==="software", cont=f.demand_type==="contingent_labour", on=(c,k)=>c?[].concat(k):[];
-  const data = () => ["personal_data", ...on(REL.pd(f),"data_details")];
-  // ICT and outsourcing: the technology question is only asked when the rules can't tell; the outsourcing question only for an ongoing technology service
-  const ict = () => ["tech_service", ...on(REL.outsrc(f),"ict_outsourcing")];
+  const g=GOODSLIKE(f), sw=f.demand_type==="software", cont=f.demand_type==="contingent_labour", pureGoods=f.demand_type==="goods", on=(c,k)=>c?[].concat(k):[];
   const role = () => cont ? ["role","headcount","skills"] : [];
-  // the service profile: suggested answers the requester confirms in one tap (bundled into one question below the threshold)
-  const profileFull = ["functions","benefits","usp","acceptance","reg_benefits"];
+  const ong = isOngoing(f), ictOng = yes(f.tech_service) && ong;
+  // data and classification: access is always asked (with details in the same answer); entity, technology and "done in-house" only when the rules can't tell
+  const access = () => pureGoods ? [] : ["personal_data", ...on(yes(f.personal_data)&&!known(f.data_details),"data_details"), ...on(cont,"system_access")];
+  const classif = () => pureGoods ? [] : ["tech_service","entity", ...on(ong && !excludedType(f),"in_house")];
+  const impact = () => on(!S.asked.background,"impact_delay");
   switch(route){
     case "catalogue":  return ["item","quantity","needed_by","location"];
     case "contract":   return cont ? [...role(),"deliverables",...on(!contractAgreed(f),"contract_ok"),"needed_by","duration","location","day_rate","system_access",...on(REL.pd(f),"data_details")]
                        : g ? ["item","quantity",...on(!contractAgreed(f),"contract_ok"),"value","needed_by"]
-                           : ["deliverables",...on(!contractAgreed(f),"contract_ok"),"needed_by","duration","value",...data()];
-    case "quote":      return g ? ["item","quantity",...on(sw,"must_haves"),"background","needed_by",...on(!sw,"location"),"value","supplier",...on(sw,data()),"profile"]
-                                : [...role(),"deliverables","background",...on(REL.volume(f),"volume"),"needed_by",...on(cont,["duration","day_rate"]),"value","supplier",...data(),"profile"];
+                           : ["deliverables",...on(!contractAgreed(f),"contract_ok"),"needed_by","duration","value","personal_data",...on(yes(f.personal_data)&&!known(f.data_details),"data_details")];
+    // business-led: the same structure, lighter (profile points bundled into one suggestion)
+    case "quote":      return g
+      ? ["item","quantity","value",...on(sw,"must_haves"),"background","profile",...on(sw,"scope_out"),"acceptance_pack","needed_by",...on(!sw,"location"),"supplier",...access(),...classif(),"confirm_derived"]
+      : [...role(),"value",...on(f.category!=="marketing","duration"),"background","profile","scope_in","scope_out","acceptance_pack",...on(REL.volume(f),"volume"),"needed_by","location",...on(cont,"day_rate"),"supplier",...access(),...classif(),"confirm_derived"];
+    // procurement-led: full depth
     case "sourcing":   return g
-      ? ["item","quantity","must_haves","background","users",...on(sw,"current_solution"),...on(!S.asked.background,"impact_delay"),"needed_by",...on(!sw,"location"),"value","supplier",...on(hasSupplier(f),"supplier_reason"),"budget_approved",
-         ...on(sw,[...data(),...ict()]),...profileFull]
-      : [...role(),"deliverables","background","users","current_solution",...on(!S.asked.background,"impact_delay"),...on(REL.volume(f),"volume"),"needed_by","duration",...on(cont,"day_rate"),"value","supplier",...on(hasSupplier(f),"supplier_reason"),"budget_approved",
-         ...data(),...ict(),...profileFull];
+      ? ["item","quantity","value","background",...impact(),"audience_fn",...on(sw,"current_solution"),"value_props","must_haves",...on(sw,"scope_out"),"acceptance_pack",...on(sw,"kpis_pack"),...on(ictOng,"service_model"),
+         "needed_by",...on(!sw,"location"),"budget_approved","supplier",...on(hasSupplier(f),["supplier_reason","supplier_terms"]),...access(),...classif(),...on(sw,"deps_pack"),"other_risks","confirm_derived"]
+      : [...role(),"value",...on(f.category!=="marketing","duration"),"background",...impact(),"audience_fn","current_solution","value_props","scope_in","scope_out","acceptance_pack",...on(!cont,"qualifications"),...on(REL.volume(f),"volume"),
+         "kpis_pack",...on(ictOng,"service_model"),...on(ong,"governance"),"needed_by","location",...on(cont,"day_rate"),"budget_approved","supplier",...on(hasSupplier(f),["supplier_reason","supplier_terms"]),
+         ...access(),...classif(),"deps_pack","other_risks","confirm_derived"];
   }
   return [];
 }
 
 // Stages group the questions so the requester sees a short, clear path. Only stages with questions for the route are shown.
 const STAGES=[
-  {id:"need",    name:"Your need",            intro:"First, what you need and roughly what it costs.",
-   facts:["need","item","quantity","deliverables","must_haves","role","headcount","skills","volume","renewal_change","value","day_rate","contract_ok"]},
-  {id:"purpose", name:"Purpose",              intro:"Now, why it's needed and who it's for. This is the heart of the service description.", facts:["background","users","current_solution","impact_delay"]},
-  {id:"timing",  name:"Timing and place",     intro:"Now, when and where.", facts:["needed_by","duration","location"]},
-  {id:"supplier",name:"Supplier and approval",intro:"A quick word on the supplier and the budget approval.", facts:["supplier","supplier_reason","budget_approved"]},
-  {id:"risk",    name:"Data and systems",     intro:"A few checks on data and systems. They decide which reviews are needed.", facts:["personal_data","data_details","system_access","tech_service","ict_outsourcing","criticality"]},
-  {id:"profile", name:"Service profile",      intro:"Last, the service profile. I'll suggest each point from what you told me: accept it in one tap, or change what doesn't fit.", facts:["functions","benefits","usp","acceptance","reg_benefits","profile"]},
-  {id:"review",  name:"Review",               intro:"Here's the route, your summary and the requirements document.", facts:[]}
+  {id:"need",    name:"Your need",            intro:"First, what you need, roughly what it costs and how long it runs.",
+   facts:["need","item","quantity","role","headcount","skills","value","day_rate","duration","tech_service","contract_ok","renewal_change"]},
+  {id:"purpose", name:"Purpose and profile",  intro:"Now, why it's needed and who it's for. For some points I'll suggest an answer you can accept in one tap.",
+   facts:["background","impact_delay","audience_fn","users","functions","current_solution","value_props","usp","benefits","reg_benefits","profile"]},
+  {id:"scope",   name:"Scope and deliverables", intro:"Next, what exactly the provider does and delivers, and how the work is accepted.",
+   facts:["scope_in","deliverables","must_haves","scope_out","acceptance_pack","acceptance","qualifications","volume"]},
+  {id:"service", name:"Running the service",  intro:"How the service is measured and run. I'll suggest standard answers you can accept or change.", facts:["kpis_pack","service_model","governance"]},
+  {id:"timing",  name:"Timing and delivery",  intro:"Now, when and where.", facts:["needed_by","location"]},
+  {id:"supplier",name:"Budget and supplier",  intro:"A quick word on the budget approval and the supplier.", facts:["budget_approved","supplier","supplier_reason","supplier_terms"]},
+  {id:"risk",    name:"Data and classification", intro:"A few checks on data and access. Most of the classification I can work out myself; I'll only ask what isn't clear.",
+   facts:["personal_data","data_details","system_access","entity","in_house","ict_outsourcing","deps_pack","other_risks"]},
+  {id:"check",   name:"Check",                intro:"Before I write anything, please check what I've worked out.", facts:["confirm_derived"]},
+  {id:"review",  name:"Review",               intro:"Here's the route, the service description and the full documents.", facts:[]}
 ];
 const stageOf = k => { const i=STAGES.findIndex(st=>st.facts.includes(k)); return i<0?0:i; };
 const posIn = k => { const st=STAGES[stageOf(k)]; return st.facts.indexOf(k); };
@@ -447,11 +523,13 @@ const currentStage = () => S.missing.length && S.det ? STAGES[stageOf(S.missing[
    ========================================================= */
 const BLANK_FACTS = {summary:null,category:null,demand_type:null,item:null,quantity:null,value:null,value_is_estimate:false,deliverables:null,duration:null,
   needed_by:null,location:null,supplier:null,supplier_reason:null,personal_data:null,ict_outsourcing:null,critical_service:null,offshore:null,
-  budget_approved:null,decline_contract:null,functions:null,benefits:null,usp:null,reg_benefits:null,profile:null,users:null,current_solution:null,impact_delay:null,must_haves:null,tech_service:null,contract_ok:null,background:null,acceptance:null,evaluation_priority:null,supplier_requirements:null,current_supplier:null,
+  budget_approved:null,decline_contract:null,scope_in:null,scope_out:null,acceptance_pack:null,acc_review:null,qualifications:null,kpis_pack:null,kpis:null,service_model:null,support_model:null,service_hours:null,tools:null,
+  governance:null,gov_meetings:null,reporting:null,change_mgmt:null,escalation:null,supplier_terms:null,entity:null,in_house:null,ongoing:null,important_fn:null,deps_pack:null,our_deps:null,prov_assumptions:null,
+  other_risks:null,confirm_derived:null,l4_match:null,l4_reason:null,audience_fn:null,value_props:null,title:null,l4:null,functions:null,benefits:null,usp:null,reg_benefits:null,profile:null,users:null,current_solution:null,impact_delay:null,must_haves:null,tech_service:null,contract_ok:null,background:null,acceptance:null,evaluation_priority:null,supplier_requirements:null,current_supplier:null,
   volume:null,support_needs:null,data_details:null,criticality:null,subcontracting:null,pricing_model:null,service_levels:null,ip_ownership:null,performance:null,role:null,headcount:null,skills:null,day_rate:null,system_access:null,renewal_change:null,wants_renewal:null};
 let CONV_SEQ=0;
 const S = fresh();
-function fresh(){ return {cid:++CONV_SEQ, curStage:null, stageIds:[], recapped:{}, req:[], challenged:{}, challengeCount:0, flags:[], pending:null, derived:{}, offChecked:{}, suggest:{}, completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
+function fresh(){ return {cid:++CONV_SEQ, curStage:null, stageIds:[], recapped:{}, req:[], challenged:{}, challengeCount:0, flags:[], pending:null, derived:{}, offChecked:{}, suggest:{}, sugAccepted:{}, checkRound:0, checkWait:false, l4Initial:null, completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
 
 /* =========================================================
    5. RULES ENGINE (deterministic)
@@ -491,9 +569,13 @@ function controlsFor(route, ctr){
   if(route==="sourcing") out.push(["i","Approval to source","Budget owner confirms need and budget before the RFP starts."]);
   if(route==="quote") out.push(["i","Three quotes","The business collects at least three comparable quotes; procurement reviews the choice."]);
   if(route==="contract") out.push(["i","Confirm contract use","Contract owner confirms the scope fits."]);
-  if(yes(f.personal_data)||yes(f.system_access)) out.push(["w","Data protection review","The supplier will see personal or client data."]);
+  if(accessFlags(f).personal) out.push(["w","Data protection review","The provider will see personal or client data."]);
   if(yes(f.tech_service) && (NEW_DEMAND(route)||f.demand_type==="contingent_labour")) out.push(["w","ICT review (DORA)", REL.ongoingSvc(f)?`Likely an ICT service: ${ictType(f)}.`:`Possibly an ICT service: ${ictType(f)}. The review confirms.`]);
-  if(yes(f.ict_outsourcing)||yes(f.critical_service)) out.push(["w","Outsourcing assessment","The supplier runs something for us on an ongoing basis that we would otherwise do ourselves."]);
+  if(NEW_DEMAND(route) && f.demand_type!=="goods"){ const o=outsourcing(f);
+    if(o.code==="yes") out.push(["w","Outsourcing assessment",`${o.result}${o.fw?` under ${o.fw.short}`:""}.`]);
+    else if(o.code==="tbd") out.push(["w","Outsourcing assessment","Whether this is outsourcing is still open."]);
+    if(isImportant(f)) out.push(["w","Critical or important function check","It may support a critical or important business function."]);
+    const a=accessFlags(f); if(a.money||/Privileged|Administrative/.test(a.level)) out.push(["w","Access review",`${a.money?"Money or account access":""}${a.money&&/Priv|Admin/.test(a.level)?"; ":""}${/Priv|Admin/.test(a.level)?a.level+" access":""}.`]); }
   if(yes(f.offshore)||/other country/i.test(f.location||"")) out.push(["w","Offshoring check","Work happens outside your country."]);
   if(yes(f.subcontracting)) out.push(["w","Subcontractor check","The supplier may use subcontractors."]);
   if(route!=="catalogue" && /on.?site|office/i.test(f.location||"") && f.demand_type!=="goods") out.push(["i","Site access","Building access is arranged before the start."]);
@@ -521,12 +603,13 @@ function nextSteps(route, cat, ctr){
 const TECH_WORDS=/\b(software|systems?|platform|cloud|saas|paas|iaas|hosting|hosted|data feeds?|data cent(?:re|er)|digital|cyber\w*|network|infrastructure|applications?|apps?|technology|database|api|it support|help ?desk|service desk|developers?|engineers?|architects?|devops|testers?|erp|crm|sap)\b/;
 function userRaw(){ return " "+S.msgs.filter(m=>m.role==="user").map(m=>m.text).join(" ")+" "; }
 function techFromRules(f){
-  const raw=userRaw(), t=raw.toLowerCase().replace(/personal data|client data|customer data|employee data/g,"");
+  const raw=[S.msgs.find(m=>m.role==="user")?.text, f.item, f.deliverables, f.scope_in, f.must_haves, f.current_solution].filter(x=>typeof x==="string").join(" ")+" ";
+  const t=raw.toLowerCase().replace(/personal data|client data|customer data|employee data/g,"");
   const it=/\b(IT|ICT)\b/.test(raw) || TECH_WORDS.test(t);
   if(TECH_CATS.includes(f.category)) return true;
   if(f.demand_type==="contingent_labour") return it || /\b(java|python|\.net|sql|cloud|security|data)\b/i.test([f.role,f.skills].join(" "));
   if(GOODSLIKE(f)) return /as a service|leasing|managed devices/.test(t);
-  if(f.category==="consulting") return it?true:null;   // can't tell: ask
+  if(f.category==="consulting"||f.category==="bpo") return it?true:null;   // can't tell: ask
   return it;
 }
 function ictType(f){
@@ -550,25 +633,98 @@ function ictType(f){
   if(f.category==="consulting"||has(/architect|consult|analyst|advis/)) return "ICT consulting";
   return "to be classified in the ICT review";
 }
+// ---------- derived facts: worked out by rules, always shown back to the user for confirmation ----------
+const isTBD = v => v==="Not given" || v==="To be determined";
+const givenText = v => known(v) && !isTBD(v) && v!=="unsure" && v!=="Confirmed" ? String(v) : "";
+function demandText(f){ return (userText()+" "+[f.item,f.deliverables,f.scope_in,f.must_haves,f.summary,f.current_solution,f.role,f.skills].filter(x=>typeof x==="string").join(" ")).toLowerCase(); }
+// Level 4 classification: meaning and keywords against each entry; the buying category weighs in
+function classifyL4(f){
+  const t=demandText(f), words5=new Set((t.match(/[a-zäöüß]{4,}/g)||[]).map(w=>w.slice(0,5)));
+  const scored=L4.map(e=>{
+    const hits=e.kw.filter(k=>t.includes(k)), ov=new Set((e.name+" "+e.desc).toLowerCase().match(/[a-zäöüß]{4,}/g)||[]);
+    const overlap=[...ov].filter(w=>words5.has(w.slice(0,5))).length, bonus=e.cat===f.category?4:0;
+    return {...e, score:hits.length*3+overlap+bonus, hits};
+  }).sort((a,b)=>b.score-a.score);
+  const top=scored[0], pct=x=>Math.max(35,Math.min(95,Math.round(100*x.score/(x.score+4))));
+  const best=scored.filter(x=>x.score===top.score).slice(0,3);
+  return best.map(x=>({code:x.code,name:x.name,cat:x.cat,match:pct(x),
+    reason: x.hits.length ? `The demand mentions ${listJoin(x.hits.slice(0,3).map(h=>`"${h}"`))}, which fits ${x.name.toLowerCase()}: ${x.desc.charAt(0).toLowerCase()+x.desc.slice(1)}` : `Closest in meaning to ${x.name.toLowerCase()}: ${x.desc.charAt(0).toLowerCase()+x.desc.slice(1)}`,
+    uncertainty: x.score<6 ? "Low confidence: the demand has few clear signals." : best.length>1 ? "Two entries match equally well." : ""}));
+}
+const l4ByCode = c => L4.find(e=>e.code===c) || null;
+function entityFrom(f){
+  const raw=userRaw()+" "+(f.location||"");
+  for(const e of ENTITIES) if(e.re.test(raw) || (e.abbr && e.abbr.test(raw))) return e.id;
+  return null;
+}
+const entityById = id => ENTITIES.find(e=>e.id===id) || null;
+const isOngoing = f => known(f.ongoing) && !isTBD(f.ongoing) ? yes(f.ongoing) : f.demand_type==="contingent_labour" ? (known(f.duration)?monthsOf(f.duration)>=3:true) : (GOODSLIKE(f)&&f.demand_type!=="software") ? false : REL.ongoingSvc(f) && !(known(f.duration) && monthsOf(f.duration)<3);
+// types that the outsourcing definitions generally leave out
+function excludedType(f){
+  if(f.demand_type==="goods") return "a purchase of goods";
+  return ({legal:"legal advice", training:"training", marketing:"events and marketing services", facilities:"facility services such as cleaning or catering",
+    "market-data":"market information services", telecom:"network and telecom services", contingent:"temporary staff working under our direction", office:"a purchase of goods", "it-hardware":"a purchase of goods"})[f.category]
+    || (f.category==="consulting" && !isOngoing(f) ? "one-off advice" : null);
+}
+// would we otherwise do this ourselves? true / false / null (unclear)
+function inHouseFromText(f){
+  const t=demandText(f);
+  if(/\b(always (?:bought|buy) (?:this|it) in|never done (?:it|this)? ?(?:ourselves|internally|in[- ]house)|we (?:don.?t|do not) (?:do|have) (?:this|it) (?:today|ourselves)|not something (?:we|our teams?) (?:do|would do))\b/.test(t)) return false;
+  if(/\b(our (?:own )?(?:team|teams|staff|people|colleagues)\b[^.]{0,40}\b(?:do|does|did|run|runs|handle|handles|process|processes|manage|manages)\b|in[- ]house today|today (?:we|our team)|we (?:currently )?(?:do|run|process|handle|manage) (?:it|this|them)|take over|on our behalf|instead of (?:us|our team)|run (?:our|the) [a-z ]*process|operate (?:our|the)|managed service|outsourc)/.test(t)) return true;
+  if(f.category==="bpo") return true;
+  return null;
+}
+function importantHint(f){
+  const t=[f.impact_delay,f.background,f.criticality].filter(x=>typeof x==="string").join(" ").toLowerCase();
+  if(!t || /nothing serious|no (?:real |big )?impact|minor|not critical/.test(t)) return null;
+  const m=t.match(/\b(clients?|customers?|payments?|regulat\w*|trading|settlement|staff (?:wouldn.?t|won.?t|would not|not) (?:get )?(?:be )?paid|payroll|outage|critical|audit findings?)\b/);
+  return m ? m[1] : null;
+}
+const isImportant = f => known(f.important_fn) && !isTBD(f.important_fn) ? yes(f.important_fn) : !!importantHint(f);
+// data, systems, money and account access, read from the answer
+function accessFlags(f){
+  const t=[f.data_details, f.personal_data===true?"":"", userText()].join(" ").toLowerCase(), any=yes(f.personal_data)||yes(f.system_access);
+  return { any, personal: any && /personal|client|customer|employee|names?\b|salar|contact|patient|hr data|payroll/.test(t), money: /\b(money|payments?|bank accounts?|accounts? access|treasury|cash|funds)\b/.test(t),
+    level: /\badmin\w*\b/.test(t)?"Administrative":/\bprivileged\b/.test(t)?"Privileged":/\bread[- ]only|read access\b/.test(t)?"Read":any&&/\bsystem|application|environment|login/.test(t)?"System":any?"To be determined":"No access",
+    env: /\bproduction\b/.test(t)?"Production":/\btest (?:data|system|environment)\b/.test(t)?"Test":"To be determined" };
+}
+const PLAIN_ICT={"Cloud services: SaaS":"software the provider hosts and runs for us (cloud software)","Cloud services: PaaS":"a cloud platform we build on","Cloud services: IaaS":"cloud computing and storage capacity",
+  "Software licensing (excluding SaaS)":"software we install and run ourselves","ICT development":"building or changing software","ICT consulting":"technology advice","ICT operation management":"running and maintaining IT for us",
+  "ICT help desk and first-level support":"an IT service desk","ICT security management":"IT security services","ICT risk management":"technology risk services","Provision of data":"data feeds","Data analysis":"data analysis",
+  "Data storage (excluding cloud)":"data storage","Network infrastructure":"network services","Telecom carrier services":"telecom services","Hardware and physical devices":"devices provided as a service",
+  "ICT facilities and hosting (excluding cloud)":"hosting in a data centre","ICT project management":"technology project management"};
+// the outsourcing determination for the entity's jurisdiction: result, reasons and the instrument it rests on
+function outsourcing(f){
+  const ent=entityById(f.entity), fw=ent?FRAMEWORKS[ent.fw]:null, ex=excludedType(f), ong=isOngoing(f), ih=known(f.in_house)&&!isTBD(f.in_house)&&f.in_house!=="unsure"?yes(f.in_house):null;
+  const reasons=[]; let result, code;
+  if(ex){ result="Not outsourcing"; code="no"; reasons.push(`It is ${ex}, which outsourcing definitions generally leave out.`); }
+  else if(!ong){ result="Not outsourcing"; code="no"; reasons.push("It is a one-off delivery, not an ongoing service."); }
+  else if(ih===true){ result="Outsourcing (likely)"; code="yes"; reasons.push("It is an ongoing service.", "The provider would do something our own teams would otherwise do."); }
+  else if(ih===false && fw && fw.newCounts){ result="Outsourcing (likely)"; code="yes"; reasons.push("It is an ongoing service.", "Under this rule set a new service launched through a provider also counts."); }
+  else if(ih===false){ result="Not outsourcing (likely)"; code="no"; reasons.push("It is an ongoing service, but not something our own teams would otherwise do."); }
+  else { result="To be determined"; code="tbd"; reasons.push("It is an ongoing service; whether our own teams would otherwise do it is not clear yet."); }
+  if(fw && fw.test==="material") { result = code==="no" ? "Service-provider arrangement, not material (likely)" : `Service-provider arrangement${isImportant(f)?", may be material":""}: materiality to be assessed`; }
+  if(fw && fw.test==="thirdparty") { result = "Third-party relationship (no separate outsourcing test): risk-based oversight"; }
+  if(!ent) reasons.push("The legal entity is not known yet, so the applicable rule set is open.");
+  return {result, code, reasons, entity:ent, fw, important:isImportant(f), ex, ong, inHouse:ih};
+}
 function classify(f){
-  const ong=REL.ongoingSvc(f), type=ictType(f);
+  const ong=isOngoing(f), type=ictType(f);
   const ict = f.tech_service===true ? (ong?{flag:"Yes",text:`Likely an ICT service under DORA (${type}). Flag for ICT review.`}:{flag:"Possible",text:`Possibly an ICT service (${type}), delivered once rather than ongoing. The ICT review confirms.`})
     : f.tech_service==="unsure" ? {flag:"To confirm",text:"Not clear yet whether this is an ICT service. The ICT review confirms."}
     : f.tech_service===false ? {flag:"No",text:"Not an ICT service, based on the answers."} : null;
-  const out = yes(f.ict_outsourcing) ? {flag:"Yes",text:"Likely outsourcing: the supplier runs something for us on an ongoing basis that we would otherwise do ourselves. Flag for outsourcing review."}
-    : f.ict_outsourcing==="unsure" ? {flag:"To confirm",text:"Not clear yet whether this is outsourcing. The outsourcing review confirms."}
-    : f.ict_outsourcing===false ? {flag:"No",text:"Not outsourcing, based on the answers."}
-    : known(f.tech_service) && !REL.outsrc(f) ? {flag:"No",text:"Not outsourcing: no ongoing service is run for us."} : null;
-  return {ict, out, type};
+  const o=outsourcing(f);
+  const out={flag:o.code==="yes"?"Yes":o.code==="no"?"No":"To confirm", text:`${o.result}${o.fw?` under ${o.fw.short}`:""}. ${o.reasons.join(" ")} Flag for the outsourcing review; not a final determination.`};
+  return {ict, out, type, o};
 }
 function deriveFacts(f){
   const d=S.derived;
-  if("tech_service" in d && f.tech_service!==d.tech_service) delete d.tech_service;   // the user or the AI set it: keep theirs
-  if(!known(f.tech_service) || "tech_service" in d){
-    const v=techFromRules(f);
-    if(v===null){ if("tech_service" in d){ f.tech_service=null; delete d.tech_service; } }
-    else { f.tech_service=v; d.tech_service=v; }
-  }
+  const derive=(k,fn)=>{ if(k in d && f[k]!==d[k]) delete d[k];   // the user or the AI set it: keep theirs
+    if(!known(f[k]) || k in d){ const v=fn(f); if(v===null||v===undefined){ if(k in d){ f[k]=null; delete d[k]; } } else { f[k]=v; d[k]=v; } } };
+  derive("tech_service", techFromRules);
+  derive("entity", entityFrom);
+  derive("in_house", inHouseFromText);
+  derive("l4", ff=>{ const r=classifyL4(ff); return r[0]&&r[0].code; });
 }
 
 function refresh(){
@@ -792,9 +948,16 @@ impact_delay (what happens if it doesn't go ahead or is delayed), must_haves (ke
 Never ask for something the user already said anywhere in the conversation, even in an answer to a different question: record it instead.
 When one answer covers several items (for example the problem, who it is for and what is used today), record every one of them.
 The personal_data question also asks which data and where it is stored: record data_details from the same answer. If the user says the supplier will host or run it, also set ict_outsourcing true.
+New demand facts: scope_in (what the provider must do and deliver; also record deliverables from the same answer), scope_out, acceptance, acc_review, qualifications, service_levels, kpis,
+support_model, service_hours, tools, gov_meetings, reporting, change_mgmt, escalation, supplier_terms, our_deps, prov_assumptions, other_risks,
+entity (the legal entity that uses the service and signs: one of ${ENTITIES.map(e=>`${e.id} = ${e.name}`).join("; ")}), in_house (true if our own teams do this today or would normally do it themselves, false if we would always buy it in),
+ongoing (true for an ongoing service, false for a one-off), important_fn (true only if the user says it supports a critical or important function), title (working title), l4 (Level 4 code, see below).
+Level 4 list: ${L4.map(e=>`${e.code} ${e.name}`).join("; ")}. On the first message set l4 to the best matching code, l4_match (0-100) and l4_reason (one short plain sentence).
+If the user types "skip", record nothing for that item.
+At the check step (asking = confirm_derived) the user confirms or corrects facts the app worked out; record any correction (entity, ongoing, in_house, tech_service, important_fn, personal_data, title, l4) and reply briefly. Never decide outsourcing yourself.
 Suggested answers: items marked suggest=true in still_needed are answered by suggestion. When you ask one, put a concrete suggestion tailored to this request in "suggestion"
 (based only on what the user said; plain words, several points separated by semicolons), and in "reply" say briefly that this is your suggestion, show it, and ask whether it fits or what to change.
-For "profile", the suggestion is five lines: "Target audience: …", "Supported functions: …", "Key benefits: …", "KPIs / success measures: …", "Regulatory / governance benefits: …".
+When an item has "lines", the suggestion must be exactly those lines, each "Label: text" on its own line, in that order.
 Never record a suggestion as a fact yourself; the app does that when the user accepts it. If the user changes a suggestion, record their version of that item.
 Combined questions: the "background" question also asks the impact of delay, so record background and impact_delay from that one answer.
 The software "must_haves" question also asks how success is judged, so record must_haves and acceptance from that one answer. evaluation_priority, supplier_requirements, current_supplier ("None" if new),
@@ -817,7 +980,7 @@ function contextLines(){
     (cat.length?`\nCatalogue: ${cat.map(x=>`${x.name} ${money(x.price)}`).join("; ")}.`:"");
 }
 function stateBlock(pend){
-  const f=S.f, still=S.missing.map((k,i)=>i<3?{key:k,label:FACTS[k].label,stage:STAGES[stageOf(k)].name,ask:FACTS[k].q(f),example:(FACTS[k].ex(f)||""),...(isSug(k)?{suggest:true}:{})}:{key:k,label:FACTS[k].label});
+  const f=S.f, still=S.missing.map((k,i)=>i<3?{key:k,label:FACTS[k].label,stage:STAGES[stageOf(k)].name,ask:FACTS[k].q(f),example:(FACTS[k].ex(f)||""),...(isSug(k)?{suggest:true}:{}),...(BUNDLES[k]?{lines:BUNDLES[k].map(([L])=>L)}:{})}:{key:k,label:FACTS[k].label});
   return `\n\n[STATE]\nknown_facts: ${JSON.stringify(Object.fromEntries(Object.entries(f).filter(([k,v])=>known(v)&&v!==false)))}\n`+
     (S.det?`route_so_far: ${CHANNELS[S.det.route].name}\n`:"")+
     `already_checked: ${JSON.stringify(Object.keys(S.challenged||{}))}\n`+
@@ -891,6 +1054,23 @@ async function handleTurn(text, cid){
   // a suggestion the user accepted (or extended) becomes the answer
   const sugResult = asked && !pend && isSug(asked) ? applySuggestion(asked, text) : false;
   if(asked && !pend && isSug(asked) && !sugResult && known(S.f[asked]) && ACCEPT.test(text.trim())) S.f[asked]=null;
+  if(sugResult) S.sugAccepted[asked]=true;
+  // "skip": the point is recorded as to be determined and listed as an open point
+  const skipped = asked && !pend && !["need","confirm_derived"].includes(asked) && /^(skip|skip (?:for now|this|it)|pass)[.!]?$/i.test(text.trim());
+  if(skipped){ S.f[asked]="Not given"; if(BUNDLES[asked]) BUNDLES[asked].forEach(([,k])=>{ if(!known(S.f[k])) S.f[k]="Not given"; }); }
+  // the check step: confirm what the rules worked out, or correct it in plain words
+  if(asked==="confirm_derived" && !pend){
+    const tt=text.trim();
+    if(!S.checkWait && /^(yes|yep|yeah|correct|that'?s (?:all )?(?:right|correct)|all (?:good|correct|right)|looks (?:good|right)|confirm(?:ed)?)\b/i.test(tt) && !/\bbut\b/i.test(tt)) S.f.confirm_derived="Confirmed";
+    else if(!S.checkWait && /^(?:no|nope|something'?s (?:wrong|not right)|not (?:quite )?right|wrong)[.!]?$/i.test(tt)){
+      S.checkWait=true; S.f.confirm_derived=null; um.score=null;
+      S.msgs.push({role:"assistant",text:"What's not right? Tell me in your own words, for example \"it's a one-off\", \"our teams don't do this today\", \"it's for the Singapore branch\" or \"the category should be technology consulting\"."});
+      S.lastAsked="confirm_derived"; S.busy=false; render(); return;
+    } else {
+      applyCorrections(tt); S.checkWait=false; S.checkRound++;
+      S.f.confirm_derived = S.checkRound>=2 ? "Confirmed with corrections" : null;
+    }
+  }
   // close the check: keep, correct or (for dates) mark as flexible
   if(pend){
     if(pend.kind==="date"){
@@ -907,9 +1087,11 @@ async function handleTurn(text, cid){
     }
   }
 
-  if(asked && !known(S.f[asked]) && (S.asked[asked]||0)>=2) giveUp(asked);
+  if(asked && asked!=="confirm_derived" && !known(S.f[asked]) && (S.asked[asked]||0)>=2) giveUp(asked);
   const prevRoute=S.det&&S.det.route, prevStages=[...(S.stageIds||[])];
   refresh();
+  // first classification against the Level 4 list, shown straight away
+  if(!prevRoute && S.det && !S.l4Initial){ S.l4Initial=initialL4(); S.msgs.push({role:"assistant",kind:"class"}); }
   if(note) S.msgs.push({role:"assistant",kind:"sys",text:note});
 
   // quality check of what changed this turn: rules first, then the AI's view; one challenge per item, three per conversation
@@ -922,7 +1104,7 @@ async function handleTurn(text, cid){
   if(!issue && aiOff && FACTS[aiCheck.fact] && !S.offChecked[aiCheck.fact] && aiCheck.fact!==(pend&&pend.fact)) issue=offTopicIssue(aiCheck.fact);
   if(!issue && aiCheck && S.challengeCount<3 && changed.includes(aiCheck.fact) && !S.challenged[aiCheck.fact] && FACTS[aiCheck.fact])
     issue={fact:aiCheck.fact, issue:String(aiCheck.issue||"needs a second look").slice(0,140), message:String(cleanReply(aiCheck.follow_up||"")||reply||"").trim()||`Could you double-check this? ${FACTS[aiCheck.fact].q(S.f)}`};
-  um.score = answerScore(asked, text, issue, sugResult, aiScore, pend);
+  um.score = skipped ? null : asked==="confirm_derived" ? null : answerScore(asked, text, issue, sugResult, aiScore, pend);
   if(issue){
     if(issue.kind==="offtopic") S.offChecked[issue.fact]=true; else { S.challenged[issue.fact]=true; S.challengeCount++; }
     S.pending={fact:issue.fact, prev:S.f[issue.fact], issue:issue.issue, kind:issue.kind||""};
@@ -931,6 +1113,8 @@ async function handleTurn(text, cid){
     S.busy=false; render(); return;
   }
 
+  // what the provider does, written back as obligations
+  if(asked==="scope_in" && givenText(S.f.scope_in)){ const ob=shallify(S.f.scope_in); if(ob.length) S.msgs.push({role:"assistant",text:`I've written this as obligations:\n${ob.map(x=>"• "+x).join("\n")}\n\nTell me if anything is wrong.`}); }
   // the route changed and needs more stages: say why, briefly
   const added=S.stageIds.filter(id=>!prevStages.includes(id)&&id!=="review");
   if(prevStages.length && added.length && S.msgs.filter(m=>m.role==="user").length>1)
@@ -952,16 +1136,19 @@ async function handleTurn(text, cid){
     const newStage=STAGES[stageOf(next)].id, stageChanged=newStage!==S.curStage;
     stageTransition(newStage);
     let msg;
-    if(isSug(next)){
+    if(next==="confirm_derived"){ msg=checkMessage(); }
+    else if(isSug(next)){
       const sg = aiAskedOk && aiSuggestion ? normSuggestion(aiSuggestion) : "";
       if(sg && words(sg)>=3){ S.suggest[next]=sg;
         const ack=(String(reply||"").split(/(?<=[.!?])\s+/)[0]||"").trim(), useAck=ack && !/suggest|\?/i.test(ack) && words(ack)<=25;
-        msg=`${useAck?ack+" ":""}${FACTS[next].q(S.f)}\n\nMy suggestion, based on what you told me:\n${next==="profile"?sg:sg.replace(/\.?$/,".")}\n\nUse it as it is, or tell me what to change.`; }
+        msg=`${useAck?ack+" ":""}${FACTS[next].q(S.f)}\n\nMy suggestion, based on what you told me:\n${BUNDLES[next]?sg:sg.replace(/\.?$/,".")}\n\nUse it as it is, or tell me what to change.`; }
       else { delete S.suggest[next]; msg=offlineQuestion(next, prevRoute, stageChanged); }
     } else msg = aiAskedOk ? reply : offlineQuestion(next, prevRoute, stageChanged);
     S.msgs.push({role:"assistant",text:msg});
     const fc=FACTS[next].choices; const fcs=typeof fc==="function"?fc(S.f):fc;
-    S.choices = isSug(next) ? ["Use this suggestion"] : aiAskedOk && choices.length ? choices.slice(0,4) : (fcs||[]);
+    const canSkip = S.det && NEW_DEMAND(S.det.route) && !["confirm_derived","value","item","need"].includes(next);
+    S.choices = next==="confirm_derived" ? ["Yes, that's right","Something's wrong"] : isSug(next) ? ["Use this suggestion", ...(canSkip?["Skip for now"]:[])]
+      : fcs ? fcs : aiAskedOk && choices.length ? choices.slice(0,3).concat(canSkip&&!CLOSED.includes(next)?["Skip for now"]:[]) : (canSkip&&!CLOSED.includes(next)?["Skip for now"]:[]);
     S.lastAsked=next;
   }
   S.busy=false; render();
@@ -977,7 +1164,7 @@ function stageTransition(newStage){
   S.curStage=newStage;
 }
 
-const BOOL_KEYS=["tech_service","personal_data","ict_outsourcing","critical_service","offshore","system_access","subcontracting","wants_renewal","decline_contract","contract_ok","value_is_estimate"];
+const BOOL_KEYS=["in_house","ongoing","important_fn","tech_service","personal_data","ict_outsourcing","critical_service","offshore","system_access","subcontracting","wants_renewal","decline_contract","contract_ok","value_is_estimate"];
 const NUM_KEYS=["value","quantity","headcount"];
 function normFact(k,v){
   if(Array.isArray(v)) v=v.filter(x=>x!==null&&x!=="").map(x=>typeof x==="object"?Object.values(x).join(" "):String(x)).join("; ");
@@ -996,11 +1183,72 @@ function mergeFacts(nf){
   }
   if(nf.value_is_estimate!==undefined && known(nf.value)) S.f.value_is_estimate=!!nf.value_is_estimate;
   if(S.f.category && !CATEGORIES.some(c=>c.id===S.f.category)) S.f.category=null;
+  if(typeof nf.entity==="string"){ const e=ENTITIES.find(x=>x.id===nf.entity.toUpperCase()||nf.entity.toLowerCase().includes(x.name.toLowerCase().split(" (")[0])||x.re.test(nf.entity)||(x.abbr&&x.abbr.test(nf.entity))); S.f.entity=e?e.id:S.f.entity; }
+  if(typeof nf.l4==="string" && !l4ByCode(nf.l4)) S.f.l4=null;
   if(S.f.category && !S.f.demand_type) S.f.demand_type=catById(S.f.category).type;
   if(S.f.demand_type==="contingent_labour") S.f.category="contingent";
   if(S.f.category==="cloud" && /\b(hr|payroll|crm|erp|finance|accounting|procurement|ticketing|learning management)\b[^.]*\b(system|tool|platform|software|application|suite)\b/i.test(userText())){ S.f.category="software"; S.f.demand_type="software"; }
   if(nf.contract_ok===false) S.f.decline_contract=true;
   if(nf.contract_ok===true && S.det && S.det.contract && !hasSupplier(S.f)) S.f.supplier=S.det.contract.supplier;
+}
+function initialL4(){
+  const r=classifyL4(S.f);
+  if(S.f.l4 && !(S.derived.l4===S.f.l4) && l4ByCode(S.f.l4) && r[0].code!==S.f.l4){ const e=l4ByCode(S.f.l4); return [{code:e.code,name:e.name,match:Number(S.f.l4_match)||80,reason:String(S.f.l4_reason||`Closest in meaning: ${e.desc}`),uncertainty:""}].concat(r.slice(0,1)); }
+  return r;
+}
+// final Level 4 validation on the full description
+function finalL4(aiPick){
+  const r=classifyL4(S.f), ini=(S.l4Initial||[])[0], user = S.f.l4 && S.derived.l4!==S.f.l4 && l4ByCode(S.f.l4);
+  let pick = user ? {code:S.f.l4, reason:"Set by you during the intake."} : aiPick && l4ByCode(aiPick.code) ? {code:aiPick.code, match:Number(aiPick.match)||null, reason:String(aiPick.reason||""), uncertainty:String(aiPick.uncertainty||"")} : {code:r[0].code, reason:r[0].reason, uncertainty:r[0].uncertainty};
+  const e=l4ByCode(pick.code), rr=r.find(x=>x.code===pick.code);
+  const changed = ini && ini.code!==pick.code;
+  return {code:e.code, name:e.name, match:pick.match||(rr?rr.match:null), reason:pick.reason||(rr&&rr.reason)||"", uncertainty:pick.uncertainty||"",
+    changed, from: changed?ini:null, why: changed ? (pick.reason||"The full description points more clearly to this entry.") : ""};
+}
+// corrections in the user's own words at the check step (the AI also reads them)
+function applyCorrections(t){
+  const f=S.f, l=t.toLowerCase();
+  if(/one[- ]off|not (?:an )?ongoing|single (?:delivery|project)|just once/.test(l)) f.ongoing=false; else if(/\bongoing\b|recurring|continuous|runs for years/.test(l)) f.ongoing=true;
+  if(/(?:don.?t|do not|doesn.?t|never|wouldn.?t|would not)\b[^.]{0,30}\b(?:do|did|done)\b[^.]{0,20}(?:ourselves|today|in[- ]house)|always (?:buy|bought)|not something (?:we|our teams)/.test(l)) f.in_house=false;
+  else if(/our teams? (?:do|does|did)|we do (?:it|this) (?:today|ourselves)|in[- ]house today|would (?:normally )?do (?:it|this) ourselves/.test(l)) f.in_house=true;
+  if(/\bno (?:technology|tech|it|ict)\b|not (?:an? )?(?:it|ict|technology)|doesn.?t involve (?:any )?technology/.test(l)) f.tech_service=false; else if(/\b(?:it|this) (?:is|involves) (?:it|technology|software)|it does involve technology/.test(l)) f.tech_service=true;
+  if(/not (?:an? )?(?:important|critical)|nothing critical|not critical/.test(l)) f.important_fn=false; else if(/(?:is|it'?s) (?:important|critical)|supports? (?:a |an )?(?:critical|important)/.test(l)) f.important_fn=true;
+  if(/no (?:access|personal data|data)|won.?t (?:see|access)/.test(l)) f.personal_data=false;
+  const ent=ENTITIES.find(e=>e.re.test(t)||(e.abbr&&e.abbr.test(t))); if(ent && /entit|branch|for the|it'?s for|sign/.test(l)) f.entity=ent.id;
+  const ti=t.match(/(?:call it|title (?:is|should be)|name (?:is|should be))\s+["“]?([^"”.]+)/i); if(ti) f.title=ti[1].trim();
+  const cm=l.match(/(?:category|classification)(?: should be| is|:)\s+([a-z ,&-]{4,})/); if(cm){ const e=L4.find(x=>x.name.toLowerCase().includes(cm[1].trim().split(" ").slice(0,2).join(" "))); if(e){ f.l4=e.code; delete S.derived.l4; } }
+}
+// what the provider does, as "The Service Provider shall ..." statements
+const SHALL_VERBS=/^(run|process|provide|deliver|design|build|develop|host|maintain|support|operate|manage|create|implement|migrate|train|review|assess|analy[sz]e|prepare|test|monitor|report|clean|cater|organi[sz]e|recruit|advise|answer|handle|send|produce|configure|install|document|hand over|integrate|redesign|map|write|supply|perform|conduct|carry out|set up|update|check|reconcile|pay|collect|book)\b/i;
+function shallify(text){
+  return String(text).split(/;|\n|\.\s+|,\s*(?:and\s+)?(?=[a-z])|\s+and\s+(?=(?:run|process|provide|deliver|design|build|develop|host|maintain|support|operate|manage|create|implement|migrate|train|review|assess|prepare|test|monitor|report|answer|handle|send|produce|hand)\b)/i)
+    .map(x=>x.trim().replace(/[.]$/,"").replace(/^(?:they|the provider|the supplier|it)\s+(?:will|should|must|shall)\s+/i,"").replace(/^(?:to|will|should|must)\s+/i,"")).filter(x=>words(x)>=2)
+    .slice(0,8).map(x=>`The Service Provider shall ${SHALL_VERBS.test(x)?x.charAt(0).toLowerCase()+x.slice(1):"deliver "+x.charAt(0).toLowerCase()+x.slice(1)}.`);
+}
+const workingTitle = () => { if(givenText(S.f.title)) return S.f.title;
+  const it=givenText(S.f.item)||givenText(S.f.summary)||"";
+  const x=it.replace(/^(?:an?|the)\s+(?:external\s+|new\s+|specialist\s+)?(?:provider|supplier|agency|consultants?|consultancy|company|partner|firm|vendor)s?\s+(?:to|for|who (?:can|will))\s+/i,"").replace(/\bour\s+/gi,"").replace(/[.,;:].*$/,"").trim();
+  return x && words(x)<=9 ? cap1(x) : offlineSummary().title; };
+function checkMessage(){
+  const f=S.f, cl=classify(f), o=cl.o, L=[], e=l4ByCode(f.l4), ini=(S.l4Initial||[])[0];
+  L.push(`Working title: **${workingTitle()}**`);
+  if(e) L.push(`Category (Level 4): **${e.name}** (${e.code}${ini&&ini.code===e.code?`, ${ini.match}% match`:""})`);
+  if(f.demand_type==="goods") L.push("It's a **purchase of goods**, so it is not outsourcing");
+  else {
+    L.push(o.entity ? `It's for the **${o.entity.name}**` : "The legal entity is **not known yet**");
+    L.push(o.ex ? `It's **${o.ex}**` : o.ong ? `It's an **ongoing service**${givenText(f.duration)?` (${f.duration})`:""}, not a one-off` : "It's a **one-off delivery**, not an ongoing service");
+    if(!o.ex && o.ong) L.push(o.inHouse===true ? "It's something **our own teams would otherwise do** themselves" : o.inHouse===false ? "It's **not** something our own teams would do themselves" : "Whether our own teams would otherwise do it is **not clear yet**");
+    L.push(yes(f.tech_service) ? `It **involves technology**: ${PLAIN_ICT[cl.type]||cl.type}` : f.tech_service===false ? "It does **not** involve a technology service" : "Whether technology is involved is **not clear yet**");
+    const ih=importantHint(f);
+    L.push(isImportant(f) ? `If it fails or is late${ih?` (you mentioned ${ih})`:""}, it **may support a critical or important business function**` : "Nothing you said suggests it supports a **critical or important business function**");
+    const a=accessFlags(f);
+    if(a.any) L.push(`The provider will **access**: ${givenText(f.data_details)||"our data or systems"}${a.money?" (including money or accounts)":""}`); else if(f.personal_data===false) L.push("The provider will **not access** our data, systems, money or accounts");
+    if(yes(f.offshore)||/other country|offshore/i.test(f.location||"")) L.push("Work happens **outside the entity's country**");
+  }
+  const means=[];
+  if(f.demand_type!=="goods") means.push(`Outsourcing: **${o.result}**${o.fw?` under ${o.fw.short}`:""}`);
+  const rev=S.det.controls.filter(c=>c[0]!=="i").map(c=>c[1]); if(rev.length) means.push(`Reviews needed: ${rev.join(", ")}`);
+  return `${S.checkRound?"Thanks, I've updated it. ":""}Here's what I've worked out from your answers. Please check it:\n${L.map((x,i)=>`${i+1}. ${x}.`).join("\n")}${means.length?`\n\nWhat this means:\n${means.map(x=>"• "+x).join("\n")}`:""}\n\nIs this right? If not, tell me what's wrong.`;
 }
 // how useful was this answer? shown as a small score under the user's message
 function answerScore(asked, text, issue, sugResult, aiScore, pend){
@@ -1018,7 +1266,7 @@ function giveUp(k){
   if(k==="value"){ f.value=defaultEstimate(); f.value_is_estimate=true; return; }
   if(["tech_service","personal_data","ict_outsourcing","system_access","subcontracting"].includes(k)){ f[k]="unsure"; return; }
   if(k==="supplier"){ f.supplier="None"; return; }
-  if(k==="need") return;
+  if(k==="need"||k==="confirm_derived") return;
   f[k]="Not given";
 }
 function wrapUp(){
@@ -1053,13 +1301,43 @@ function offlineSuggest(k){
   const kpi=cap1((/cycle|slow|weeks|delay|long/.test(ctx)&&!/cycle time/.test(kpiBase)?"reduction in end-to-end cycle time; ":"")+kpiBase);
   const reg = /regulat|audit|complian|control|finding|policy/.test(ctx) ? "A clear audit trail; evidence that the required controls were applied; better regulatory compliance"
     : yes(f.tech_service) ? "Operational resilience through a managed, supported service; clear ownership and an audit trail" : "No specific regulatory benefit";
+  const isICT=yes(f.tech_service), ong=isOngoing(f), lfx=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1);
+  const OUT={software:"Migrating historic data, unless agreed separately; changes to our other systems; hardware", consulting:"Implementing the new design, unless agreed separately; changes to IT systems",
+    bpo:"Approval and payment decisions, which stay with us; changes to our finance systems", marketing:"Guest travel and accommodation, unless stated", facilities:"Repairs that need specialist contractors",
+    "it-services":"Support after hand-over, unless agreed separately; hardware and licences", training:"Travel costs for participants", cloud:"Application support; data migration, unless agreed separately"}[c] || "Anything not listed in scope; travel costs not agreed in advance";
+  const crit = f.demand_type==="software" ? "It works as specified in user acceptance testing, with no open critical defects" : GOODSLIKE(f) ? "Delivered complete, undamaged and working"
+    : ong ? "Service levels met for the first three months; outputs complete and accurate" : "Each deliverable is complete, matches the agreed scope and is accepted in writing";
+  const rev = GOODSLIKE(f)&&f.demand_type!=="software" ? "The recipient checks the delivery within 5 working days; faulty items are replaced at no cost" : "Our business owner reviews each deliverable within 5 working days; if it fails, the provider fixes it and resubmits at no extra cost; our business owner gives final sign-off";
+  const qual = c==="consulting" ? "Proven experience in similar projects in financial services; fluent English" : c==="it-services"||isICT ? "Certified in the relevant technology; experience in regulated environments; background-checked"
+    : c==="bpo" ? "Trained staff with experience in the process; background-checked" : f.demand_type==="contingent_labour" ? (givenText(f.skills)||"The skills listed in the role profile") : "Relevant experience and qualifications for the work; fluent English";
+  const sl = !ong ? "Not applicable (one-off delivery)" : isICT ? "Availability of 99.5% in service hours; priority 1 incidents answered within 1 hour and fixed within 4 hours"
+    : c==="bpo" ? "95% of items processed within 3 working days; accuracy of at least 99%" : c==="facilities" ? "Tasks done to schedule; issues fixed within 24 hours" : "Agreed response times met in at least 95% of cases";
   switch(k){
+    case "audience_fn": return `Target audience: ${aud}\nSupported functions: ${fun}`;
+    case "value_props": return `Unique selling points: ${usp}\nKey benefits: ${ben}\nRegulatory / governance benefits: ${reg}`;
+    case "scope_out": return OUT;
+    case "acceptance_pack": return `Acceptance criteria: ${crit}\nReview and sign-off: ${rev}`;
+    case "qualifications": return qual;
+    case "kpis_pack": return `Service levels: ${sl}\nKPIs: ${kpi}`;
+    case "service_model": return "Support model: First-line support by the provider's service desk, with second- and third-line support for incidents and defects\nService hours: Monday to Friday, 08:00 to 18:00 local time\nTools and systems: The provider supplies and maintains its own service desk and monitoring tools; costs are included in the price";
+    case "governance": return "Governance meetings: Monthly service review with our business owner; quarterly review with procurement\nReporting: Monthly report on service levels, KPIs, incidents and open issues\nChange management: Changes by written change request, approved by both sides before work starts\nEscalation: Service manager, then account director, then our business owner and procurement";
+    case "deps_pack": return `Our dependencies: A named business contact; access to the information${yes(f.personal_data)?" and systems":""} the provider needs within 5 working days of the start\nProvider assumptions: The scope stays as described; decisions and sign-offs are given on time`;
     case "users": return aud; case "functions": return fun; case "benefits": return ben; case "usp": return usp; case "acceptance": return kpi; case "reg_benefits": return reg;
     case "profile": return `Target audience: ${aud}\nSupported functions: ${fun}\nKey benefits: ${ben}\nKPIs / success measures: ${kpi}\nRegulatory / governance benefits: ${reg}`;
   }
   return "";
 }
-const PROFILE_KEYS={"target audience":"users","audience":"users","supported functions":"functions","functions":"functions","key benefits":"benefits","benefits":"benefits","kpis / success measures":"acceptance","kpis":"acceptance","success measures":"acceptance","regulatory / governance benefits":"reg_benefits","regulatory benefits":"reg_benefits","regulatory":"reg_benefits"};
+const BUNDLES={
+  profile:[["Target audience","users"],["Supported functions","functions"],["Key benefits","benefits"],["KPIs / success measures","kpis"],["Regulatory / governance benefits","reg_benefits"]],
+  audience_fn:[["Target audience","users"],["Supported functions","functions"]],
+  value_props:[["Unique selling points","usp"],["Key benefits","benefits"],["Regulatory / governance benefits","reg_benefits"]],
+  acceptance_pack:[["Acceptance criteria","acceptance"],["Review and sign-off","acc_review"]],
+  kpis_pack:[["Service levels","service_levels"],["KPIs","kpis"]],
+  service_model:[["Support model","support_model"],["Service hours","service_hours"],["Tools and systems","tools"]],
+  governance:[["Governance meetings","gov_meetings"],["Reporting","reporting"],["Change management","change_mgmt"],["Escalation","escalation"]],
+  deps_pack:[["Our dependencies","our_deps"],["Provider assumptions","prov_assumptions"]]
+};
+const PROFILE_KEYS={"target audience":"users","audience":"users","supported functions":"functions","functions":"functions","key benefits":"benefits","benefits":"benefits","kpis / success measures":"kpis","kpis":"kpis","success measures":"kpis","unique selling points":"usp","regulatory / governance benefits":"reg_benefits","regulatory benefits":"reg_benefits","regulatory":"reg_benefits"};
 function normSuggestion(v){
   if(v && typeof v==="object" && !Array.isArray(v)) return Object.entries(v).map(([k,x])=>`${k.replace(/_/g," ")}: ${Array.isArray(x)?x.join("; "):x}`).join("\n");
   if(Array.isArray(v)) return v.join("; ");
@@ -1067,9 +1345,11 @@ function normSuggestion(v){
 }
 function setFromSuggestion(k, v){
   const f=S.f;
-  if(k==="profile"){
-    String(v).split(/\n+/).forEach(line=>{ const m=line.match(/^\s*[-•*]?\s*([^:]{3,40}):\s*(.+)$/); if(!m) return; const key=PROFILE_KEYS[m[1].trim().toLowerCase()]; if(key && !known(f[key])) f[key]=m[2].trim().replace(/\.$/,""); });
-    f.profile="Confirmed"; return;
+  if(BUNDLES[k]){
+    String(v).split(/\n+/).forEach(line=>{ const m=line.match(/^\s*[-•*]?\s*([^:]{3,45}):\s*(.+)$/); if(!m) return; const lab=m[1].trim().toLowerCase();
+      const hit=BUNDLES[k].find(([L])=>lab===L.toLowerCase()||lab.startsWith(L.toLowerCase().split(/[ /]/)[0])) ; const key=hit?hit[1]:PROFILE_KEYS[lab];
+      if(key && (!known(f[key])||isTBD(f[key]))) f[key]=m[2].trim().replace(/\.$/,""); });
+    f[k]="Confirmed"; return;
   }
   f[k]=String(v).replace(/\.$/,"");
 }
@@ -1080,8 +1360,8 @@ function applySuggestion(k, text){
   const t=String(text).trim();
   if(ACCEPT.test(t)){ setFromSuggestion(k, sg); return "accepted"; }
   const m=t.match(/^(?:yes|yep|yeah|ok(?:ay)?|looks good|that fits|fine)\b[,.!]?\s*(?:but|and|plus|also)?\s*(?:add|include)?\s*(.+)$/i);
-  if(m && words(m[1])>=2 && k!=="profile"){ setFromSuggestion(k, sg+"; "+m[1].replace(/\.$/,"")); return "extended"; }
-  if(m && words(m[1])>=2 && k==="profile"){ setFromSuggestion(k, sg); return "extended"; }   // the AI folds the change in; the rules keep the suggestion
+  if(m && words(m[1])>=2 && !BUNDLES[k]){ setFromSuggestion(k, sg+"; "+m[1].replace(/\.$/,"")); return "extended"; }
+  if(m && words(m[1])>=2 && BUNDLES[k]){ setFromSuggestion(k, sg); return "extended"; }   // the AI folds the change in; the rules keep the suggestion
   return false;
 }
 
@@ -1101,7 +1381,7 @@ function offlineRead(text, asked){
       if(f.demand_type!=="contingent_labour" && !known(f.item)) f.item=itemFrom(text);
     }
   }
-  if(asked && asked!=="need" && !known(f[asked])){ const v=readAnswer(asked, text); if(known(v)) f[asked]=v; }
+  if(asked && asked!=="need" && asked!=="confirm_derived" && !known(f[asked])){ const v=readAnswer(asked, text); if(known(v)) f[asked]=v; }
   splitCombined(asked, text);
   fillUnknown(extractAll(text, asked));
   // a sentence that became "today's solution" is no longer part of the problem statement
@@ -1284,9 +1564,12 @@ function extractAll(text, asked){
 }
 const fmtN = x => /^\d+$/.test(String(x)) ? Number(x).toLocaleString("en-GB") : x;
 const cap1 = x => x ? String(x).charAt(0).toUpperCase()+String(x).slice(1) : x;
-const CLOSED=["contract_ok","value","quantity","headcount","tech_service","personal_data","ict_outsourcing","system_access","budget_approved","subcontracting"];
+const CLOSED=["in_house","entity","supplier_terms","contract_ok","value","quantity","headcount","tech_service","personal_data","ict_outsourcing","system_access","budget_approved","subcontracting"];
 function readAnswer(k, text){
   const t=text.trim().toLowerCase();
+  if(k==="in_house"){ if(/not sure|unsure|don.?t know/.test(t)) return "unsure"; if(/always buy|buy (?:this|it) in|^no\b|never/.test(t)) return false; if(/^yes|our teams|normally do|ourselves|in[- ]house|we do/.test(t)) return true; return null; }
+  if(k==="entity"){ const e=ENTITIES.find(x=>t.includes(x.name.toLowerCase())||x.re.test(text)||(x.abbr&&x.abbr.test(text))); return e?e.id:/another|other/.test(t)?null:"Not given"; }
+  if(k==="supplier_terms") return /^no\b|none/.test(t)?"No":/not sure|unsure/.test(t)?"Not sure":text.trim();
   if(k==="value"){ const v=parseMoney(text); if(v!=null){S.f.value_is_estimate=false;return v;} if(/know|sure|idea|estimate/.test(t)){S.f.value_is_estimate=true;return defaultEstimate();} return null; }
   if(k==="quantity"||k==="headcount"){ const n=t.match(/\d+/); return n?+n[0]:(/more/.test(t)?"4+":null); }
   if(k==="criticality"){ if(/client|customer|regulat|payment|trading|can.?t|cannot|outage|down|serious/.test(t) && !/nothing serious|no impact|minor/.test(t)) S.f.critical_service=true; return text.trim(); }
@@ -1338,7 +1621,7 @@ function offlineQuestion(k, prevRoute, stageChanged){
     if(k==="value" && known(f.duration)) intro="";
   }
   const why = F.why ? " "+F.why(f) : "", ex = F.ex(f) ? " "+F.ex(f) : "";
-  if(isSug(k)){ const sg=S.suggest[k]||offlineSuggest(k); S.suggest[k]=sg; return `${intro}${F.q(f)}\n\nMy suggestion, based on what you told me:\n${k==="profile"?sg:sg+"."}\n\nUse it as it is, or tell me what to change.`.trim(); }
+  if(isSug(k)){ const sg=S.suggest[k]||offlineSuggest(k); S.suggest[k]=sg; return `${intro}${F.q(f)}\n\nMy suggestion, based on what you told me:\n${BUNDLES[k]?sg:sg.replace(/\.?$/,".")}\n\nUse it as it is, or tell me what to change.`.trim(); }
   return `${intro}${F.q(f)}${ex}${why}`.trim();
 }
 
@@ -1385,7 +1668,7 @@ const SCRUB={
   time:new RegExp(`\\b${MONTHS_RE}\\b|\\bMay\\s+\\d|\\b\\d{1,2}\\s+May\\b|\\bQ[1-4]\\b|\\b20\\d\\d\\b|\\basap\\b|as soon as possible|\\bnext (?:week|month|quarter|year)\\b|\\b(?:${CITIES.join("|")})\\b|\\bon[- ]site\\b`,"i")
 };
 const STRIP_TIME=[
-  new RegExp(`\\s*,?\\s*\\b(?:by|from|in|on|before|starting(?: in| from)?|until|for|over|within|during|lasting|of)\\s+(?:the\\s+)?(?:(?:end|start|beginning|middle) of\\s+)?(?:Q[1-4](?:\\s+20\\d\\d)?|20\\d\\d|${MONTHS_RE}\\w*(?:\\s+\\d{1,2})?(?:\\s+20\\d\\d)?|next (?:week|month|quarter|year)|(?:around |about |roughly )?\\d+\\s*(?:-|–|to)?\\s*\\d*\\s*(?:months?|years?|weeks?)|(?:our\\s+)?(?:${CITIES.join("|")})(?:\\s+office)?)\\b`,"gi"),
+  new RegExp(`\\s*,?\\s*\\b(?:by|from|in|on|before|starting(?: in| from)?|until|for|over|within|during|lasting|of)\\s+(?:the\\s+)?(?:(?:end|start|beginning|middle) of\\s+)?(?:Q[1-4](?:\\s+20\\d\\d)?|20\\d\\d|${MONTHS_RE}\\w*(?:\\s+\\d{1,2})?(?:\\s+20\\d\\d)?|next (?:week|month|quarter|year)|(?:around |about |roughly )?\\d+\\s*(?:-|–|to)?\\s*\\d*\\s*(?:months?|years?|weeks?)|(?:our\\s+)?(?:${CITIES.join("|")})(?:\\s+(?:office|entity|branch|team))?)\\b`,"gi"),
   /\s*,?\s*\b(?:around|about|roughly|approximately)\s+\d+\s*(?:-|–|to)?\s*\d*\s*(?:months?|years?|weeks?)\b/gi,
   /\s*,?\s*(?:as soon as possible|asap)\b/gi
 ];
@@ -1514,16 +1797,141 @@ function mergeDesc(base, ai){
 }
 // what is captured for procurement, shown as a table and never written into the description
 function intakeRecord(){
-  const f=S.f, D=S.det, route=S.override||D.route, cl=classify(f), v=k=>known(f[k])&&f[k]!=="Not given"?show(k,f[k]):null;
-  const supplier = hasSupplier(f) ? `${f.supplier}${known(f.supplier_reason)&&f.supplier_reason!=="Not given"?` (${f.supplier_reason})`:""}` : NEW_DEMAND(route) ? "Open"+((PREFERRED[f.category]||[]).length?`, preferred: ${PREFERRED[f.category].join(", ")}`:"") : null;
-  const rows=[["Buying route",CHANNELS[route].name], ["Budget",known(f.value)?money(Number(f.value))+(f.value_is_estimate?" (estimate)":""):null], ["Budget approved",v("budget_approved")],
+  const f=S.f, D=S.det, route=S.override||D.route, cl=classify(f), o=cl.o, a=accessFlags(f), nd=NEW_DEMAND(route), v=k=>known(f[k])&&!isTBD(f[k])?show(k,f[k]):null;
+  const supplier = hasSupplier(f) ? `${f.supplier}${givenText(f.supplier_reason)?` (${f.supplier_reason})`:""}` : nd ? "Open"+((PREFERRED[f.category]||[]).length?`, preferred: ${PREFERRED[f.category].join(", ")}`:"") : null;
+  const fin=S.sd&&S.sd.l4Final, ini=(S.l4Initial||[])[0];
+  const rows=[["Buying route",CHANNELS[route].name],
+    ["Category (Level 4)", fin ? `${fin.name} (${fin.code})${ini?(ini.code===fin.code?", initial classification confirmed":`, changed from ${ini.name}`):""}` : ini ? `${ini.name} (${ini.code}), ${ini.match}% match` : null],
+    ["Budget",known(f.value)?money(Number(f.value))+(f.value_is_estimate?" (estimate)":""):null], ["Budget approved",v("budget_approved")],
     ["Quantity",v("quantity")], ["People",v("headcount")], ["Day rate",v("day_rate")], ["Volume",v("volume")],
-    ["Start or delivery",v("needed_by")], ["Duration",v("duration")], ["Location",v("location")],
+    ["Start or delivery",v("needed_by")], ["Duration",v("duration")], ["Where and how",v("location")],
     ["Supplier",supplier], ["Existing contract",D.contract&&route==="contract"?`${D.contract.title} with ${D.contract.supplier} (${D.contract.id})`:null],
-    ["Personal data",known(f.personal_data)?show("personal_data",f.personal_data)+(yes(f.personal_data)&&known(f.data_details)?`: ${f.data_details}`:""):null], ["System access",v("system_access")],
-    ["ICT service (DORA)",cl.ict?cl.ict.flag+(["Yes","Possible"].includes(cl.ict.flag)?` · ${cl.type}`:""):null], ["Outsourcing",cl.out?cl.out.flag:null],
-    ["If it stopped",v("criticality")], ["If it doesn't go ahead",v("impact_delay")]];
+    ["Legal entity", nd && f.demand_type!=="goods" ? (o.entity?o.entity.name:"To be determined") : null],
+    ["Data and system access", known(f.personal_data) ? (a.any?`Yes${givenText(f.data_details)?`: ${f.data_details}`:""}${a.money?" (money or accounts)":""}`:show("personal_data",f.personal_data)) : null],
+    ["System access",v("system_access")],
+    ["Outsourcing", nd && f.demand_type!=="goods" ? `${o.result}${o.fw?` (${o.fw.short})`:""}` : null],
+    ["ICT service (DORA)",cl.ict?cl.ict.flag+(["Yes","Possible"].includes(cl.ict.flag)?` · ${cl.type}`:""):null],
+    ["Critical or important function", nd && f.demand_type!=="goods" ? (isImportant(f)?"May apply, flagged for review":"No indication") : null],
+    ["Materiality", nd ? "To be determined in the materiality process" : null],
+    ["If it doesn't go ahead",v("impact_delay")], ["Checked by you", nd ? (givenText(f.confirm_derived)||"Not yet") : null]];
   return rows.filter(r=>r[1]);
+}
+
+/* ---------- detailed service description for sourcing (new demand), built from the answers; the AI version is merged on top ---------- */
+const DETAIL_SECTIONS=[["title","Service title"],["purpose","Purpose and background"],["qualification","Service qualification"],["scope","Scope of services"],["obligations","Service Provider obligations"],
+  ["our_deps","Our responsibilities and dependencies"],["assumptions","Service Provider assumptions"],["delivery","Delivery model and locations"],["timeline","Timelines, service periods and committed dates"],
+  ["deliverables","Deliverables"],["acceptance","Acceptance criteria"],["acceptance_test","Acceptance testing and remediation"],["service_levels","Service levels"],["kpis","Key performance indicators"],
+  ["sla_consequences","Service level failure consequences"],["tools","Tools, systems and facilities"],["qualifications","Personnel qualifications"],["volumes","Volumes and workload assumptions"],
+  ["access","Data, asset, system, money and account access"],["gov_meetings","Governance meetings"],["reporting","Reporting"],["change_mgmt","Change management"],["escalation","Escalation"],
+  ["supplier_docs","Supplier documents, URLs and incorporated materials"],["open_points","Open points and items to be determined"]];
+const TBDX="To be determined";
+function openPoints(){
+  const f=S.f, out=(S.req||[]).filter(k=>FACTS[k]&&(isTBD(f[k])||f[k]==="unsure")).map(k=>`${FACTS[k].label}: to be determined.`);
+  const o=outsourcing(f); if(o.code==="tbd" && f.demand_type!=="goods") out.push("Outsourcing: whether our own teams would otherwise do this is still open.");
+  if(!o.entity && f.demand_type!=="goods") out.push("Legal entity: to be confirmed; it decides the applicable outsourcing rules.");
+  if(f.value_is_estimate) out.push(`Value: ${money(Number(f.value))} is an estimate.`);
+  if(isOngoing(f)) out.push("Service level failure consequences: to be agreed in sourcing (Legal and commercial review).");
+  if(f.supplier_terms && !/^no$/i.test(String(f.supplier_terms))) out.push("Supplier standard terms: obtain a fixed (static) copy before relying on them.");
+  return out;
+}
+function offlineDetail(brd){
+  const f=S.f, g=k=>givenText(f[k]).replace(/\.$/,""), sp=x=>x?String(x).split(/;|\n/).map(t=>t.trim().replace(/\.$/,"")).filter(Boolean).map(cap1):[], lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1);
+  const a=accessFlags(f), ong=isOngoing(f), ict=yes(f.tech_service)&&ong;
+  return {
+    purpose:[g("background")&&cap1(g("background"))+".", g("users")&&`It serves ${lf(g("users"))}.`, g("current_solution")&&`Today: ${lf(g("current_solution"))}.`, g("impact_delay")&&`If it doesn't go ahead or is delayed: ${lf(g("impact_delay"))}.`].filter(Boolean).join(" ")||TBDX,
+    scope_in: shallify(g("scope_in")||g("must_haves")||g("deliverables")), scope_out: sp(g("scope_out")),
+    our_deps: sp(g("our_deps")), assumptions: sp(g("prov_assumptions")),
+    delivery: [g("location"), (yes(f.offshore)||/offshore|other country/i.test(f.location||""))&&"Work outside the entity's country (offshoring check)"].filter(Boolean).join("; ")||TBDX,
+    timeline: [g("needed_by")&&`Start or delivery: ${g("needed_by")}`, g("duration")&&`Service period: ${g("duration")}`].filter(Boolean).join(". ")||TBDX,
+    deliverables: sp(g("deliverables")).length?sp(g("deliverables")):(GOODSLIKE(f)&&g("item")?[`${known(f.quantity)?fmtN(f.quantity)+" × ":""}${g("item")}`]
+      : shallify(g("scope_in")).map(x=>x.replace(/^The Service Provider shall (?:send|deliver|provide|produce|prepare|write|hand over)\s+/i,"").replace(/^The Service Provider shall .*/,"").replace(/\.$/,"")).filter(x=>x&&/report|plan|design|document|model|map|roadmap|analysis|assessment|code|release|presentation|statement|dashboard|specification/i.test(x)).map(cap1)),
+    acceptance: g("acceptance")||TBDX, acceptance_test: g("acc_review")||TBDX,
+    service_levels: ong ? (sp(g("service_levels")).filter(x=>!/not applicable/i.test(x))) : ["Not applicable (one-off delivery)"],
+    kpis: sp(g("kpis")),
+    sla_consequences: ong ? "To be agreed in sourcing. No service credit values are set in the intake; values and enforceability need Legal and commercial review." : "Not applicable (one-off delivery)",
+    tools: ict ? [g("support_model")&&`Support model: ${g("support_model")}`, g("service_hours")&&`Service hours: ${g("service_hours")}`, g("tools")&&`Tools and systems: ${g("tools")}`].filter(Boolean) : ["Not applicable (no ongoing technology service)"],
+    qualifications: g("qualifications")||g("skills")||"",
+    volumes: g("volume")||(known(f.quantity)?`${fmtN(f.quantity)} ${f.demand_type==="software"?"users":"units"}`:""),
+    access: f.demand_type==="goods" ? ["No access (purchase of goods)"] : [`Access: ${a.any?"Yes":f.personal_data===false?"No access":TBDX}`, a.any&&`Details: ${g("data_details")||TBDX}`, a.any&&`Personal or client data: ${a.personal?"Yes":"No indication"}`,
+      a.any&&`Access level: ${a.level}`, a.any&&`Production or test: ${a.env}`, `Money or accounts: ${a.money?"Yes":"No indication"}`].filter(Boolean),
+    gov_meetings: g("gov_meetings")||(ong?"":"Not applicable (one-off delivery)"), reporting: g("reporting")||"", change_mgmt: g("change_mgmt")||"", escalation: g("escalation")||"",
+    supplier_docs: !hasSupplier(f) ? "None stated (no supplier named yet)" : /^no$/i.test(String(f.supplier_terms||"")) ? "None" : known(f.supplier_terms)&&!isTBD(f.supplier_terms) ? `${f.supplier_terms}. A fixed (static) copy must be reviewed; changing online terms are a risk.` : TBDX,
+    risks: /nothing/i.test(g("other_risks"))?"":g("other_risks"),
+    open_points: openPoints()
+  };
+}
+function mergeDetail(base, ai){
+  const out={...base}; if(!ai||typeof ai!=="object") return out;
+  for(const [k] of DETAIL_SECTIONS){ if(["title","qualification","obligations","open_points"].includes(k)) continue;
+    let v=ai[k]; if(Array.isArray(v)) v=v.map(x=>String(x).trim()).filter(Boolean); else if(typeof v==="string") v=v.trim(); else v=null;
+    if(v && (Array.isArray(v)?v.length:v.length>2) && !/^to be determined\.?$/i.test(Array.isArray(v)?v.join(""):v)) out[k]=v; }
+  if(Array.isArray(ai.open_points)) out.open_points=[...new Set([...base.open_points, ...ai.open_points.map(String).filter(Boolean)])];
+  return out;
+}
+// output C: structured attributes for approval to source
+function sourcingAttributes(){
+  const f=S.f, cl=classify(f), o=cl.o, a=accessFlags(f), d=S.sd&&S.sd.detail||{}, fin=S.sd&&S.sd.l4Final||{}, jn=x=>Array.isArray(x)?x.join("; "):x||TBDX;
+  return [
+    ["Classification",[["Level 4 code",fin.code||TBDX],["Level 4 name",fin.name||TBDX],["Match quality",fin.match?fin.match+"%":TBDX],["Reasoning",fin.reason||""],["Uncertainty",fin.uncertainty||"None noted"]]],
+    ["Service qualification",[["ICT service",cl.ict?cl.ict.flag:TBDX],["Critical or important function",isImportant(f)?"May apply (flagged)":"No indication"],["Outsourcing",`${o.result}${o.fw?` (${o.fw.short})`:""}`],
+      ["Materiality-related inputs",[known(f.value)&&`Value ${money(Number(f.value))}`, isImportant(f)&&"possible important function", a.any&&"data or system access", (yes(f.offshore)||/offshore|other country/i.test(f.location||""))&&"cross-border"].filter(Boolean).join("; ")||"None noted"],["Final materiality outcome",TBDX]]],
+    ["Scope",[["Service purpose",d.purpose||TBDX],["In scope",jn(d.scope_in)],["Out of scope",jn(d.scope_out)],["Deliverables",jn(d.deliverables)],["Service period",givenText(f.duration)||TBDX],["Delivery location",givenText(f.location)||TBDX],
+      ["Entity",o.entity?`${o.entity.name}, ${o.entity.country}`:TBDX],["Volumes",d.volumes||TBDX]]],
+    ["Risk-relevant access",[["Money or accounts",a.money?"Yes":"No indication"],["Data or information assets",a.any?"Yes":f.personal_data===false?"No":TBDX],["Data type",a.personal?"Personal or client data":a.any?"Business or system data":"None"],
+      ["Access level",a.level],["Production or test",a.any?a.env:"Not applicable"],["Privileged access",/Priv|Admin/.test(a.level)?"Yes":"No indication"],["Cross-border",(yes(f.offshore)||/offshore|other country/i.test(f.location||""))?"Yes":"No indication"],["Subcontracting",known(f.subcontracting)?show("subcontracting",f.subcontracting):TBDX]]],
+    ["Governance",[["Service levels",jn(d.service_levels)],["KPIs",jn(d.kpis)],["Reporting",d.reporting||TBDX],["Governance meetings",d.gov_meetings||TBDX],["Change management",d.change_mgmt||TBDX],["Escalation",d.escalation||TBDX],["Open points",String((d.open_points||[]).length)]]]
+  ];
+}
+// output A: quality check by section
+function sectionQuality(){
+  const f=S.f, d=S.sd&&S.sd.detail||{}, ong=isOngoing(f), ict=yes(f.tech_service)&&ong, acc=S.sugAccepted, o=outsourcing(f), a=accessFlags(f), R=[];
+  const add=(sec,status,issue,fix)=>R.push({sec,status,issue:issue||"",fix:fix||""});
+  const has=k=>!!givenText(f[k]), sug=keys=>keys.some(k=>acc[k]);
+  const fromSug=(sec,keys,fixTBD)=>{ const k0=keys.find(k=>has(k)); if(!k0) return add(sec,"To be determined","Not provided",fixTBD); add(sec,"Complete",sug(Object.keys(BUNDLES).filter(b=>BUNDLES[b].some(([,x])=>keys.includes(x))).concat(keys))?"Suggested by the assistant and confirmed by you":"" , sug(Object.keys(BUNDLES).filter(b=>BUNDLES[b].some(([,x])=>keys.includes(x))).concat(keys))?"Check the wording against your actual need":""); };
+  const ins=(d.scope_in||[]).length, outs=(d.scope_out||[]).length;
+  add("Scope", ins&&outs?"Complete":ins||outs?"Partial":"To be determined", !ins?"In-scope activities missing":!outs?"Exclusions missing":"", !ins?"List the provider's main activities":!outs?"Add what is explicitly not included":"");
+  add("Service qualification", f.confirm_derived&&!isTBD(f.confirm_derived)&&o.entity?"Complete":"Partial", o.entity?"Derived by the rules"+(f.confirm_derived?", checked by you":""):"Legal entity not known", o.entity?"":"Confirm which entity signs the contract");
+  add("Information and communication technology relevance", f.tech_service==="unsure"?"To be determined":"Complete", S.derived.tech_service!==undefined?"Derived from the description":"", "");
+  add("Critical or important function relevance", known(f.important_fn)&&!isTBD(f.important_fn)?"Complete":"Partial", isImportant(f)?"Indicated by your impact answer; not a final decision":"No indication from your answers", "Confirm in the outsourcing and materiality review");
+  add("Active obligations", ins>=2?"Complete":ins?"Partial":"To be determined", ins?"":"No provider obligations captured", ins<2?"Describe what the provider shall do":"");
+  add("Responsibility allocation", has("our_deps")?"Complete":"Partial", has("our_deps")?"":"Our own dependencies not stated", has("our_deps")?"":"State what we must provide and by when");
+  const abbr=[...new Set((userRaw().match(/\b[A-Z]{2,5}\b/g)||[]).filter(x=>!["EU","UK","US","IT","HR","OK","CEO","CFO","USA","API","SAP","ERP","CRM","ICT","KPI","SLA"].includes(x)))];
+  add("Definitions", abbr.length?"Partial":"Complete", abbr.length?`Abbreviations used: ${abbr.slice(0,5).join(", ")}`:"", abbr.length?"Write each abbreviation in full the first time":"");
+  if(ict) fromSug("Tools",["tools","support_model"],"Name the tools and who provides them"); else add("Tools","Not applicable","No ongoing technology service","");
+  add("Timelines", has("needed_by")&&(has("duration")||GOODSLIKE(f))?"Complete":has("needed_by")?"Partial":"To be determined", has("needed_by")?"":"No start or delivery date", has("needed_by")?"":"Give a date or period");
+  add("Deliverables", (d.deliverables||[]).length||ins?"Complete":"To be determined", "", (d.deliverables||[]).length||ins?"":"List the deliverables, their format and recipient");
+  fromSug("Acceptance criteria",["acceptance"],"Make acceptance measurable");
+  fromSug("Acceptance testing",["acc_review"],"Say who reviews, when, and what happens if it fails");
+  if(ong){ fromSug("Service levels",["service_levels"],"Add measurable service levels"); } else add("Service levels","Not applicable","One-off delivery","");
+  fromSug("Key performance indicators",["kpis"],"Add measurable KPIs");
+  if(ong) add("Service level failure consequences","To be determined","No consequence agreed yet","Agree the principle in sourcing; values need Legal and commercial review"); else add("Service level failure consequences","Not applicable","One-off delivery","");
+  add("Data, system, asset, money and account access", a.money||/Priv|Admin/.test(a.level)?"Risk":!known(f.personal_data)||f.personal_data==="unsure"?"To be determined":a.any&&!has("data_details")?"Partial":"Complete",
+    a.money?"Money or account access":/Priv|Admin/.test(a.level)?`${a.level} access`:a.any&&!has("data_details")?"Access details missing":"", a.money||/Priv|Admin/.test(a.level)?"Needs the access review":a.any&&!has("data_details")?"Describe data types, access level and environment":"");
+  fromSug("Assumptions",["prov_assumptions"],"State the provider's assumptions and their impact");
+  fromSug("Dependencies",["our_deps"],"State our dependencies and owners");
+  if(ong){ fromSug("Governance",["gov_meetings"],"Set meetings, frequency and attendees"); fromSug("Reporting",["reporting"],"Set report content, frequency and recipients"); fromSug("Change management",["change_mgmt"],"Describe how changes are approved"); fromSug("Escalation",["escalation"],"Set the escalation route"); }
+  else ["Governance","Reporting","Change management","Escalation"].forEach(x=>add(x,"Not applicable","One-off delivery",""));
+  add("Supplier documents and URLs", !hasSupplier(f)?"Not applicable":/^no$/i.test(String(f.supplier_terms||""))?"Complete":known(f.supplier_terms)&&!isTBD(f.supplier_terms)&&!/not sure/i.test(f.supplier_terms)?"Risk":"To be determined",
+    known(f.supplier_terms)&&!/^no$/i.test(String(f.supplier_terms))?"Relies on supplier documents":"", known(f.supplier_terms)&&!/^no$/i.test(String(f.supplier_terms))?"Review a fixed copy; avoid changing online terms":"");
+  const op=(d.open_points||[]).length; add("Open points", op?"Partial":"Complete", op?`${op} open point${op>1?"s":""}`:"", op?"Close them before the sourcing request":"");
+  return R;
+}
+// outputs E and F: compact sourcing request text and a very short version
+function offlineCompact(){
+  const f=S.f, d=S.sd&&S.sd.detail||{}, a=accessFlags(f), g=k=>givenText(f[k]).replace(/\.$/,""), lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1);
+  const ob=(d.scope_in||[]).map(x=>x.replace(/^The Service Provider shall /,"").replace(/\.$/,"")).slice(0,4);
+  const parts=[`${S.sd?S.sd.title:workingTitle()}.`, ob.length?`The Service Provider shall ${listJoin(ob)}.`:"", g("background")&&`Purpose: ${lf(g("background"))}.`,
+    (d.deliverables||[]).length&&`Deliverables: ${d.deliverables.slice(0,4).join("; ")}.`, [g("needed_by")&&`start ${g("needed_by")}`, g("duration")&&`for ${g("duration")}`, g("location")&&lf(g("location"))].filter(Boolean).join(", ").replace(/^./,c=>c.toUpperCase()).replace(/(.)$/,"$1."),
+    a.any?`Access: ${g("data_details")||"data or systems"}.`:"", yes(f.tech_service)?"Technology service (ICT review applies).":"",
+    (d.service_levels||[]).filter(x=>!/not applicable/i.test(x)).length?`Service levels: ${d.service_levels.slice(0,2).join("; ")}.`:"", g("acceptance")&&`Acceptance: ${lf(g("acceptance"))}.`,
+    (d.open_points||[]).length?`Open points: ${d.open_points.slice(0,3).join(" ")}`:""];
+  return parts.filter(x=>x&&x.length>1).join(" ").replace(/\s+/g," ").trim();
+}
+function clampChars(t, max){ t=String(t||"").replace(/\s+/g," ").trim(); if(t.length<=max) return t; const cut=t.slice(0,max), e=cut.lastIndexOf(". "); return e>max*0.5?cut.slice(0,e+1):cut.slice(0,cut.lastIndexOf(" ")).replace(/[,;:]$/,"")+"."; }
+function offlineShort(){
+  const f=S.f, a=accessFlags(f), g=k=>givenText(f[k]).replace(/\.$/,""), d=S.sd&&S.sd.detail||{};
+  const ob=(d.scope_in||[]).map(x=>x.replace(/^The Service Provider shall /,"").replace(/\.$/,"")).slice(0,2);
+  return clampChars([`${S.sd?S.sd.title:workingTitle()}:`, ob.length?`the provider shall ${listJoin(ob)}.`:"", g("background")&&`Purpose: ${g("background").charAt(0).toLowerCase()+g("background").slice(1)}.`, a.any?`Access to ${g("data_details")||"our data or systems"}.`:"No data access.", g("duration")&&`Period: ${g("duration")}.`].filter(Boolean).join(" "), 500);
 }
 
 // full business requirements document built from the answers alone (no AI); the AI version is merged on top
@@ -1534,7 +1942,11 @@ function offlineBRD(risk){
   const R=[], req=(type,text,priority="Must")=>R.push({type,text,priority});
   const goods=GOODSLIKE(f), cont=f.demand_type==="contingent_labour";
   // requirements
-  if(cont){
+  if(NEW_DEMAND(route) && givenText(f.scope_in)){
+    shallify(f.scope_in).forEach(x=>req(cont?"Resourcing":"Service",x));
+    if(cont && g("skills")) split(g("skills")).forEach(x=>req("Skills",`Candidates must have ${lf(x)}.`));
+    if(g("location")) req("Location",`Perform the work ${/^on.?site|^remote|^hybrid|^at |^offshore/i.test(g("location"))?lf(g("location")):"in "+g("location")}.`,"Should");
+  } else if(cont){
     req("Resourcing",`Provide ${g("headcount")||1} ${lf(g("role")||"external worker")}${(+g("headcount")||1)>1?"s":""}${g("duration")?` for ${g("duration")}`:""}${g("needed_by")?`, starting ${g("needed_by")}`:""}.`);
     split(g("skills")).forEach(x=>req("Skills",`Candidates must have ${lf(x)}.`));
     if(g("deliverables")) req("Scope",`Work on ${lf(g("deliverables"))}.`);
@@ -1559,8 +1971,8 @@ function offlineBRD(risk){
   if(yes(f.personal_data)){ req("Data protection","Process personal data only on our instructions, under a data processing agreement signed before the start.");
     const st=String(g("data_details")||"").match(/stored in ((?:the )?[\w ]+)/i); if(st) req("Data protection",`Store and process the data only in ${st[1].trim()}.`); }
   if(yes(f.system_access)) req("Security","Follow our access, security and acceptable-use policies. Access is removed on the last working day.");
-  if(yes(f.ict_outsourcing)) req("Resilience","Provide a business continuity plan, an exit plan, and audit rights for us and our regulators.");
-  if(yes(f.tech_service) && !yes(f.ict_outsourcing) && NEW_DEMAND(route)) req("Compliance","Support the ICT third-party risk assessment and the register of information, and give the information it needs.","Should");
+  if(NEW_DEMAND(route)?outsourcing(f).code==="yes":yes(f.ict_outsourcing)) req("Resilience","Provide a business continuity plan, an exit plan, and audit rights for us and our regulators.");
+  if(yes(f.tech_service) && NEW_DEMAND(route)) req("Compliance","Support the ICT third-party risk assessment and the register of information, and give the information it needs.","Should");
   split(g("must_haves")).forEach(x=>req(f.demand_type==="software"?"Functional":"Supply",`${cap(x)}.`));
   if(yes(f.critical_service)) req("Resilience","Test business continuity at least once a year and report incidents within 24 hours.");
   if(yes(f.subcontracting)||f.subcontracting==="unsure") req("Compliance","Use subcontractors only with our prior written approval.");
@@ -1589,7 +2001,7 @@ function offlineBRD(risk){
   if(yes(f.personal_data)||yes(f.system_access)) stakeholders.push({role:"Data protection",who:"Data protection officer"});
   if(yes(f.ict_outsourcing)||yes(f.system_access)) stakeholders.push({role:"IT security",who:"Information security team"});
   if(yes(f.tech_service) && NEW_DEMAND(route)) stakeholders.push({role:"ICT third-party risk",who:"ICT review (DORA)"});
-  if(yes(f.ict_outsourcing)) stakeholders.push({role:"Outsourcing",who:"Outsourcing review"});
+  if(NEW_DEMAND(route)?outsourcing(f).code!=="no"&&f.demand_type!=="goods":yes(f.ict_outsourcing)) stakeholders.push({role:"Outsourcing",who:"Outsourcing review"});
   if(["sourcing","contract"].includes(route)) stakeholders.push({role:"Legal",who:"Contract review"});
   const scope_out=["Anything not listed under in scope", ...({consulting:["Implementing the new design, unless agreed separately (proposed)"],"it-services":["Support after handover, unless agreed separately (proposed)"],
     software:["Migrating historic data, unless agreed separately (proposed)"],marketing:["Guest travel and accommodation, unless stated (proposed)"],training:["Travel costs for participants (proposed)"]}[f.category]||[])];
@@ -1653,6 +2065,16 @@ ${S.det&&NEW_DEMAND(S.det.route)?execSpec():`1. "description": the SERVICE DESCR
    Never copy the user's raw wording such as "I don't know" or typos. Use only what the conversation supports; leave a field "" (or []) when there is nothing to say. Never invent facts.
    For a simple catalogue order, fill only name, summary and, if given, problem.`}
 2. "brd": the BUSINESS REQUIREMENTS DOCUMENT content, complete enough for the sourcing, risk and contract teams to work from without asking again. Here all captured details belong.
+${S.det&&NEW_DEMAND(S.det.route)?`   For this new demand fill only requirements, milestones, evaluation, stakeholders and risk_and_compliance in "brd"; the rest goes into "detail".
+3. "detail": the DETAILED SERVICE DESCRIPTION for the sourcing request and contract input. Keys (string, or array of short strings): purpose, scope_in, scope_out, our_deps, assumptions, delivery, timeline,
+   deliverables, acceptance, acceptance_test, service_levels, kpis, tools, qualifications, volumes, access, gov_meetings, reporting, change_mgmt, escalation, supplier_docs, open_points.
+   Writing rules: describe what the third-party Service Provider provides; use "The Service Provider shall ..." for provider obligations (scope_in) and "The organisation shall ..." only for confirmed dependencies;
+   say clearly which party is responsible; no vague wording such as "reasonable efforts", "as required" or "support as needed"; write abbreviations in full the first time;
+   separate confirmed information from assumptions and open points; write "To be determined" where something is unknown and list it in open_points; never invent service levels, access, legal terms or materiality outcomes;
+   do not include intellectual property terms (flag them for Legal review if the user raised them). Captured details (dates, locations, access) belong here.
+4. "compact": a compact sourcing request description in one paragraph (what the provider provides, purpose, key deliverables, timeline and location, access or technology, service levels or acceptance, important open points). No artificial limit, but concise. Do not cut sentences.
+5. "short500": a very short version of at most 500 characters keeping the nature of the service, its purpose and key access information.
+6. "l4_final": re-check the Level 4 classification against the full description: {"code":"one code from the list","match":0-100,"reason":"short plain reason","uncertainty":""}.`:""}
 Rules for the brd: use every fact and detail from the conversation. Never invent names, numbers or dates. Where something important is unknown, put it in open_points.
 Money: the currency is ${CONFIG.currency} (€). Quote the value exactly as given in value_display. Never recalculate or re-estimate amounts.
 Do not use internal labels such as "contingent labour" or category ids; use plain words. Do not rate the overall risk level yourself; describe the facts.
@@ -1668,6 +2090,8 @@ Return JSON only:
   "timeline":"","location":"","volumes":"","service_levels":[""],"supplier_requirements":[""],"risk_and_compliance":[""],
   "commercials":[""],"evaluation":[{"criterion":"","weight":"40%"}],"stakeholders":[{"role":"","who":""}],
   "assumptions":[""],"dependencies":[""],"open_points":[""]},
+ ${S.det&&NEW_DEMAND(S.det.route)?`"detail":{"purpose":"","scope_in":[""],"scope_out":[""],"our_deps":[""],"assumptions":[""],"delivery":"","timeline":"","deliverables":[""],"acceptance":"","acceptance_test":"","service_levels":[""],"kpis":[""],"tools":[""],"qualifications":"","volumes":"","access":[""],"gov_meetings":"","reporting":"","change_mgmt":"","escalation":"","supplier_docs":"","open_points":[""]},
+ "compact":"","short500":"","l4_final":{"code":"","match":0,"reason":"","uncertainty":""},`:""}
  "quality_remarks":["at most 3 short remarks a buyer would raise: gaps, inconsistencies or risks in this request; empty if none"]}`;
 
 const nonEmpty = v => Array.isArray(v) ? v.filter(x=>x&&(typeof x!=="object"||Object.values(x).some(Boolean))).length>0 : !!(v&&String(v).trim());
@@ -1690,6 +2114,8 @@ async function buildDoc(cid=S.cid){
       const convo=S.msgs.filter(m=>!m.kind).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
       const docMsg=[{role:"user",content:`Conversation:\n${convo}\n\nFacts: ${JSON.stringify({...cleanFacts(), value_display: known(S.f.value)?money(Number(S.f.value))+(S.f.value_is_estimate?" (estimate)":""):"unknown"})}\nCategory: ${catById(S.f.category).name}\n`+
         `ICT service (DORA): ${cl.ict?cl.ict.text:"not assessed"}\nOutsourcing: ${cl.out?cl.out.text:"not assessed"}\n`+
+        (NEW_DEMAND(S.det.route)?`Critical or important function: ${isImportant(S.f)?"may apply (flag only)":"no indication"}\nLegal entity: ${(entityById(S.f.entity)||{}).name||"to be determined"}\nDerived facts checked by the requester: ${givenText(S.f.confirm_derived)||"no"}\n`+
+          `Initial Level 4 classification: ${(S.l4Initial||[]).map(x=>`${x.code} ${x.name} (${x.match}%)`).join("; ")}\nLevel 4 list: ${L4.map(e=>`${e.code} ${e.name}: ${e.desc}`).join(" | ")}\n`:"")+
         `Recommended route: ${CHANNELS[S.det.route].name}. ${S.det.why}\nChecks triggered: ${S.det.controls.map(c=>c[1]).join(", ")||"none"}\nExisting contract: ${S.det.contract?`${S.det.contract.title} with ${S.det.contract.supplier}`:"none"}\nPreferred suppliers: ${(PREFERRED[S.f.category]||[]).join(", ")||"none"}`}];
       for(let attempt=0; attempt<2; attempt++){
         try{ ai=await callLLM(DOC_SYSTEM(),docMsg); } catch(e){ if(attempt) throw e; ai=null; }
@@ -1701,7 +2127,13 @@ async function buildDoc(cid=S.cid){
     }catch(e){ if(e instanceof Stale) throw e; guard(cid); ai=null; S.msgs.push({role:"assistant",kind:"sys",text:"The AI couldn't write the documents just now, so they are built from your answers."}); }
   }
   const name=ai&&ai.description&&scrubText(String(ai.description.name||"")).replace(/\.$/,"");
-  S.sd = {title:(name&&words(name)<=8?name:"")||base.title, desc:mergeDesc(desc0, ai&&ai.description), brd:mergeBRD(offlineBRD(base.risk), ai&&ai.brd), _ai:!!ai, _date:new Date()};
+  S.sd = {title:(name&&words(name)<=8?name:"")||(NEW_DEMAND(S.det.route)?workingTitle():"")||base.title, desc:mergeDesc(desc0, ai&&ai.description), brd:mergeBRD(offlineBRD(base.risk), ai&&ai.brd), _ai:!!ai, _date:new Date()};
+  if(NEW_DEMAND(S.det.route)){
+    S.sd.detail = mergeDetail(offlineDetail(S.sd.brd), ai&&ai.detail);
+    S.sd.compact = ai&&typeof ai.compact==="string"&&words(ai.compact)>=25 ? ai.compact.trim() : offlineCompact();
+    S.sd.short500 = clampChars(ai&&typeof ai.short500==="string"&&words(ai.short500)>=10 ? ai.short500 : offlineShort(), 500);
+    S.sd.l4Final = finalL4(ai&&ai.l4_final);
+  }
   S.quality = computeQuality(ai&&Array.isArray(ai.quality_remarks)?ai.quality_remarks:[]);
   S.docKey=key; S.brdEdited=null;
   S.msgs.push({role:"assistant",kind:"sd"});
@@ -1745,7 +2177,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&
 const md=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
 const money=v=>v==null?"Unknown":new Intl.NumberFormat("en-GB",{style:"currency",currency:CONFIG.currency,maximumFractionDigits:0}).format(v);
 const fmtDate=d=>{const x=new Date(d);return isNaN(x)?d:x.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});};
-const show=(k,v)=>v===true?"Yes":v===false?"No":v==="unsure"?"Not sure":k==="value"?money(Number(v))+(S.f.value_is_estimate?" (est.)":""):["quantity","headcount"].includes(k)?fmtN(v):cap1(String(v));
+const show=(k,v)=>isTBD(v)?"To be determined":k==="entity"&&entityById(v)?entityById(v).name:k==="l4"&&l4ByCode(v)?`${l4ByCode(v).name} (${v})`:v===true?"Yes":v===false?"No":v==="unsure"?"Not sure":k==="value"?money(Number(v))+(S.f.value_is_estimate?" (est.)":""):["quantity","headcount"].includes(k)?fmtN(v):cap1(String(v));
 
 const TRIES=[
   ["Catalogue","We need 15 laptops for new joiners in Frankfurt."],
@@ -1798,6 +2230,7 @@ function recapHTML(m, expanded){
 function msgHTML(m,i,lastRec,lastSd){
   if(m.role==="user") return `<div class="m u"><div class="ucol"><div class="bub">${esc(m.text)}</div>${m.score?`<div class="ascore s${m.score>=8?"hi":m.score>=5?"mid":"lo"}">Answer quality ${m.score}/10</div>`:""}</div></div>`;
   if(m.kind==="sys") return `<div class="sys">${esc(m.text)}</div>`;
+  if(m.kind==="class"){ const r=S.l4Initial||[]; return `<div class="m a"><div class="av">G</div><div class="classcard"><div class="ch">Category (Level 4), initial</div>${r.map(x=>`<div class="cr"><b>${esc(x.name)}</b> <span class="cc">${esc(x.code)}</span> <span class="cm">${x.match}% match</span><div class="cx">${esc(x.reason)}${x.uncertainty?` <i>${esc(x.uncertainty)}</i>`:""}</div></div>`).join("")}<div class="cf">Based on your first message. I'll check it again at the end; if it's wrong, just tell me.</div></div></div>`; }
   if(m.kind==="stage"){ const st=stageById(m.stage); return `<div class="stagemark"><span><b>Step ${m.idx} of ${m.total} · ${esc(st.name)}</b><br>${esc(st.intro)}</span></div>`; }
   if(m.kind==="recap"){ const lastRecap=S.msgs.map((x,j)=>x.kind==="recap"?j:-1).filter(j=>j>=0).pop(); return `<div class="m a"><div class="av">G</div>${recapHTML(m, i===lastRecap)}</div>`; }
   if(m.kind==="rec") return `<div class="m a"><div class="av">G</div><div class="wide">${i===lastRec?recHTML(m.rec):`<div class="card old">Earlier recommendation: ${esc(CHANNELS[m.rec.route].name)}. Updated below.</div>`}</div></div>`;
@@ -1844,11 +2277,20 @@ function sdHTML(){
   return `<div class="card sd"><div class="sd-h"><small>Service description · click the text to edit</small><div class="t" contenteditable data-sd="title">${esc(d.title||"Untitled")}</div></div>
     <div class="sec desc">${descHTML(true)}</div>
     <div class="sec record"><h4>Captured for procurement <span class="muted">not part of the description</span></h4><div class="kvg">${rec.map(([k,v])=>`<span>${esc(k)}</span><span>${esc(v)}</span>`).join("")}</div></div>
+    ${d.detail?`<div class="sec srq"><h4>Sourcing request text</h4><p class="cmp">${esc(d.compact)}</p>
+      <div class="shortv"><span class="muted">Short version, ${d.short500.length} of 500 characters</span><p>${esc(d.short500)}</p></div>
+      <div class="cpy"><button class="lnk" data-act="copycompact">Copy sourcing text</button><button class="lnk" data-act="copyshort">Copy short version</button></div></div>`:""}
     ${qualityHTML()}
-    <div class="sec brdlink"><div><b>Business requirements document</b><br><span class="muted">${n} requirements, risk and compliance, commercial terms, evaluation, approvals${S.sd._ai?"":" · built from your answers"}</span></div>
+    ${d.detail?sectionSummaryHTML():""}
+    <div class="sec brdlink"><div><b>${d.detail?"Detailed service description":"Business requirements document"}</b><br><span class="muted">${d.detail?`25 sections, ${n} obligations, outsourcing and ICT determination, sourcing attributes, quality check by section`:`${n} requirements, risk and compliance, commercial terms, evaluation, approvals`}${S.sd._ai?"":" · built from your answers"}</span></div>
       <button class="btn btn-a" data-act="brd">Open document</button></div>
     <div class="acts">${S.submitted?`<span class="muted">Submitted as <b>${esc(S.submitted)}</b></span>`:`<button class="btn btn-p" data-act="submit">Looks right, submit</button>`}
       <button class="lnk" data-act="copy">Copy description</button><span class="muted">Something to change? Just tell me.</span></div></div>`;
+}
+function sectionSummaryHTML(){
+  const R=sectionQuality(), c=st=>R.filter(r=>r.status===st).length, bad=R.filter(r=>["Partial","To be determined","Risk"].includes(r.status));
+  return `<div class="sec qsec"><h4>Quality check by section</h4><div class="qcounts"><span class="qc ok">${c("Complete")} complete</span><span class="qc pa">${c("Partial")} partial</span><span class="qc tb">${c("To be determined")} to be determined</span><span class="qc rk">${c("Risk")} risk</span><span class="qc na">${c("Not applicable")} not applicable</span></div>
+    ${bad.length?`<ul class="qlist">${bad.slice(0,6).map(r=>`<li class="${r.status==="Risk"?"warn":"info"}"><b>${esc(r.sec)}</b>: ${esc(r.issue||r.status)}${r.fix?`. ${esc(r.fix)}`:""}</li>`).join("")}</ul>`:""}</div>`;
 }
 function qualityHTML(){
   const q=S.quality; if(!q) return "";
@@ -1864,6 +2306,8 @@ function sdText(){ const d=S.sd.desc||{};
 
 /* ---------- business requirements document ---------- */
 const DOC_CSS=`.brd{font-family:Inter,Arial,sans-serif;color:#141b2d;font-size:13.5px;line-height:1.55}
+.brd h3.dsec{font-size:13.5px;color:#0f2147;margin:16px 0 4px}.brd .tbd{color:#8a5d00;font-style:italic}
+.brd .st-Complete{color:#1d6b43;font-weight:600}.brd .st-Partial{color:#8a5d00;font-weight:600}.brd .st-Tobedetermined{color:#3c4a6b;font-weight:600}.brd .st-Risk{color:#b42318;font-weight:600}.brd .st-Notapplicable{color:#7c859e}
 .brd h1{font-family:"Inter Tight",Arial,sans-serif;font-size:24px;margin:0 0 2px;color:#0f2147}
 .brd .kicker{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a5d00;font-weight:700}
 .brd h2{font-family:"Inter Tight",Arial,sans-serif;font-size:15.5px;color:#0f2147;margin:26px 0 8px;padding-bottom:5px;border-bottom:2px solid #f2a900}
@@ -1880,6 +2324,7 @@ const DOC_CSS=`.brd{font-family:Inter,Arial,sans-serif;color:#141b2d;font-size:1
 .brd .small{font-size:12px;color:#7c859e}.brd .conv p{margin:0 0 5px}.brd .conv b{color:#0f2147}`;
 
 function brdHTML(){
+  if(S.sd.detail) return detailHTML();
   const d=S.sd, B=d.brd, f=S.f, D=S.det, route=S.override||D.route, ch=CHANNELS[route];
   const L=a=>(a||[]).filter(Boolean), ul=a=>L(a).length?`<ul>${L(a).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:"";
   let n=0; const H=t=>`<h2>${++n}. ${t}</h2>`;
@@ -1916,10 +2361,54 @@ function brdHTML(){
   <h2>Appendix B. Intake conversation</h2><div class="conv small">${convo}</div>
   </div>`;
 }
+function detailHTML(){
+  const d=S.sd, X=d.detail, B=d.brd, f=S.f, D=S.det, route=S.override||D.route, ch=CHANNELS[route], cl=classify(f), o=cl.o, fin=d.l4Final||{}, ini=(S.l4Initial||[])[0];
+  const L=a=>[].concat(a||[]).filter(Boolean), val=v=>{ const a=L(v); if(!a.length) return `<p class="tbd">To be determined</p>`; return a.length>1?`<ul>${a.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<p>${esc(a[0])}</p>`; };
+  const date=(d._date?new Date(d._date):new Date()).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"});
+  const kv=rows=>`<table class="kv">${rows.filter(r=>r&&r[1]!==undefined&&r[1]!==null&&r[1]!=="").map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}</table>`;
+  const qual=`<h3>Category (Level 4)</h3>${kv([["Initial classification",ini?`${ini.name} (${ini.code}), ${ini.match}% match`:"—"],["Final classification",fin.code?`${fin.name} (${fin.code})${fin.match?`, ${fin.match}% match`:""}`:"—"],["Reasoning",fin.reason],["Uncertainty",fin.uncertainty||"None noted"]])}
+    <h3>Information and communication technology</h3><p>${esc(cl.ict?cl.ict.text:"To be determined.")}</p>
+    <h3>Critical or important function</h3><p>${isImportant(f)?"May apply, based on the impact described. Flagged for the outsourcing and materiality review; not a final decision.":"Nothing in the answers indicates a critical or important function. To be confirmed in the review."}</p>
+    <h3>Outsourcing determination</h3>${kv([["Legal entity",o.entity?`${o.entity.name}, ${o.entity.country}`:"To be determined"],["Regulator",o.fw?o.fw.regulator:"To be determined"],["Applicable instrument",o.fw?o.fw.instrument:"To be determined"],
+      ["Result",o.result],["Based on",o.reasons.join(" ")],["Checked by the requester",givenText(f.confirm_derived)||"No"],["Rule set",RULESET_VERSION],["Regulatory change watch",o.fw&&o.fw.watch?o.fw.watch:"None recorded"]])}
+    <p class="small">This is a flag for the outsourcing review, not a final determination. The test applied is the one for the legal entity's jurisdiction; a third-party arrangement is not treated as outsourcing by default.</p>
+    <h3>Materiality</h3><p>Materiality cannot be finally determined from this intake alone. The captured attributes are input to the applicable materiality determination process.</p>`;
+  const sections={title:`<p><b>${esc(d.title)}</b></p>`, purpose:val(X.purpose), qualification:qual,
+    scope:`<div class="two"><div><h3>In scope</h3>${val(X.scope_in)}</div><div><h3>Out of scope</h3>${val(X.scope_out)}</div></div>`,
+    obligations: L(B.requirements).length?`<table><tr><th style="width:62px">ID</th><th style="width:110px">Type</th><th>Obligation</th><th style="width:70px">Priority</th></tr>${B.requirements.map(r=>`<tr><td>${esc(r.id)}</td><td>${esc(r.type)}</td><td>${esc(String(r.text).replace(/^The supplier shall/i,"The Service Provider shall"))}</td><td class="pri-${esc(r.priority)}">${esc(r.priority)}</td></tr>`).join("")}</table>`:val([]),
+    open_points: val(X.open_points)};
+  const body=DETAIL_SECTIONS.map(([k,t],i)=>`<h3 class="dsec">${i+1}. ${esc(t)}</h3>${sections[k]!==undefined?sections[k]:val(X[k])}`).join("");
+  const attrs=sourcingAttributes().map(([g,rows])=>`<h3>${esc(g)}</h3>${kv(rows)}`).join("");
+  const a=accessFlags(f);
+  const mat=`<ul>${[`Information and communication technology: ${cl.ict?cl.ict.flag:"To be determined"}`,`Critical or important function: ${isImportant(f)?"may apply":"no indication"}`,`Outsourcing: ${o.result}${o.fw?` (${o.fw.short})`:""}`,
+    `Data, system, money and account access: ${a.any?(givenText(f.data_details)||"yes"):f.personal_data===false?"none":"to be determined"}${a.money?" (money or accounts)":""}`,`Location and cross-border: ${givenText(f.location)||"to be determined"}${(yes(f.offshore)||/offshore|other country/i.test(f.location||""))?" (cross-border)":""}`,
+    `Estimated value: ${known(f.value)?money(Number(f.value))+(f.value_is_estimate?" (estimate)":""):"to be determined"}`,`Subcontracting: ${known(f.subcontracting)?show("subcontracting",f.subcontracting):"to be determined"}`,
+    `Known dependencies: ${L(X.our_deps).join("; ")||"none stated"}`,`Known assumptions: ${L(X.assumptions).join("; ")||"none stated"}`,`Open points: ${L(X.open_points).length}`].map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+    <p>Materiality cannot be finally determined from this intake alone. The captured attributes should be used as input to the applicable materiality determination process.</p>`;
+  const q=sectionQuality();
+  const qtab=`<table><tr><th style="width:30%">Section</th><th style="width:110px">Status</th><th>Issue or gap</th><th>Recommended improvement</th></tr>${q.map(r=>`<tr><td>${esc(r.sec)}</td><td class="st-${r.status.replace(/\s/g,"")}">${esc(r.status)}</td><td>${esc(r.issue)}</td><td>${esc(r.fix)}</td></tr>`).join("")}</table>`;
+  const facts=Object.entries(f).filter(([k,v])=>FACTS[k]&&known(v)&&!BUNDLES[k]&&k!=="ict_outsourcing").map(([k,v])=>`<tr><td>${esc(FACTS[k].label)}</td><td>${esc(show(k,v))}</td></tr>`).join("");
+  const convo=S.msgs.filter(m=>!m.kind).map(m=>`<p><b>${m.role==="user"?"Requester":"Intake assistant"}:</b> ${esc(m.text)}</p>`).join("");
+  return `<div class="brd">
+  <div class="kicker">Service description for approval to source</div><h1>${esc(d.title)}</h1>
+  ${kv([["Reference",S.submitted||"Draft, not yet submitted"],["Version and status",S.submitted?"1.0, submitted":"0.1, draft for review"],["Date",date],["Category (Level 4)",fin.code?`${fin.name} (${fin.code})`:"—"],["Buying route",`${ch.name}, typically ${ch.days} working days`],["Estimated value",known(f.value)?money(Number(f.value))+(f.value_is_estimate?" (estimate)":""):"To be determined"]])}
+  <h2>Part 1. Executive service description</h2><div class="lead">${descHTML(false)}</div>
+  <h2>Part 2. Detailed service description</h2>${body}
+  <h2>Part 3. Structured sourcing input attributes</h2>${attrs}
+  <h2>Part 4. Materiality and governance input summary</h2>${mat}
+  <h2>Part 5. Compact sourcing request description</h2><div class="lead"><p>${esc(d.compact)}</p></div>
+  <h3>Optional very short description (500 characters or fewer)</h3><p>${esc(d.short500)}</p>
+  <h2>Part 6. Service description quality check</h2><p><b>${esc(S.quality?S.quality.rating:"")}</b>${S.quality?`, ${S.quality.score}/100`:""}.</p>${qtab}
+  <h2>Part 7. Level 4 classification, final validation</h2>${kv([["Final",fin.code?`${fin.name} (${fin.code})${fin.match?`, ${fin.match}% match`:""}`:"—"],["Reasoning",fin.reason],["Remaining uncertainty",fin.uncertainty||"None noted"]])}
+  <p><b>${fin.changed?"The Level 4 classification has changed due to refined scope.":"The initial Level 4 classification is confirmed."}</b>${fin.changed?` Initial: ${esc(fin.from.name)} (${esc(fin.from.code)}). Final: ${esc(fin.name)} (${esc(fin.code)}). ${esc(fin.why)}`:""}</p>
+  <h2>Appendix A. Details captured in the intake</h2><table class="kv">${facts}</table>
+  <h2>Appendix B. Intake conversation</h2><div class="conv small">${convo}</div>
+  </div>`;
+}
 function openBRD(){
   const html = S.brdEdited || brdHTML();
   $("#docRoot").innerHTML=`<div class="docwrap"><div class="doctools">
-      <b>Business requirements document</b><span class="muted hide-sm">Click any text to edit</span><span class="sp"></span>
+      <b>${S.sd.detail?"Service description":"Business requirements document"}</b><span class="muted hide-sm">Click any text to edit</span><span class="sp"></span>
       <button class="btn btn-g" data-doc="print">Print or save as PDF</button><button class="btn btn-g" data-doc="word">Download Word</button>
       <button class="btn btn-g hide-sm" data-doc="json">JSON</button><button class="btn btn-p" data-doc="close">Close</button></div>
     <div class="paper" id="paper" contenteditable="true" spellcheck="false">${html}</div></div>`;
@@ -1946,6 +2435,8 @@ function bind(){
     if(a==="submit") submit(); if(a==="json") download(); if(a==="brd") openBRD();
     if(a==="more"){ S.showMore=!S.showMore; render(); }
     if(a==="copy") navigator.clipboard?.writeText(sdText()).then(()=>b.textContent="Copied");
+    if(a==="copycompact") navigator.clipboard?.writeText(S.sd.compact||"").then(()=>b.textContent="Copied");
+    if(a==="copyshort") navigator.clipboard?.writeText(S.sd.short500||"").then(()=>b.textContent="Copied");
   });
   document.querySelectorAll("[data-sd]").forEach(el=>el.addEventListener("blur",()=>{const k=el.dataset.sd; S.sd[k]=el.textContent.trim(); S.brdEdited=null;}));
   document.querySelectorAll("[data-sec]").forEach(el=>el.addEventListener("blur",()=>{const k=el.dataset.sec, d=S.sd.desc;

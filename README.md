@@ -57,3 +57,23 @@ An answer that has nothing to do with the question (a recipe, a joke) is caught 
 New demand gets the format of an executive service description: a headline (name, tagline and 50–100 words), an executive description of 150–250 words and a service summary table (service name, target audience, supported functions, business problem solved, key capabilities, key benefits, unique selling points, KPIs / success measures, regulatory / governance benefits). Business-led demand gets the same parts, shorter. Catalogue orders and call-offs keep a short description.
 
 For the profile points (audience, functions, benefits, unique selling points, KPIs, regulatory benefits) the chat suggests an answer tailored to the request; the user accepts it in one tap or changes it. Above the threshold each point is a separate question, below it they are bundled into one. Each answer gets a small score (for example "Answer quality 9/10").
+
+## New demand: guided service description (front door + sourcing intake)
+
+New demand combines the front door with a tiered version of a detailed service-description intake:
+
+1. **Your need**: what, value, duration, and whether technology is involved (only if the rules can't tell). The first message is classified against a Level 4 category list (mock) with match % and reasoning.
+2. **Purpose and profile**: problem and impact of delay, audience and functions (suggested), today's solution and why external, unique selling points, benefits and regulatory benefits (suggested).
+3. **Scope and deliverables**: what the provider does (played back as "The Service Provider shall…"), out of scope (suggested), acceptance and sign-off (suggested), staff qualifications, volumes.
+4. **Running the service** (ongoing services): service levels and KPIs, support model and tools (technology only), governance, reporting, change and escalation (suggested standard pack).
+5. **Timing and delivery**, 6. **Budget and supplier** (plus supplier standard terms if a supplier is named).
+7. **Data and classification**: data, system, money and account access; legal entity, technology and "done by our teams today" only when unclear; dependencies and assumptions; anything else.
+8. **Check**: everything the rules worked out (category, entity, ongoing or one-off, done in-house, technology, possible critical or important function, access, offshoring) is shown in plain words with what it means. The user confirms or corrects it in their own words.
+
+Below the threshold (business-led) the same flow is lighter. Any question can be skipped ("To be determined").
+
+**Outsourcing** is determined per legal entity: entity → regulator → instrument → that instrument's test → confirmed facts → result with reasons. The rule matrix (EBA/GL/2019/02, PRA SS2/21, MAS Notice 658, HKMA SA-2, APRA CPS 230, OSFI B-10, US Interagency Guidance 2023) and the change watch are data in the code and must be replaced with the organisation's own entity-to-regulator matrix. Results are flags for the outsourcing review, never final determinations. ICT (DORA) is a separate flag.
+
+**Outputs** for new demand: executive service description; detailed service description (25 sections); structured sourcing input attributes; materiality and governance input summary (materiality always "to be determined"); compact sourcing request text and a version of 500 characters or less; quality check by section; final Level 4 validation.
+
+All entities, categories and suppliers in the code are mock data.
