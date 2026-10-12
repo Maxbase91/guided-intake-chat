@@ -954,7 +954,9 @@ async function handleTurn(text, cid){
     let msg;
     if(isSug(next)){
       const sg = aiAskedOk && aiSuggestion ? normSuggestion(aiSuggestion) : "";
-      if(sg && words(sg)>=3){ S.suggest[next]=sg; msg = reply.includes(sg.split("\n")[0].slice(0,40)) ? reply : `${reply}\n\nMy suggestion:\n${sg}`; }
+      if(sg && words(sg)>=3){ S.suggest[next]=sg;
+        const ack=(String(reply||"").split(/(?<=[.!?])\s+/)[0]||"").trim(), useAck=ack && !/suggest|\?/i.test(ack) && words(ack)<=25;
+        msg=`${useAck?ack+" ":""}${FACTS[next].q(S.f)}\n\nMy suggestion, based on what you told me:\n${next==="profile"?sg:sg.replace(/\.?$/,".")}\n\nUse it as it is, or tell me what to change.`; }
       else { delete S.suggest[next]; msg=offlineQuestion(next, prevRoute, stageChanged); }
     } else msg = aiAskedOk ? reply : offlineQuestion(next, prevRoute, stageChanged);
     S.msgs.push({role:"assistant",text:msg});
@@ -1684,11 +1686,16 @@ async function buildDoc(cid=S.cid){
   if(aiReady()){
     try{
       const convo=S.msgs.filter(m=>!m.kind).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
-      ai=await callLLM(DOC_SYSTEM(),[{role:"user",content:`Conversation:\n${convo}\n\nFacts: ${JSON.stringify({...cleanFacts(), value_display: known(S.f.value)?money(Number(S.f.value))+(S.f.value_is_estimate?" (estimate)":""):"unknown"})}\nCategory: ${catById(S.f.category).name}\n`+
+      const docMsg=[{role:"user",content:`Conversation:\n${convo}\n\nFacts: ${JSON.stringify({...cleanFacts(), value_display: known(S.f.value)?money(Number(S.f.value))+(S.f.value_is_estimate?" (estimate)":""):"unknown"})}\nCategory: ${catById(S.f.category).name}\n`+
         `ICT service (DORA): ${cl.ict?cl.ict.text:"not assessed"}\nOutsourcing: ${cl.out?cl.out.text:"not assessed"}\n`+
-        `Recommended route: ${CHANNELS[S.det.route].name}. ${S.det.why}\nChecks triggered: ${S.det.controls.map(c=>c[1]).join(", ")||"none"}\nExisting contract: ${S.det.contract?`${S.det.contract.title} with ${S.det.contract.supplier}`:"none"}\nPreferred suppliers: ${(PREFERRED[S.f.category]||[]).join(", ")||"none"}`}]);
-      guard(cid);
-      if(!ai || !ai.description || typeof ai.description!=="object") throw new Error("empty");
+        `Recommended route: ${CHANNELS[S.det.route].name}. ${S.det.why}\nChecks triggered: ${S.det.controls.map(c=>c[1]).join(", ")||"none"}\nExisting contract: ${S.det.contract?`${S.det.contract.title} with ${S.det.contract.supplier}`:"none"}\nPreferred suppliers: ${(PREFERRED[S.f.category]||[]).join(", ")||"none"}`}];
+      for(let attempt=0; attempt<2; attempt++){
+        try{ ai=await callLLM(DOC_SYSTEM(),docMsg); } catch(e){ if(attempt) throw e; ai=null; }
+        guard(cid);
+        if(ai && ai.description && typeof ai.description==="object") break;
+        ai=null;
+      }
+      if(!ai) throw new Error("empty");
     }catch(e){ if(e instanceof Stale) throw e; guard(cid); ai=null; S.msgs.push({role:"assistant",kind:"sys",text:"The AI couldn't write the documents just now, so they are built from your answers."}); }
   }
   const name=ai&&ai.description&&scrubText(String(ai.description.name||"")).replace(/\.$/,"");

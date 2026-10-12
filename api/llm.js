@@ -74,7 +74,7 @@ async function callGemini(system, history, model) {
       contents: history.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
       generationConfig: {
         temperature: 0.3,
-        responseMimeType: "application/json",
+        responseMimeType: "application/json", maxOutputTokens: 8192,
         ...(/flash/i.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
       },
     }),
@@ -118,7 +118,7 @@ async function callGroqWith(model, system, history, opts = {}) {
     body: JSON.stringify({
       model,
       temperature: 0.3,
-      max_tokens: 4000,
+      max_tokens: 8000,
       ...(opts.noJson ? {} : { response_format: { type: "json_object" } }),
       ...extra,
       messages: [{ role: "system", content: system }, ...history.map((m) => ({ role: m.role, content: m.content }))],
@@ -180,7 +180,7 @@ async function callMistralWith(model, system, history, jsonMode = true) {
     signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.MISTRAL_API_KEY}` },
     body: JSON.stringify({
-      model, temperature: 0.3, max_tokens: 4000,
+      model, temperature: 0.3, max_tokens: 8000,
       ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
       messages: [{ role: "system", content: system }, ...history.map((m) => ({ role: m.role, content: m.content }))],
     }),
