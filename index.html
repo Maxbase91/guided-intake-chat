@@ -294,7 +294,7 @@ const CONFIG = {
 const CATEGORIES = [
   {id:"it-hardware", name:"IT hardware",                   type:"goods",    kw:["laptop","notebook","monitor","headset","keyboard","printer","hardware","docking","screen","smartphone"]},
   {id:"software",    name:"Software and SaaS",             type:"software", kw:["licence","license","software","saas","subscription","seats","system","platform","tool","orchestrat","workflow","portal","automation","agentic","entry point"]},
-  {id:"it-services", name:"IT services and development",   type:"services", kw:["develop","implementation","integration","migration","testing","build an app"]},
+  {id:"it-services", name:"IT services and development",   type:"services", kw:["develop","implementation","integration","migration","testing","build an app","service desk","help desk","helpdesk","managed it"]},
   {id:"cloud",       name:"Cloud and hosting",             type:"services", kw:["cloud","hosting","aws","azure","data centre"]},
   {id:"consulting",  name:"Management consulting",         type:"services", kw:["consult","advisory","strategy","redesign","transformation","assessment","operating model"]},
   {id:"legal",       name:"Legal services",                type:"services", kw:["legal","lawyer","counsel","litigation","law firm"]},
@@ -304,7 +304,7 @@ const CATEGORIES = [
   {id:"market-data", name:"Market data",                   type:"software", kw:["market data","data feed","terminal","ratings data"]},
   {id:"training",    name:"Training and learning",         type:"services", kw:["training","course","workshop","coaching","certification"]},
   {id:"office",      name:"Office supplies and furniture", type:"goods",    kw:["paper","stationery","toner","chair","desk","supplies","furniture"]},
-  {id:"bpo",         name:"Business process services",    type:"services", kw:["invoice processing","accounts payable","payroll service","payroll processing","back office","call centre","contact centre","kyc operations","process our","processing of","claims handling","document processing"]},
+  {id:"bpo",         name:"Business process services",    type:"services", kw:["kyc","client onboarding","periodic review","financial crime","sanctions screening","transaction monitoring","payments operations","payment processing","reconciliation","settlement operations","invoice processing","accounts payable","payroll service","payroll processing","back office","call centre","contact centre","kyc operations","process our","processing of","claims handling","document processing"]},
   {id:"telecom",     name:"Telecom",                       type:"services", kw:["mobile contract","telecom","network","sim card","connectivity"]}
 ];
 const DEMAND_TYPES = {goods:"Goods", services:"Services", software:"Software", contingent_labour:"External workers"};
@@ -340,7 +340,7 @@ const L4 = [
   {code:"L4-1201", name:"Software licences (installed)", cat:"software", kw:["licence","license","on-premise","installed","perpetual"], desc:"Licences for software installed and run by us."},
   {code:"L4-1202", name:"Software as a service", cat:"software", kw:["saas","cloud-based","subscription","platform","tool","workflow","portal","system","orchestrat","hosted"], desc:"Business applications the provider hosts and runs, used by us over the internet."},
   {code:"L4-1301", name:"Application development and maintenance", cat:"it-services", kw:["develop","build","implementation","integration","migration","testing","maintenance","enhancement","bug"], desc:"Building, changing, testing and maintaining software for us."},
-  {code:"L4-1302", name:"IT managed services and service desk", cat:"it-services", kw:["managed service","service desk","help desk","helpdesk","operations","run and maintain","monitoring"], desc:"Running and supporting IT systems or a service desk for us on an ongoing basis."},
+  {code:"L4-1302", name:"IT managed services and service desk", cat:"it-services", kw:["managed it service","it managed service","service desk","help desk","helpdesk","it operations","run and maintain","monitoring"], desc:"Running and supporting IT systems or a service desk for us on an ongoing basis."},
   {code:"L4-1401", name:"Cloud infrastructure and hosting", cat:"cloud", kw:["cloud","hosting","aws","azure","data centre","server","storage","iaas","paas"], desc:"Computing, storage and hosting capacity provided by the provider."},
   {code:"L4-1501", name:"Telecom and network services", cat:"telecom", kw:["mobile","telecom","network","sim","connectivity","lines"], desc:"Mobile, fixed-line and network connectivity services."},
   {code:"L4-1601", name:"Market data and research", cat:"market-data", kw:["market data","data feed","terminal","ratings","research","prices"], desc:"Market prices, reference data, ratings and research delivered as a feed or terminal."},
@@ -352,6 +352,8 @@ const L4 = [
   {code:"L4-2501", name:"Facility management, cleaning and catering", cat:"facilities", kw:["cleaning","facility","facilities","maintenance of","catering","security guard","office move"], desc:"Cleaning, catering, building maintenance and other facility services."},
   {code:"L4-2601", name:"Office supplies and furniture", cat:"office", kw:["stationery","paper","toner","chair","desk","furniture","supplies"], desc:"Office supplies, furniture and consumables."},
   {code:"L4-2701", name:"Contingent workforce and contractors", cat:"contingent", kw:["contractor","temporary","freelance","interim","day rate","developer","consultant"], desc:"External individuals working under our direction for a period."},
+  {code:"L4-2802", name:"Financial crime and KYC operations", cat:"bpo", kw:["kyc","know your customer","client onboarding","due diligence","periodic review","aml","anti-money","financial crime","sanctions screening","transaction monitoring"], desc:"Know-your-customer, client due diligence, screening and monitoring work run by a provider for the bank."},
+  {code:"L4-2803", name:"Payments and banking operations", cat:"bpo", kw:["payments operations","payment processing","reconciliation","settlement","corporate actions","custody","swift"], desc:"Payment processing, settlements, reconciliations and other banking operations run by a provider."},
   {code:"L4-2801", name:"Business process services", cat:"bpo", kw:["invoice processing","accounts payable","payroll","back office","call centre","contact centre","kyc","claims","document processing","processing"], desc:"The provider runs a business process for us on an ongoing basis, such as invoice processing or payroll."}
 ];
 /* Legal entities (mock) and the regulatory rule set that decides "outsourcing or not" for each. Versioned; replace with the real entity-to-regulator matrix. */
@@ -414,7 +416,7 @@ const FACTS = {
   location:       {label:"Where and how",   q:f=>["goods","software"].includes(f.demand_type)?"Where should it be delivered?":"Where and how will the work be done?", ex:f=>["goods","software"].includes(f.demand_type)?"An office or building is enough.":"For example: \"remotely from the provider's offices in Poland\" or \"on our premises in London\".", choices:f=>["goods","software"].includes(f.demand_type)?null:["Remote","On our premises","At the provider's site","Offshore or another country"]},
   supplier:       {label:"Supplier",        q:f=>S.det&&S.det.route==="contract"&&S.det.contract&&!hasSupplier(f)?`We already have the ${S.det.contract.title} with ${S.det.contract.supplier} for this kind of work. Are you happy to use them?`:"Do you already have a supplier in mind?", ex:f=>S.det&&S.det.route==="contract"&&!hasSupplier(f)?"That's usually the quickest way, because no new competition is needed.":`It's fine to say no.${(PREFERRED[f.category]||[]).length?` Our preferred ones for this are ${PREFERRED[f.category].join(" and ")}.`:""}`, choices:f=>S.det&&S.det.route==="contract"&&!hasSupplier(f)?["Yes, use them","No, someone else"]:["No preference"]},
   supplier_reason:{label:"Why this supplier",q:f=>`Why ${f.supplier} in particular?`, ex:()=>"For example: they built the current system, or nobody else offers it.", why:()=>"Without a reason, a purchase this size needs competing offers."},
-  personal_data:  {label:"Data and system access", q:()=>"Will the provider see or access any of our or our clients' data, systems, money or accounts? If so, which, and with what access?", ex:()=>"For example: \"read access to employee names and salaries in our HR test system, stored in the EU\", or simply \"no access\".", choices:["No access","Not sure"]},
+  personal_data:  {label:"Data and system access", q:()=>"Will the provider see or access any of our or our clients' data, systems, money or accounts? If so, which, and with what access?", ex:f=>{ const d=bankDomain(f); return d&&d.personal ? `For example: "read access to ${d.personal} in our systems, stored in the EU", or simply "no access".` : "For example: \"read access to employee names and salaries in our HR test system, stored in the EU\", or simply \"no access\"."; }, choices:["No access","Not sure"]},
   tech_service:   {label:"Technology involved", q:()=>"Will the provider supply or run any technology for this, for example software, a system they host, IT support or data feeds?", ex:()=>"", choices:["Yes","No","Not sure"]},
   ict_outsourcing:{label:"Runs it for us",  q:()=>"Will the provider run something for us on an ongoing basis that we would otherwise do ourselves?", ex:()=>"", choices:["Yes","No","Not sure"]},
   // ---- scope, service and governance (new demand) ----
@@ -700,7 +702,7 @@ function importantHint(f){
   const m=t.match(/\b(clients?|customers?|payments?|regulat\w*|trading|settlement|staff (?:wouldn.?t|won.?t|would not|not) (?:get )?(?:be )?paid|payroll|outage|critical|audit findings?)\b/);
   return m ? m[1] : null;
 }
-const isImportant = f => known(f.important_fn) && !isTBD(f.important_fn) ? yes(f.important_fn) : !!importantHint(f);
+const isImportant = f => known(f.important_fn) && !isTBD(f.important_fn) ? yes(f.important_fn) : !!importantHint(f) || !!(bankDomain(f)||{}).important;
 // data, systems, money and account access, read from the answer
 function accessFlags(f){
   const t=[f.data_details, f.personal_data===true?"":"", userText()].join(" ").toLowerCase(), any=yes(f.personal_data)||yes(f.system_access);
@@ -844,7 +846,9 @@ function findIssue(changed){
     if(k==="personal_data" && f.personal_data===false){
       const m=ctx.match(/\b(hr system|hr platform|payroll|salar(?:y|ies)|employee (?:records|names|details)|customer (?:records|names|details|data)|client (?:records|names|details)|patients?|crm|recruit\w*|candidates?)\b/);
       const what=m ? m[1].replace(/\b(crm|hr)\b/g,x=>x.toUpperCase()) : "";
-      if(m) return {fact:k, issue:`"no personal data" although the request mentions ${what}`, message:`You said no personal data, but ${/^(CRM|HR)/.test(what)?"a "+what:what} usually involves names, contact details or salaries. Will the supplier see any of that?`, choices:["Yes","No, none at all"]};
+      const dm=!m&&bankDomain(f);
+      if(dm&&dm.personal) return {fact:k, issue:`"no personal data" although ${dm.name.toLowerCase()} usually involves personal data`, message:`You said no access, but ${dm.name} at a bank usually involves ${dm.personal}. Will the supplier see any of that?`, choices:["Yes","No, none at all"], flip:true};
+      if(m) return {fact:k, issue:`"no personal data" although the request mentions ${what}`, message:`You said no personal data, but ${/^(CRM|HR)/.test(what)?"a "+what:what} usually involves names, contact details or salaries. Will the supplier see any of that?`, choices:["Yes","No, none at all"], flip:true};
     }
     if(k==="tech_service" && f.tech_service===false && !("tech_service" in S.derived)){
       const m=userRaw().match(/\b(IT|ICT|software|system|platform|cloud|SaaS|hosting|data feed|application|digital)\b/i);
@@ -939,7 +943,8 @@ function parseJSON(t){ t=String(t||"").trim().replace(/^```(?:json)?/i,"").repla
 function chatSystem(){
   return `You are the intake assistant of a corporate procurement team. You talk with business colleagues who want to buy something.
 You only have a conversation. Fixed rules decide the buying route and which facts are needed. Each turn you get the current state, including the ordered list "still_needed".
-
+${BANK_CONTEXT}
+${S.f&&S.f.category?`Domain notes for this request (typical at a large bank; use them for suggestions, examples and sensible follow-ups):\n${domainNotes(S.f)}\n`:""}
 Your job each turn:
 1. Read the user's latest message and record EVERY fact it contains in "facts", for any key in the list below, not only the one you asked about.
    Business users often put many details into one message (budget, dates, place, data, supplier, success criteria). Capture all of them so they are never asked again. Use null for unknown. Never invent facts.
@@ -992,7 +997,7 @@ Level 4 list: ${L4.map(e=>`${e.code} ${e.name}`).join("; ")}. On the first messa
 If the user types "skip", record nothing for that item.
 At the check step (asking = confirm_derived) the user confirms or corrects facts the app worked out; record any correction (entity, ongoing, in_house, tech_service, important_fn, personal_data, title, l4) and reply briefly. Never decide outsourcing yourself.
 Suggested answers: items marked suggest=true in still_needed are answered by suggestion. When you ask one, put a concrete suggestion tailored to this request in "suggestion"
-(based only on what the user said; plain words, several points separated by semicolons), and in "reply" say briefly that this is your suggestion, show it, and ask whether it fits or what to change.
+(based on what the user said and on what is typical at a large international bank for this kind of service, using the domain notes; specific, not generic; never invent facts about this organisation; plain words, at most 4 points per line, separated by semicolons), and in "reply" say briefly that this is your suggestion, show it, and ask whether it fits or what to change.
 When an item has "lines", the suggestion must be exactly those lines, each "Label: text" on its own line, in that order.
 Never record a suggestion as a fact yourself; the app does that when the user accepts it. If the user changes a suggestion, record their version of that item.
 Combined questions: the "background" question also asks the impact of delay, so record background and impact_delay from that one answer.
@@ -1180,7 +1185,7 @@ async function afterChanges(done, cid, opts={}){
   }
   if(S.completed) S.completed=false;
   const next=S.missing[0];
-  askNext(next, msg+(next===asked?"\n\nBack to where we were:":""));
+  await askNext(next, msg+(next===asked?"\n\nBack to where we were:":""), cid);
 }
 // the end of the intake: write the description, recommend the route, offer improvements
 async function finishIntake(cid, lead){
@@ -1217,7 +1222,7 @@ async function handleTurn(text, cid, opts={}){
     if(/^(?:yes|yep|yeah|change it|please do|correct|do it)\b/i.test(tt)){
       S.msgs.push({role:"user",text:tt}); S.choices=[];
       const done=applyChanges(pc.changes);
-      if(done.length) await afterChanges(done, cid); else askNext(S.lastAsked||S.missing[0], "That's already what I have.\n\nBack to where we were:");
+      if(done.length) await afterChanges(done, cid); else await askNext(S.lastAsked||S.missing[0], "That's already what I have.\n\nBack to where we were:", cid);
       render(); return;
     }
     if(/^(?:no|nope|it'?s my answer|my answer)\b/i.test(tt)){ S.msgs.push({role:"user",text:tt}); return handleTurn(pc.text, cid, {noCorr:true, silent:true}); }
@@ -1235,7 +1240,7 @@ async function handleTurn(text, cid, opts={}){
       if(!corr.rest){
         S.msgs.push({role:"user",text}); S.choices=[];
         const done=applyChanges(corr.changes);
-        if(done.length) await afterChanges(done, cid); else askNext(S.lastAsked||S.missing[0], "That's already what I have.\n\nBack to where we were:");
+        if(done.length) await afterChanges(done, cid); else await askNext(S.lastAsked||S.missing[0], "That's already what I have.\n\nBack to where we were:", cid);
         render(); return;
       }
       // answer and correction in one message: apply the change, read the rest as the answer
@@ -1251,7 +1256,7 @@ async function handleTurn(text, cid, opts={}){
   // the user is answering a check we raised on an earlier answer
   const pend=S.pending; S.pending=null;
   const t=text.trim().toLowerCase();
-  const keepIt = pend && pend.kind!=="offtopic" && (/^(yes|yep|yeah|correct|that'?s (right|correct)|right|confirmed?|it is|keep( it)?( as it is)?|as i said|it'?s fixed|fixed|hard deadline|that'?s fine|fine)\b/.test(t) || /is right$/.test(t)) && !/\d/.test(t.replace(/^[^\d]*right/,"")) && words(text)<=6;
+  const keepIt = pend && pend.flip ? /^(no|nope|none|not)\b/.test(t) : pend && pend.kind!=="offtopic" && (/^(yes|yep|yeah|correct|that'?s (right|correct)|right|confirmed?|it is|keep( it)?( as it is)?|as i said|it'?s fixed|fixed|hard deadline|that'?s fine|fine)\b/.test(t) || /is right$/.test(t)) && !/\d/.test(t.replace(/^[^\d]*right/,"")) && words(text)<=6;
   if(pend && !keepIt && pend.kind!=="date") S.f[pend.fact]=null;
   let reply=null, choices=[], complete=false, note=null, aiAsking=null, aiCheck=null, aiSuggestion=null, aiScore=null;
   if(aiReady()){
@@ -1346,7 +1351,7 @@ async function handleTurn(text, cid, opts={}){
   if(!issue && !pend && !skipped && asked && TIPS[asked] && um.score!=null && um.score<=CONFIG.thresholds.answerTip && !S.thinChecked[asked] && S.thinCount<3 && S.det && NEW_DEMAND(S.det.route) && givenText(S.f[asked])) issue=thinIssue(asked);
   if(issue){
     if(issue.kind==="offtopic") S.offChecked[issue.fact]=true; else if(issue.kind==="thin"){ S.thinChecked[issue.fact]=true; S.thinCount++; } else { S.challenged[issue.fact]=true; S.challengeCount++; }
-    S.pending={fact:issue.fact, prev:S.f[issue.fact], issue:issue.issue, kind:issue.kind||""};
+    S.pending={fact:issue.fact, prev:S.f[issue.fact], issue:issue.issue, kind:issue.kind||"", flip:!!issue.flip};
     S.msgs.push({role:"assistant",text:issue.message, check:true});
     S.choices=issue.choices||[]; S.lastAsked=issue.fact;
     S.busy=false; render(); return;
@@ -1371,11 +1376,11 @@ async function handleTurn(text, cid, opts={}){
     let msg;
     if(next==="confirm_derived"){ msg=checkMessage(); }
     else if(isSug(next)){
-      const sg = aiAskedOk && aiSuggestion ? normSuggestion(aiSuggestion) : "";
+      const sg = aiAskedOk && aiSuggestion ? tidySuggestion(next, aiSuggestion) : "";
       if(sg && words(sg)>=3){ S.suggest[next]=sg;
         const ack=(String(reply||"").split(/(?<=[.!?])\s+/)[0]||"").trim(), useAck=ack && !/suggest|\?/i.test(ack) && words(ack)<=25;
         msg=`${useAck?ack+" ":""}${FACTS[next].q(S.f)}\n\nMy suggestion, based on what you told me:\n${BUNDLES[next]?sg:sg.replace(/\.?$/,".")}\n\nUse it as it is, or tell me what to change.`; }
-      else { delete S.suggest[next]; msg=offlineQuestion(next, prevRoute, stageChanged); }
+      else { delete S.suggest[next]; const ai=await aiSuggest(next, cid); if(ai) S.suggest[next]=ai; msg=offlineQuestion(next, prevRoute, stageChanged); }
     } else msg = aiAskedOk ? reply : offlineQuestion(next, prevRoute, stageChanged);
     S.msgs.push({role:"assistant",text:msg});
     const fc=FACTS[next].choices; const fcs=typeof fc==="function"?fc(S.f):fc;
@@ -1410,17 +1415,18 @@ function offerImprovement(){
   S.msgs.push({role:"assistant",text:`This would be rated **${q.rating} (${q.score}/100)**, below the ${min} a strong sourcing request needs. ${keys.length===1?"One point":`${keys.length} points`} would strengthen it:\n${keys.map(k=>"• "+FACTS[k].label).join("\n")}\n\nShall we go through ${keys.length===1?"it":"them"}? ${keys.length>4?"It takes a few minutes.":"It only takes a minute."}`});
   S.choices=["Yes, let's improve it","Submit anyway"];
 }
-function startImprovement(text){
+async function startImprovement(text){
   const f=S.f, keys=S.offerImprove||[]; S.offerImprove=null; S.improveRound=1;
   S.msgs.push({role:"user",text}); S.choices=[];
   keys.forEach(k=>{ if(BUNDLES[k]) BUNDLES[k].forEach(([,x])=>{ if(isTBD(f[x])||!givenText(f[x])) f[x]=null; }); f[k]=null; S.asked[k]=0; delete S.sugAccepted[k]; delete S.suggest[k]; delete S.thinChecked[k]; });
   S.completed=false; refresh();
   const next=S.missing[0]; if(!next){ S.completed=true; render(); return; }
-  askNext(next, "Let's go through them, one at a time.");
+  await askNext(next, "Let's go through them, one at a time.");
   render();
 }
 // ask a question without the AI (used when resuming after the description was written)
-function askNext(next, lead){
+async function askNext(next, lead, cid){
+  if(isSug(next) && !S.suggest[next] && aiReady()){ S.busy=true; render(); const ai=await aiSuggest(next, cid||S.cid); if(ai) S.suggest[next]=ai; S.busy=false; }
   stageTransition(STAGES[stageOf(next)].id);
   const msg = next==="confirm_derived" ? checkMessage() : offlineQuestion(next, S.det.route, true);
   S.msgs.push({role:"assistant",text:(lead?lead+"\n\n":"")+msg});
@@ -1513,7 +1519,8 @@ function checkMessage(){
     if(!o.ex && o.ong) L.push(o.inHouse===true ? "It's something **our own teams would otherwise do** themselves" : o.inHouse===false ? "It's **not** something our own teams would do themselves" : "Whether our own teams would otherwise do it is **not clear yet**");
     L.push(yes(f.tech_service) ? `It **involves technology**: ${PLAIN_ICT[cl.type]||cl.type}` : f.tech_service===false ? "It does **not** involve a technology service" : "Whether technology is involved is **not clear yet**");
     const ih=importantHint(f);
-    L.push(isImportant(f) ? `If it fails or is late${ih?` (you mentioned ${ih})`:""}, it **may support a critical or important business function**` : "Nothing you said suggests it supports a **critical or important business function**");
+    const dI=!ih&&!known(f.important_fn)&&(bankDomain(f)||{}).important;
+    L.push(dI ? `It's ${dI}, so it **may support a critical or important business function**` : isImportant(f) ? `If it fails or is late${ih?` (you mentioned ${ih})`:""}, it **may support a critical or important business function**` : "Nothing you said suggests it supports a **critical or important business function**");
     const a=accessFlags(f);
     if(a.any) L.push(`The provider will **access**: ${givenText(f.data_details)||"our data or systems"}${a.money?" (including money or accounts)":""}`); else if(f.personal_data===false) L.push("The provider will **not access** our data, systems, money or accounts");
     if(yes(f.offshore)||/other country|offshore/i.test(f.location||"")) L.push("Work happens **outside the entity's country**");
@@ -1564,52 +1571,180 @@ function wrapUp(){
 
 /* ---------- suggested answers for the service profile: the requester accepts in one tap or changes them ---------- */
 const isSug = k => { const x=FACTS[k]&&FACTS[k].sug; return typeof x==="function"?!!x(S.f):!!x; };
-const CAT_AUD={software:"the colleagues who use it day to day, their managers and the teams that support it", consulting:"the teams whose processes change, and the sponsor who owns the outcome",
-  "it-services":"the business owners and users of the systems concerned, and Technology", cloud:"the application owners and the Technology teams that run on it", marketing:"the clients and guests attending, and the team hosting them",
-  training:"the colleagues taking part and their line managers", facilities:"everyone working at the sites covered, and the site management team", legal:"the business area that needs the advice, and Legal",
-  "market-data":"the front-office, risk and research users of the data", telecom:"all colleagues with a company mobile, and Technology", "it-hardware":"the colleagues receiving the equipment", office:"the colleagues at the offices supplied", contingent:"the team the external workers join, and its manager"};
-const CAT_FUN={software:"the business function that uses it, Technology and Information Security", consulting:"the business area being changed, with Finance and Risk for the business case", "it-services":"Technology and the business area that owns the system",
-  cloud:"Technology infrastructure and the application owners", marketing:"Marketing and the client-facing business", training:"HR / Learning and the teams being trained", facilities:"Corporate Real Estate and site operations",
-  legal:"Legal and the business area concerned", "market-data":"Front office, Risk and Market Data", telecom:"Technology and all mobile users", "it-hardware":"Technology and the teams equipped", office:"Corporate services", contingent:"the hiring team and Technology"};
+/* ---------- what is typical at a large international bank (suggestions only; the user confirms) ---------- */
+const BANK_CONTEXT = `Context: the requester works at a large international bank of global systemic importance (retail, corporate, investment and private banking; tens of thousands of staff; operations and technology hubs in several countries; supervised by prudential and conduct regulators; three lines of defence: business and operations, Risk and Compliance, Internal Audit).
+Use what is typical at such a bank to make suggestions concrete and specific: which functions own and use the service, where the work usually sits, typical KPIs and service levels, regulatory angles, risks and dependencies.
+Never name a specific bank. Never invent facts about this organisation (names, figures, system names, suppliers, exact locations); typical market practice is fine, as a suggestion the user confirms.`;
+// audience and functions per category, framed for a large bank
+const CAT_AUD={software:"the colleagues who use it day to day, their managers, and the Technology team that supports it",
+  consulting:"the business and operations teams whose processes change, and the senior sponsor who owns the outcome",
+  "it-services":"the business owners and users of the applications concerned, and the Technology delivery teams",
+  cloud:"the application owners and the Technology infrastructure and platform teams",
+  marketing:"clients and prospects of the business hosting the event, and the relationship managers inviting them",
+  training:"the colleagues taking part and their line managers", facilities:"everyone working at the sites covered, and the site management team",
+  legal:"the business area that needs the advice, with Legal as the instructing function",
+  "market-data":"front-office traders and sales, Risk, Finance and Research users of the data",
+  telecom:"all colleagues with a company mobile or network connection, and Technology", "it-hardware":"the colleagues receiving the equipment",
+  office:"the colleagues at the offices supplied", contingent:"the team the external workers join, and its manager",
+  bpo:"the Operations team that owns the process today, and the internal and external clients it serves"};
+const CAT_FUN={software:"the business function that uses it, Technology, and Information Security for access and data protection",
+  consulting:"the business area being changed, with Finance for the business case and Risk for the control impact",
+  "it-services":"Technology and the business area that owns the application", cloud:"Technology infrastructure, the application owners, and Information Security",
+  marketing:"Marketing and the client-facing business (for example Corporate Banking or Wealth Management)", training:"HR / Learning and the teams being trained",
+  facilities:"Corporate Real Estate and site operations", legal:"Legal and the business area concerned",
+  "market-data":"Front office, Risk, Finance and the Market Data team", telecom:"Technology and all mobile users", "it-hardware":"Technology and the teams equipped",
+  office:"Corporate services", contingent:"the hiring team, HR and Technology for access", bpo:"Operations (process owner), with Risk and Compliance overseeing the controls"};
+// specific kinds of work, recognised from the request; each note is what a large bank typically sees
+const DOMAINS=[
+  {id:"kyc", name:"KYC and financial crime operations",
+   re:/\b(kyc|know your (?:customer|client)|client onboarding|customer due diligence|\bcdd\b|\bedd\b|periodic review|aml|anti[- ]money|financial crime|sanctions screening|transaction monitoring|name screening|alert (?:review|handling))\b/i,
+   aud:"Client onboarding and periodic review teams in Operations (first line of defence), usually in onboarding hubs; relationship managers in Corporate, Commercial and Private Banking whose clients wait on KYC",
+   fun:"Client Onboarding / KYC Operations as process owner, Financial Crime Compliance as second-line oversight, and the client-facing businesses",
+   ben:"faster client onboarding; clearing the backlog of overdue periodic reviews; consistent quality of KYC files; flexible capacity for peaks and remediation",
+   kpi:"turnaround time per case (onboarding and periodic review); backlog and overdue reviews; quality-check pass rate; rework rate",
+   sl:"Standard cases completed within 5 working days and high-risk cases within 10; at least 98% of files pass quality checks; overdue periodic reviews reduced to zero by an agreed date",
+   reg:"Evidence for regulators that customer due diligence is complete and on time; a clear audit trail per client file; fewer findings on overdue reviews",
+   out:"Final risk-rating and client acceptance decisions, which stay with the bank; exit decisions for clients; changes to our onboarding systems",
+   qual:"Analysts trained in customer due diligence and enhanced due diligence; recognised AML certification (for example ACAMS) for team leads; background-checked staff",
+   personal:"client names, ID documents, addresses, ownership structures and source-of-wealth information", important:"KYC and financial crime work, which large banks usually treat as supporting a critical or important function",
+   deps:"Access to the onboarding and screening systems; our KYC procedures and risk-rating rules; a named Financial Crime Compliance contact for escalations",
+   notes:"Usually run in Operations hubs, often nearshore or offshore; client data access makes data protection and outsourcing reviews likely; regulators expect the bank to keep the risk decisions."},
+  {id:"payops", name:"Payments and securities operations",
+   re:/\b(payments? (?:operations|processing|investigations)|swift|reconciliation|trade settlement|settlements?|corporate actions|custody|securities operations|cash management operations)\b/i,
+   aud:"Payments, settlements and reconciliations teams in Operations, and the businesses whose clients rely on timely payments",
+   fun:"Operations (process owner), Treasury and Finance, with Operational Risk oversight",
+   ben:"fewer failed or late payments; faster investigation of exceptions; capacity for volume peaks", kpi:"straight-through processing rate; exceptions cleared within the cut-off; open reconciliation breaks by age; failed settlements",
+   sl:"All items processed before the daily cut-off; 99.9% accuracy; reconciliation breaks investigated within 1 working day",
+   reg:"Operational resilience for an important business service; a clear audit trail of every payment",
+   out:"Payment authorisation and release, which stay with the bank; changes to the payment systems",
+   qual:"Staff experienced in payments or securities operations at a bank; background-checked", personal:"client account details, payment data and counterparties",
+   important:"payments and settlement work, which large banks usually treat as an important business service", deps:"System access with dual control; cut-off times and procedures; a named Operations contact",
+   notes:"Money movement makes this high risk: dual control, access reviews and operational resilience requirements apply."},
+  {id:"ap", name:"Accounts payable and finance operations",
+   re:/\b(accounts payable|invoice processing|supplier invoices?|purchase[- ]to[- ]pay|p2p|expense processing|general ledger|record[- ]to[- ]report)\b/i,
+   aud:"Accounts Payable and Finance Operations teams, and the suppliers and budget holders who wait on payment",
+   fun:"Finance (process owner), Procurement for the purchase-to-pay process, and Tax",
+   ben:"suppliers paid on time; fewer duplicate or wrong payments; less manual work at month end", kpi:"invoices processed within the agreed days; first-time match rate; duplicate payments prevented; supplier queries closed on time",
+   sl:"95% of invoices processed within 3 working days; accuracy of at least 99%; supplier queries answered within 2 working days",
+   reg:"Clean controls for the annual audit; correct VAT treatment", out:"Approval and payment release, which stay with us; changes to our finance systems",
+   qual:"Staff experienced in accounts payable for large companies; background-checked", personal:"supplier bank details and contact data",
+   important:null, deps:"Access to the finance system and invoice inbox; approval workflows; a named Finance contact",
+   notes:"Usually run from a finance shared-service centre; bank details make fraud controls important."},
+  {id:"hrops", name:"HR operations and payroll",
+   re:/\b(payroll|hr operations|hr system|hris|recruitment process|employee records|benefits administration|onboarding of (?:staff|employees))\b/i,
+   aud:"HR operations and payroll teams, and all employees in the countries covered", fun:"HR (process owner), Finance for payroll accounting, and Information Security",
+   ben:"accurate and on-time pay; less manual work; better employee experience", kpi:"payroll accuracy; payroll delivered on time; employee queries closed on time",
+   sl:"Payroll 100% on time; accuracy of at least 99.9%; employee queries answered within 2 working days",
+   reg:"Compliance with tax and social security rules in each country; data protection for employee data", out:"Pay and grading decisions, which stay with HR",
+   qual:"Payroll specialists for each country covered; background-checked", personal:"employee names, salaries, bank details and personal records",
+   important:"payroll, which banks often treat as a critical service for staff", deps:"Employee master data; pay rules per country; a named HR contact",
+   notes:"Employee data makes data protection reviews certain; multi-country payroll needs local expertise."},
+  {id:"contact", name:"Client contact centre",
+   re:/\b(contact cent(?:er|re)|call cent(?:er|re)|client service desk|customer service|complaints handling)\b/i,
+   aud:"Retail or wealth clients who call or write in, and the client service teams in Operations", fun:"Client service / Operations, with Compliance for conduct and complaints handling",
+   ben:"shorter waiting times; consistent answers; capacity for peaks", kpi:"calls answered within the target time; first-contact resolution; complaint handling time; client satisfaction",
+   sl:"80% of calls answered within 30 seconds; complaints acknowledged within 1 working day and resolved within the regulatory deadline",
+   reg:"Fair treatment of clients and complaints handling to regulatory standards", out:"Decisions on refunds or compensation beyond agreed limits",
+   qual:"Trained client service agents; product training for the bank's products; background-checked", personal:"client names, account details and conversation records",
+   important:"client service, which large banks usually treat as an important business service", deps:"Scripts and product information; access to client systems; escalation routes",
+   notes:"Conduct risk and client data access; call recording and complaint rules apply."},
+  {id:"regrep", name:"Regulatory reporting",
+   re:/\b(regulatory reporting|prudential reporting|corep|finrep|liquidity reporting|transaction reporting|emir|mifid reporting)\b/i,
+   aud:"Regulatory Reporting and Finance teams, and the senior managers who sign off the returns", fun:"Finance / Regulatory Reporting, with Risk for data and Compliance",
+   ben:"returns submitted on time and correct; less manual adjustment; fewer resubmissions", kpi:"returns submitted on time; resubmissions; data quality issues closed",
+   sl:"All returns ready for sign-off 2 working days before the deadline", reg:"Accurate and timely returns to supervisors; a clear data lineage",
+   out:"Sign-off and submission of returns, which stay with the bank", qual:"Specialists in the relevant regulatory returns; experience at large banks", personal:null,
+   important:"regulatory reporting, which supervisors expect to be resilient", deps:"Source data and reconciliations; reporting calendar; a named Finance contact",
+   notes:"Senior managers stay accountable for the returns; deadlines are fixed by supervisors."},
+  {id:"servicedesk", name:"IT service desk and managed IT",
+   re:/\b(service desk|help ?desk|managed (?:it )?service|end user (?:support|computing)|desktop support|infrastructure support)\b/i,
+   aud:"All colleagues who need IT support, and the Technology teams that run the services", fun:"Technology (service owner) and Information Security",
+   ben:"faster fixes; support around the clock; predictable cost", kpi:"incidents resolved within target; first-contact resolution; user satisfaction; backlog of tickets",
+   sl:"Priority 1 incidents answered within 15 minutes and fixed within 4 hours; 80% of calls answered within 60 seconds",
+   reg:"Operational resilience and ICT risk management in line with regulatory expectations", out:"Changes to systems outside the agreed services; hardware purchases",
+   qual:"ITIL-trained staff; certified engineers for the technologies supported; background-checked", personal:"colleague names and contact details; possibly access to systems with client data",
+   important:"IT services that support banking systems, which may count as critical or important", deps:"Access to the ticketing tool and systems; knowledge articles; escalation to our Technology teams",
+   notes:"ICT third-party risk rules apply (for example DORA in the EU); privileged access needs strict control."},
+  {id:"cyber", name:"Cyber security services",
+   re:/\b(cyber|penetration test|pen ?test|security operations|\bsoc\b|threat intelligence|vulnerability (?:scan|management)|red team)\b/i,
+   aud:"The Chief Information Security Office and the Technology teams responsible for the systems tested or monitored", fun:"Information Security (owner), Technology, and Operational Risk",
+   ben:"risks found before attackers find them; faster detection and response; evidence for regulators and auditors", kpi:"findings reported within the agreed time; critical findings fixed on time; detection and response times",
+   sl:"Critical findings reported within 24 hours; security incidents escalated within 15 minutes", reg:"Evidence of testing and monitoring expected by supervisors; ICT risk requirements",
+   out:"Fixing the findings, unless agreed separately", qual:"Certified testers (for example CREST or OSCP); security-cleared staff", personal:"possibly client and employee data in the systems tested",
+   important:null, deps:"Scope and rules of engagement; test accounts and access; named Technology contacts",
+   notes:"Testers get privileged access; rules of engagement and confidentiality are essential."}
+];
+function bankDomain(f){
+  const t=[userText(), f.item, f.summary, f.background, f.scope_in].filter(x=>typeof x==="string").join(" ");
+  return DOMAINS.find(d=>d.re.test(t)) || null;
+}
+// notes passed to the AI for the current request
+function domainNotes(f){
+  const d=bankDomain(f), c=f.category;
+  const base=`Category: ${catById(c).name}. Typical audience: ${CAT_AUD[c]||"the requesting team"}. Typical functions: ${CAT_FUN[c]||"the requesting business area"}.`;
+  if(!d) return base;
+  return `${base}\nThis request looks like ${d.name}. At a large bank, typically: audience ${d.aud}; functions ${d.fun}; benefits ${d.ben}; KPIs ${d.kpi}; service levels ${d.sl}; regulatory angle ${d.reg}; out of scope ${d.out}; qualifications ${d.qual}; dependencies ${d.deps}.${d.personal?` Data usually involved: ${d.personal}.`:""} ${d.notes}`;
+}
+// a suggestion written by the AI for one question, grounded in the request and in typical bank practice
+async function aiSuggest(k, cid){
+  if(!aiReady()) return null;
+  const f=S.f, lines=BUNDLES[k]?BUNDLES[k].map(([L])=>L):null, draft=offlineSuggest(k);
+  const known_=Object.fromEntries(["item","summary","background","impact_delay","users","functions","current_solution","must_haves","scope_in","value","duration","location","quantity","needed_by"].filter(x=>givenText(f[x])).map(x=>[x,givenText(f[x])]));
+  const system=`${BANK_CONTEXT}\n\nYou write ONE suggested answer for a question in a procurement intake chat. The user will accept it or change it.\n${domainNotes(f)}\n
+Rules: specific to this request and to a large bank; plain words; no abbreviations without writing them out; no invented figures about this organisation (typical service levels are fine as suggestions); short points separated by semicolons.
+Keep it short: at most 4 points per line and at most 45 words per line. Pick the most important points; do not list everything.
+${lines?`Write exactly these lines, each "Label: text" on its own line, in this order: ${lines.join(" | ")}.`:"Write one short paragraph or a few points separated by semicolons."}
+Return JSON only: {"suggestion":"..."}`;
+  try{
+    const out=await callLLM(system,[{role:"user",content:`Question: ${FACTS[k].q(f)}\nWhat we know: ${JSON.stringify(known_)}\nA generic draft to improve on (make it specific; keep its line labels): ${draft}\n\nJSON only.`}]);
+    guard(cid);
+    const sg=tidySuggestion(k, out&&out.suggestion||"");
+    if(!sg || words(sg)<4) return null;
+    if(lines && !lines.every(L=>new RegExp(L.split(/[ /]/)[0],"i").test(sg))) return null;
+    return sg;
+  }catch(e){ if(e instanceof Stale) throw e; return null; }
+}
 function offlineSuggest(k){
   const f=S.f, c=f.category, ctx=(String(f.background||"")+" "+userText()).toLowerCase(), lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1);
-  const aud=cap1(known(f.users)&&f.users!=="Not given"?String(f.users):CAT_AUD[c]||"the team that raised the need and the colleagues it serves");
-  const fun=cap1(CAT_FUN[c]||"the requesting business area");
+  const D=bankDomain(f);
+  const aud=cap1(known(f.users)&&f.users!=="Not given"?String(f.users):D?D.aud:CAT_AUD[c]||"the team that raised the need and the colleagues it serves");
+  const fun=cap1(D?D.fun:CAT_FUN[c]||"the requesting business area");
   const B=[]; if(/slow|time|cycle|weeks|delay|long|wait/.test(ctx)) B.push("shorter cycle times"); if(/manual|spreadsheet|email|excel|hand-?off/.test(ctx)) B.push("less manual work and fewer hand-offs");
   if(/audit|regulat|complian|control|finding|policy/.test(ctx)) B.push("better regulatory and policy compliance"); if(/error|mistake|quality|lost/.test(ctx)) B.push("fewer errors and lost requests");
   if(/cost|spend|expens|saving/.test(ctx)) B.push("lower cost"); if(/visib|transparen|status|track/.test(ctx)) B.push("more transparency");
   B.push("a better experience for the people using it"); if(B.length<3) B.push("clear accountability with one supplier");
-  const ben=cap1(B.join("; "));
+  const ben=cap1(D ? [D.ben, ...B.filter(x=>!/experience for the people|accountability/.test(x))].join("; ") : B.join("; "));
   const cs=known(f.current_solution)&&f.current_solution!=="Not given"?String(f.current_solution).replace(/\.$/,""):"";
   const usp = cs ? `A single, managed solution in place of today's approach (${lf(cs)}), delivered by a specialist supplier` : "A dedicated, managed solution in place of today's workarounds, delivered by a specialist supplier";
   const kpiBase = f.demand_type==="software" ? "% of users active after three months; cycle time compared with today; user satisfaction score"
     : c==="marketing" ? "attendance against invitations; guest feedback score; delivered within budget" : c==="training" ? "completion rate; participant feedback; skills applied on the job"
     : c==="facilities" ? "service levels met each month; issues fixed on time; user satisfaction" : f.demand_type==="contingent_labour" ? "milestones delivered on time; quality of work signed off by the manager"
     : GOODSLIKE(f) ? "delivered complete and on time; fault rate after delivery; user satisfaction" : "deliverables accepted on time and within budget; agreed outcomes achieved; stakeholder satisfaction";
-  const kpi=cap1((/cycle|slow|weeks|delay|long/.test(ctx)&&!/cycle time/.test(kpiBase)?"reduction in end-to-end cycle time; ":"")+kpiBase);
-  const reg = /regulat|audit|complian|control|finding|policy/.test(ctx) ? "A clear audit trail; evidence that the required controls were applied; better regulatory compliance"
+  const kpi=cap1(D?D.kpi:(/cycle|slow|weeks|delay|long/.test(ctx)&&!/cycle time/.test(kpiBase)?"reduction in end-to-end cycle time; ":"")+kpiBase);
+  const reg = D ? D.reg : /regulat|audit|complian|control|finding|policy/.test(ctx) ? "A clear audit trail; evidence that the required controls were applied; better regulatory compliance"
     : yes(f.tech_service) ? "Operational resilience through a managed, supported service; clear ownership and an audit trail" : "No specific regulatory benefit";
   const isICT=yes(f.tech_service), ong=isOngoing(f), lfx=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1);
   const OUT={software:"Migrating historic data, unless agreed separately; changes to our other systems; hardware", consulting:"Implementing the new design, unless agreed separately; changes to IT systems",
     bpo:"Approval and payment decisions, which stay with us; changes to our finance systems", marketing:"Guest travel and accommodation, unless stated", facilities:"Repairs that need specialist contractors",
     "it-services":"Support after hand-over, unless agreed separately; hardware and licences", training:"Travel costs for participants", cloud:"Application support; data migration, unless agreed separately"}[c] || "Anything not listed in scope; travel costs not agreed in advance";
+  const OUTD = D ? D.out : OUT;
   const crit = f.demand_type==="software" ? "It works as specified in user acceptance testing, with no open critical defects" : GOODSLIKE(f) ? "Delivered complete, undamaged and working"
     : ong ? "Service levels met for the first three months; outputs complete and accurate" : "Each deliverable is complete, matches the agreed scope and is accepted in writing";
   const rev = GOODSLIKE(f)&&f.demand_type!=="software" ? "The recipient checks the delivery within 5 working days; faulty items are replaced at no cost" : "Our business owner reviews each deliverable within 5 working days; if it fails, the provider fixes it and resubmits at no extra cost; our business owner gives final sign-off";
-  const qual = c==="consulting" ? "Proven experience in similar projects in financial services; fluent English" : c==="it-services"||isICT ? "Certified in the relevant technology; experience in regulated environments; background-checked"
+  const qual = D ? D.qual : c==="consulting" ? "Proven experience in similar projects in financial services; fluent English" : c==="it-services"||isICT ? "Certified in the relevant technology; experience in regulated environments; background-checked"
     : c==="bpo" ? "Trained staff with experience in the process; background-checked" : f.demand_type==="contingent_labour" ? (givenText(f.skills)||"The skills listed in the role profile") : "Relevant experience and qualifications for the work; fluent English";
-  const sl = !ong ? "Not applicable (one-off delivery)" : isICT ? "Availability of 99.5% in service hours; priority 1 incidents answered within 1 hour and fixed within 4 hours"
+  const sl = !ong ? "Not applicable (one-off delivery)" : D ? D.sl : isICT ? "Availability of 99.5% in service hours; priority 1 incidents answered within 1 hour and fixed within 4 hours"
     : c==="bpo" ? "95% of items processed within 3 working days; accuracy of at least 99%" : c==="facilities" ? "Tasks done to schedule; issues fixed within 24 hours" : "Agreed response times met in at least 95% of cases";
   switch(k){
     case "audience_fn": return `Target audience: ${aud}\nSupported functions: ${fun}`;
     case "value_props": return `Unique selling points: ${usp}\nKey benefits: ${ben}\nRegulatory / governance benefits: ${reg}`;
-    case "scope_out": return OUT;
+    case "scope_out": return OUTD;
     case "acceptance_pack": return `Acceptance criteria: ${crit}\nReview and sign-off: ${rev}`;
     case "qualifications": return qual;
     case "kpis_pack": return `Service levels: ${sl}\nKPIs: ${kpi}`;
     case "service_model": return "Support model: First-line support by the provider's service desk, with second- and third-line support for incidents and defects\nService hours: Monday to Friday, 08:00 to 18:00 local time\nTools and systems: The provider supplies and maintains its own service desk and monitoring tools; costs are included in the price";
     case "governance": return "Governance meetings: Monthly service review with our business owner; quarterly review with procurement\nReporting: Monthly report on service levels, KPIs, incidents and open issues\nChange management: Changes by written change request, approved by both sides before work starts\nEscalation: Service manager, then account director, then our business owner and procurement";
-    case "deps_pack": return `Our dependencies: A named business contact; access to the information${yes(f.personal_data)?" and systems":""} the provider needs within 5 working days of the start\nProvider assumptions: The scope stays as described; decisions and sign-offs are given on time`;
+    case "deps_pack": return `Our dependencies: ${D?D.deps+", all":`A named business contact; access to the information${yes(f.personal_data)?" and systems":""} the provider needs`} within 5 working days of the start\nProvider assumptions: The scope stays as described; decisions and sign-offs are given on time`;
     case "users": return aud; case "functions": return fun; case "benefits": return ben; case "usp": return usp; case "acceptance": return kpi; case "reg_benefits": return reg;
     case "profile": return `Target audience: ${aud}\nSupported functions: ${fun}\nKey benefits: ${ben}\nKPIs / success measures: ${kpi}\nRegulatory / governance benefits: ${reg}`;
   }
@@ -1627,9 +1762,23 @@ const BUNDLES={
 };
 const PROFILE_KEYS={"target audience":"users","audience":"users","supported functions":"functions","functions":"functions","key benefits":"benefits","benefits":"benefits","kpis / success measures":"kpis","kpis":"kpis","success measures":"kpis","unique selling points":"usp","regulatory / governance benefits":"reg_benefits","regulatory benefits":"reg_benefits","regulatory":"reg_benefits"};
 function normSuggestion(v){
-  if(v && typeof v==="object" && !Array.isArray(v)) return Object.entries(v).map(([k,x])=>`${k.replace(/_/g," ")}: ${Array.isArray(x)?x.join("; "):x}`).join("\n");
-  if(Array.isArray(v)) return v.join("; ");
+  const flat=x=>Array.isArray(x)?x.map(flat).join("; "):x&&typeof x==="object"?Object.entries(x).map(([k,y])=>`${k.replace(/_/g," ")}: ${flat(y)}`).join("; "):String(x??"");
+  if(v && typeof v==="object" && !Array.isArray(v)) return Object.entries(v).map(([k,x])=>`${k.replace(/_/g," ")}: ${flat(x)}`).join("\n");
+  if(Array.isArray(v)) return v.map(flat).join("; ");
   return String(v||"").trim();
+}
+// a suggestion as the user sees it: one label per line, short, no formatting, no invented dates
+function tidySuggestion(k, v){
+  let sg=normSuggestion(v).replace(/\*\*|__/g,"").replace(/\[object Object\]/g,"").trim();
+  const lines=BUNDLES[k]?BUNDLES[k].map(([L])=>L):null;
+  if(lines) lines.slice(1).forEach(L=>{ sg=sg.replace(new RegExp(`[;.]?\\s*(${L.replace(/[/]/g,"\\/")})\\s*:`,"i"),"\n$1:"); });
+  const DATE=/\s*,?\s*\b(?:(?:confirmed|finalised|finalized|ready|provided|documented|verified|shared|agreed|delivered|completed|signed off)\s+)?by\s+(?:the\s+)?\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/gi;
+  const PAREN=/\s*\([^)]*\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b[^)]*\)/gi;
+  const cap=line=>{ const m=line.match(/^([^:]{3,45}:)\s*(.*)$/), head=m?m[1]+" ":"", body=(m?m[2]:line).replace(PAREN,"").replace(DATE,"");
+    const pts=body.split(/;\s*/).map(x=>x.trim().replace(/[.,]$/,"")).filter(Boolean).slice(0,4).map(x=>{ const w=x.split(/\s+/); return w.length>28?w.slice(0,28).join(" ").replace(/[,(]$/,"")+"…":x; });
+    return head+pts.join("; "); };
+  sg=sg.split(/\n+/).map(x=>x.trim()).filter(Boolean).map(cap).join(lines?"\n":"; ");
+  return sg;
 }
 function setFromSuggestion(k, v){
   const f=S.f;
