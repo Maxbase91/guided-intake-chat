@@ -142,3 +142,16 @@ test("a place in the answer about where data is stored does not become the work 
   await say(page, "in the EU");
   expect(await page.evaluate(() => [S.f.data_details, S.f.location])).toEqual(["employee names and salaries, stored in the EU", null]);
 });
+
+test("a second off-topic answer is recorded as not given when the AI flags it again", async ({ page, request }) => {
+  await openApp(page, { kind: "ai" });
+  await say(page, HR);
+  await say(page, "About 400k");
+  await say(page, "MOCK_OFFTOPIC we need a beer every Thursday");
+  await expect(lastAssistant(page)).toContainText("doesn't seem to answer");
+  const k = await page.evaluate(() => S.pending && S.pending.fact);
+  // "team" makes it look like business text to the rules; the AI's verdict on the pending item decides
+  await mock(request, { nextChat: { assessment: { fact: k, ok: false, issue: "off-topic", follow_up: "", score: 1 } } });
+  await say(page, "pitch golf with the management team");
+  expect(await page.evaluate((key) => S.f[key], k)).toBe("Not given");
+});

@@ -155,7 +155,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .qlist{list-style:none;margin:8px 0 0;padding:0}
 .qlist li{display:flex;gap:8px;font-size:13.5px;padding:3px 0}
 .qlist li:before{flex:none;width:18px;text-align:center;font-weight:700}
-.qlist li.warn:before{content:"!";color:var(--warn)} .qlist li.info:before{content:"i";color:var(--info)} .qlist li.ok:before{content:"✓";color:var(--ok)}
+.qlist li.warn:before{content:"!";color:var(--warn)} .qlist li.opt:before{content:"+";color:var(--info)} .qlist li .lnk{margin-left:auto;flex:none;align-self:flex-start;color:var(--navy-3);font-weight:600;text-decoration:none} .qlist li.info:before{content:"i";color:var(--info)} .qlist li.ok:before{content:"✓";color:var(--ok)}
 .side .grp{font:inherit;font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:6px 0 0;padding:7px 0;display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;background:none;border:0;border-top:1px solid var(--line-2);cursor:pointer;text-align:left}
 .side .grp span{display:flex;align-items:center;gap:6px}
 .side .grp span:before{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s;flex:none}
@@ -478,7 +478,7 @@ const GOODSLIKE = f => f.demand_type==="goods" || f.demand_type==="software";
 const TECH_CATS=["software","cloud","it-services","market-data","telecom"];
 const REL = {
   pd:       f => yes(f.personal_data) || yes(f.system_access),
-  ongoingSvc: f => ["cloud","telecom","software","market-data","facilities"].includes(f.category) || (known(f.duration) && monthsOf(f.duration)>=6) || /\b(ongoing|monthly|subscription|managed service|run(?:s|ning)? (?:our|the)|operate|support desk|service desk)\b/.test(userText()),
+  ongoingSvc: f => ["cloud","telecom","software","market-data","facilities"].includes(f.category) || (known(f.duration) && monthsOf(f.duration)>=6) || /\b(ongoing|monthly|subscription|managed service|run(?:s|ning)? (?:our|the) (?:service|operations?|process(?:es)?|platform|system|desk|function|back office)|operate|support desk|service desk)\b/.test(userText()),   // "run the invitations" for an event is not a running service
   outsrc:   f => yes(f.tech_service) && REL.ongoingSvc(f),
   techy:    f => yes(f.ict_outsourcing) || ["cloud","it-services","software","market-data","telecom"].includes(f.category),
   ongoing:  f => yes(f.ict_outsourcing) || ["facilities","cloud","telecom","software","market-data"].includes(f.category),
@@ -758,6 +758,8 @@ function inHouseFromText(f){
   return null;
 }
 function importantHint(f){
+  // events, training and office or hardware purchases do not support a critical or important function, even when "clients" come up
+  if(["marketing","training","office","it-hardware"].includes(f.category)) return null;
   const t=[f.impact_delay,f.background,f.criticality].filter(x=>typeof x==="string").join(" ").toLowerCase();
   if(!t || /nothing serious|no (?:real |big )?impact|minor|not critical/.test(t)) return null;
   const m=t.match(/\b(clients?|customers?|payments?|regulat\w*|trading|settlement|staff (?:wouldn.?t|won.?t|would not|not) (?:get )?(?:be )?paid|payroll|outage|critical|audit findings?)\b/);
@@ -867,7 +869,8 @@ function refresh(){
   }
   if(f.demand_type==="contingent_labour" && !known(f.value) && known(f.day_rate)){ const v=parseMoney(f.day_rate); if(v) f.value = rateIsTotal(f.day_rate) ? v : v*20*monthsOf(f.duration) * (parseInt(f.headcount)||1); if(v) f.value_is_estimate=!rateIsTotal(f.day_rate); }
   S.det = determine();
-  const req = requiredFor(S.det.route, f);
+  // the route's questions, plus optional points the requester chose to add from the quality check
+  const base = requiredFor(S.det.route, f), req = [...base, ...(S.extraAsk||[]).filter(k=>FACTS[k] && !base.includes(k))];
   S.req = req;
   S.stageIds = STAGES.filter(st=>st.id==="review"||req.some(k=>factsOf(st).includes(k))).map(st=>st.id);
   const order = [...req].sort((a,b)=>(stageOf(a)-stageOf(b))||(posIn(a)-posIn(b)));
@@ -899,7 +902,7 @@ const words = v => String(v||"").trim().split(/\s+/).filter(Boolean).length;
 const VAGUE=/^(tbd|tbc|n\/?a|not sure|don'?t know|idk|stuff|things|everything|various|whatever|same|as usual|-|\?+|ok|okay|yes|no)\.?$/i;
 
 // does a free-text answer relate to the request at all? (catches a recipe or a joke given as "the problem to solve")
-const TEXT_FACTS=["background","users","functions","benefits","usp","reg_benefits","current_solution","impact_delay","must_haves","deliverables","acceptance","skills","role","item","data_details","renewal_change","supplier_reason","criticality","volume"];
+const TEXT_FACTS=["other_risks","background","users","functions","benefits","usp","reg_benefits","current_solution","impact_delay","must_haves","deliverables","acceptance","skills","role","item","data_details","renewal_change","supplier_reason","criticality","volume"];
 const STOP=new Set("the and for with that this from have has had are was were will would should could can our your their they them you its it's into onto over under about after before then than when what which who whom why how there here also just only very more most some any all each other such been being not but nor yet out off per via upon within without because while where these those does did done doing make made get got let one two three four five six well much many lot lots like want need needs needed please thanks thank yes".split(" "));
 const BIZ=/\b(teams?|staff|employees?|users?|customers?|clients?|colleagues|buyers?|requesters?|process\w*|manual\w*|slow\w*|delay\w*|costs?|costly|saving\w*|audit\w*|complian\w*|regulat\w*|risks?|controls?|data|systems?|tools?|platforms?|software|reports?|reporting|deadlines?|suppliers?|vendors?|contracts?|services?|support\w*|business|operations?|operational|finance|financial|legal|hr|payroll|procurement|ict|sales|marketing|quality|errors?|mistakes?|spreadsheets?|excel|emails?|mailbox\w*|sharepoint|lists?|databases?|trackers?|workflows?|approv\w*|growth|growing|capacity|skills?|expertise|experience\w*|budget|projects?|deliver\w*|implement\w*|integrat\w*|migrat\w*|security|licen[cs]\w*|office|offices|sites?|events?|training|workshops?|launch\w*|replac\w*|end of life|out of support|problems?|issues?|fail\w*|missing|lack\w*|improv\w*|reduc\w*|increas\w*|faster|efficien\w*|onboard\w*|requests?|orders?|invoices?|pay\w*|paid|penalt\w*|fines?|revenue|profit\w*|loss\w*|lose|losing|miss\w*|late|complain\w*|frustrat\w*|satisf\w*|reputation\w*|findings?|breach\w*|outages?|downtime|blocked|waiting|chas\w*|impact\w*|consequen\w*|serious|critical|minor|visibility|transparen\w*|scal\w*|volume|demand|productiv\w*|workload|bottleneck\w*|backlog|outdated|legacy|obsolete|expir\w*|renew\w*|guests?|venue|catering|cleaning|maintenance|hardware|laptops?|devices?|network|cloud|hosting|applications?|apps?|api|sso|sign-on|portal|dashboards?|interfaces?|sap|developers?|engineers?|consult\w*|advis\w*|strategy|roadmap|analysis|assessment|governance|resilien\w*|polic\w*|certif\w*|requirement\w*|stakeholders?|management|managers?|department|function\w*|bank\w*|trading|regions?|countries|global|internal\w*|external\w*|in-house|outsourc\w*|vendor|tender\w*|rfp|quotes?|kpis?|sla|uptime|availability|automat\w*|digital\w*|standard\w*|consolidat\w*|central\w*|single|manual)\b/i;
 function contentWords(t){ return (String(t||"").toLowerCase().match(/[a-zäöüß][a-zäöüß-]{2,}/g)||[]).filter(w=>!STOP.has(w)); }
@@ -911,6 +914,8 @@ function offTopic(k, v){
   const ctx=new Set(contentWords(prior).map(w=>w.slice(0,5)));
   return !ws.some(w=>ctx.has(w.slice(0,5)));
 }
+// how the AI says an answer has nothing to do with the question
+const AI_OFF_RE=/off.?topic|unrelated|not related|does(?:n.?t| not) (?:answer|relate)|irrelevant|nothing to do/i;
 function offTopicIssue(k){
   const F=FACTS[k], ex=F.ex(S.f);
   return {fact:k, kind:"offtopic", issue:"answer doesn't relate to the request", message:`That doesn't seem to answer my question. ${F.q(S.f)}${ex?" "+ex:""}`};
@@ -1452,8 +1457,9 @@ async function handleTurn(text, cid, opts={}){
         S.flags.push({fact:pend.fact,issue:pend.issue,status:"corrected"});
       } else { S.f[pend.fact]=base; S.flags.push({fact:pend.fact,issue:"where the data is stored is not given",status:"missing"}); }
     } else if(pend.kind==="offtopic"){
-      const nv=S.f[pend.fact];
-      if(!known(nv) || offTopic(pend.fact, nv) || nv===pend.prev){ S.f[pend.fact]="Not given"; S.flags.push({fact:pend.fact,issue:"no usable answer given",status:"unanswered"}); }
+      // the second answer is checked by the rules and, with AI, by the AI's own verdict ("Pitch golf with the management team")
+      const nv=S.f[pend.fact], aiAgain=aiCheck && aiCheck.fact===pend.fact && AI_OFF_RE.test(aiCheck.issue||"");
+      if(!known(nv) || offTopic(pend.fact, nv) || nv===pend.prev || aiAgain){ S.f[pend.fact]="Not given"; S.flags.push({fact:pend.fact,issue:"no usable answer given",status:"unanswered"}); }
       else S.flags.push({fact:pend.fact,issue:pend.issue,status:"corrected"});
     } else {
       if(!known(S.f[pend.fact])) S.f[pend.fact]=pend.prev;
@@ -1474,7 +1480,7 @@ async function handleTurn(text, cid, opts={}){
   if(prevRoute && S.det && prevRoute!==S.det.route && known(S.f.needed_by) && !changed.includes("needed_by")) changed.push("needed_by");
   let issue = findIssue(changed);
   if(issue && issue.kind!=="offtopic" && issue.kind!=="where" && S.challengeCount>=3) issue=null;   // the data location is always asked
-  const aiOff = aiCheck && /off.?topic|unrelated|not related|does(?:n.?t| not) (?:answer|relate)|irrelevant|nothing to do/i.test(aiCheck.issue||"");
+  const aiOff = aiCheck && AI_OFF_RE.test(aiCheck.issue||"");
   // only for the question just asked: an off-topic verdict on another item would say "doesn't answer my question" and ask something else
   if(!issue && aiOff && aiCheck.fact===asked && FACTS[asked] && !S.offChecked[asked] && asked!==(pend&&pend.fact)) issue=offTopicIssue(asked);
   if(!issue && aiCheck && S.challengeCount<3 && changed.includes(aiCheck.fact) && !S.challenged[aiCheck.fact] && FACTS[aiCheck.fact])
@@ -1554,6 +1560,18 @@ async function startImprovement(text){
   S.completed=false; refresh();
   const next=S.missing[0]; if(!next){ S.completed=true; render(); return; }
   await askNext(next, "Let's go through them, one at a time.");
+  render();
+}
+// an optional point from the quality check the requester chose to add: ask its question now, then rebuild the documents
+async function startOptional(k){
+  if(S.busy || !FACTS[k] || S.submitted) return;
+  const f=S.f; S.extraAsk=[...new Set([...(S.extraAsk||[]), k])];
+  if(BUNDLES[k]) BUNDLES[k].forEach(([,x])=>{ if(isTBD(f[x])||!givenText(f[x])) f[x]=null; });
+  f[k]=null; S.asked[k]=0; delete S.sugAccepted[k]; delete S.suggest[k]; delete S.thinChecked[k];
+  S.msgs.push({role:"user",text:`Add ${FACTS[k].label.toLowerCase()}`}); S.choices=[];
+  S.completed=false; refresh();
+  const next=S.missing[0]; if(!next){ S.completed=true; render(); return; }
+  await askNext(next, "Sure, let's add it.");
   render();
 }
 // ask a question without the AI (used when resuming after the description was written)
@@ -2010,6 +2028,7 @@ function itemFrom(text){
   let x=text.split(/[.;:\n]/)[0].replace(/^\s*(?:hi|hello)[,!]?\s*/i,"").replace(/^(?:please\s+)?(?:we|i)(?:'d| would)?\s+(?:would like|are looking for|am looking for|need|want|like)\s+(?:t?o (?:buy|get|order|have|procure)\s+)?/i,"").replace(/^please\s+/i,"").replace(/^(?:need|looking for)\s+/i,"");
   x=x.split(/,|\s+(?:to replace|because|since|by|in|from|starting|with a budget|at around|around|about)\s+/i)[0];
   if(!/\b(?:ticket|licen[cs]e|subscription|membership|seat|place)s?\s+for\b/i.test(x)) x=x.split(/\s+for\s+/i)[0];
+  x=x.replace(/^(?:please\s+)?(?:buy|purchase|procure|order|source|get|acquire)\s+(?:us\s+)?/i,"").replace(/^(?:an?|the)\s+/i,"");
   x=x.replace(/^\d[\d,]*\s+(?:x\s+)?/,"").trim();
   return x.length>2 && x.length<90 ? x.charAt(0).toUpperCase()+x.slice(1) : null;
 }
@@ -2317,7 +2336,7 @@ function scrubText(t, keepTime){
   }).filter(Boolean).join(" ").replace(/,?\s+\b(?:needed|required|live|delivered|starting|due|which|and|dating|dated|introduced|since|as)\s*(?=[.,;]|$)/gi,"").replace(/\s+([,.])/g,"$1").replace(/,\s*\./g,".").trim();
   return out;
 }
-const firstPerson = x => String(x||"").replace(/^\s*(?:hi|hello)[,!]?\s*/i,"").replace(/^(?:please\s+)?(?:we|i)(?:'d| would)?\s+(?:would like|are looking for|am looking for|need|want|like)\s+(?:t?o (?:buy|get|order|have|procure)\s+)?/i,"");
+const firstPerson = x => String(x||"").replace(/^\s*(?:hi|hello)[,!]?\s*/i,"").replace(/^(?:please\s+)?(?:we|i)(?:'d| would)?\s+(?:would like|are looking for|am looking for|need|want|like)\s+(?:t?o (?:buy|get|order|have|procure)\s+)?/i,"").replace(/^(?:please\s+)?(?:buy|purchase|procure|order|source|get|acquire)\s+(?:us\s+)?/i,"");   // "Buy a platform" is a request for "a platform"
 function offlineDescription(){
   const f=S.f, c=catById(f.category), cont=f.demand_type==="contingent_labour", sw=f.demand_type==="software", goods=GOODSLIKE(f);
   const g=k=>known(f[k])&&!["Not given","unsure","None"].includes(f[k])&&typeof f[k]==="string"?f[k].trim().replace(/\.$/,""):null;
@@ -2355,14 +2374,19 @@ function offlineExec(lead){
     capabilities:scl(split(g("must_haves")||(cont?g("skills"):g("deliverables"))||g("item"))), benefits:scl(split(g("benefits"))), usp:sc(g("usp")),
     kpis:scl(split(g("acceptance"))), regulatory:/^no specific/i.test(g("reg_benefits")||"")?"":sc(g("reg_benefits"))};
   const L=execLimits(), what=lf(String(lead||c.name).replace(/\.$/,"")), nd=x=>String(x).replace(/\.$/,"");
+  // a noun phrase ("a process orchestration platform") becomes a sentence; a problem phrased as a goal ("providing a single entry") is not "today"
+  const needs=/^(?:an?|the|some|new|one|\d)\b/i.test(what) ? `The organisation needs ${what}.` : cap1(what)+".", goal=/^(?:to\s+[a-z]+|[a-z]+ing)\b/i.test(t.problem||"");
+  t.kpis=t.kpis.map(x=>x.replace(/^(?:success (?:is|will be) (?:measured|judged|assessed) (?:by|on)|we (?:will )?measure success by|measured by)\s+/i,"")).filter(Boolean).map(cap1);
+  t.capabilities=t.capabilities.filter(x=>!/^(?:would|should|could|do|does|will|can) (?:you|we|it)\b/i.test(x));
+  t.problem=cap1(t.problem);
   t.tagline=cap1(nd(t.benefits[0]||t.capabilities[0]||c.name));
-  t.headline=clampWords([`It provides ${t.audience?lf(nd(t.audience)):"the business"} with ${what}.`, t.problem&&`It solves this problem: ${lf(nd(t.problem))}.`,
+  t.headline=clampWords([`It provides ${t.audience?lf(nd(t.audience)):"the business"} with ${what}.`, t.problem&&(goal?`Its goal is ${lf(nd(t.problem))}.`:`It solves this problem: ${lf(nd(t.problem))}.`),
     t.benefits.length&&`It delivers ${listJoin(t.benefits.slice(0,3).map(lf))}.`].filter(Boolean).join(" "), L.head);
   t.exec=clampWords([
-    [cap1(what)+".", t.audience&&`It is for ${lf(nd(t.audience))}.`, t.functions&&`It supports ${lf(nd(t.functions))}.`].filter(Boolean).join(" "),
-    [t.problem&&`Today, ${lf(nd(t.problem))}.`, t.usp&&`${cap1(nd(t.usp))}.`].filter(Boolean).join(" "),
-    t.capabilities.length?`The service covers ${listJoin(t.capabilities.map(lf))}.`:"",
-    [t.benefits.length&&`It delivers ${listJoin(t.benefits.map(lf))}.`, t.kpis.length&&`Success is measured by ${listJoin(t.kpis.map(lf))}.`].filter(Boolean).join(" "),
+    [needs, t.audience&&`It is for ${lf(nd(t.audience))}.`, t.functions&&`It supports ${lf(nd(t.functions))}.`].filter(Boolean).join(" "),
+    [t.problem&&(goal?`The goal is ${lf(nd(t.problem))}.`:`Today, ${lf(nd(t.problem))}.`), t.usp&&`${cap1(nd(t.usp))}.`].filter(Boolean).join(" "),
+    t.capabilities.length?`Key capabilities: ${listJoin(t.capabilities.map(lf))}.`:"",
+    [t.benefits.length&&`It delivers ${listJoin(t.benefits.map(lf))}.`, t.kpis.length&&`Success means: ${listJoin(t.kpis.map(lf))}.`].filter(Boolean).join(" "),
     t.regulatory?`${cap1(nd(t.regulatory))}.`:""].filter(Boolean).join("\n\n"), L.exec);
   t.summary=t.headline; t.narrative=t.exec;
   return t;
@@ -2914,20 +2938,56 @@ function sectionSummaryHTML(){
   return `<div class="sec qsec"><h4>Quality check by section</h4><div class="qcounts"><span class="qc ok">${c("Complete")} complete</span><span class="qc pa">${c("Partial")} partial</span><span class="qc tb">${c("To be determined")} to be determined</span><span class="qc rk">${c("Risk")} risk</span><span class="qc na">${c("Not applicable")} not applicable</span></div>
     ${bad.length?`<ul class="qlist">${bad.slice(0,6).map(r=>`<li class="${r.status==="Risk"?"warn":"info"}"><b>${esc(r.sec)}</b>: ${esc(r.issue||r.status)}${r.fix?`. ${esc(r.fix)}`:""}</li>`).join("")}</ul>`:""}</div>`;
 }
+// why a section this route did not ask still matters for this request; null leaves it out of the quality check
+function optionalWhy(sec, row){
+  const f=S.f, ong=isOngoing(f), v=known(f.value)?Number(f.value):0, mo=givenText(f.duration)?monthsOf(f.duration):0, has=k=>!!givenText(f[k]);
+  const crit=isImportant(f), outL=outsourcing(f).code==="yes", tech=yes(f.tech_service), sw=f.demand_type==="software";
+  const size = crit ? "it may support a critical or important function" : outL ? "it is likely outsourcing" : mo>=12 ? `it runs for ${f.duration}` : v>=250000 ? `it is a ${money(v)} service` : "";
+  const WHY={
+    "Governance": ong && size ? size : null,
+    "Reporting": ong && (has("service_levels")||has("kpis")) ? "it tracks the service levels and KPIs you set" : ong && outL ? "outsourcing needs regular reporting" : null,
+    "Change management": ong && (sw||tech) ? "software and technology services change during the contract" : null,
+    "Escalation": ong && (crit||outL) ? size : ong && tech ? "incidents need a clear route to decision makers" : null,
+    "Service level failure consequences": ong && has("service_levels") ? "you set service levels, so agree what happens when they are missed" : null,
+    "Critical or important function relevance": crit ? "your answers point to a critical or important function" : outL ? "it is likely outsourcing" : null,
+    "Tools": tech && ong ? "the provider runs technology for us" : null,
+    "Acceptance testing": "suppliers need to know how their work is accepted",
+    "Dependencies": "suppliers price what we must provide into their offer",
+    "Assumptions": "suppliers price what we must provide into their offer",
+    "Responsibility allocation": "suppliers price what we must provide into their offer",
+    "Active obligations": ong && !sw ? "the provider's duties become the service obligations in the contract" : null,
+    "Definitions": row && /abbreviations used:/i.test(row.issue||"") ? `the description uses ${String(row.issue).replace(/^abbreviations used:\s*/i,"")}, which readers outside your team may not know` : null,
+  };
+  return WHY[sec] || null;   // nothing specific to this demand: left out
+}
+// gaps the route asked for are "to improve"; the rest is optional, chosen for this demand, and can be added in the chat
+function qualityGaps(){
+  const f=S.f, req=S.req||[], keyOf=sec=>{ const m=SEC2KEY[sec]; return typeof m==="function"?m(f):m; };
+  const rows=S.sd&&S.sd.detail ? sectionQuality().filter(r=>["Partial","To be determined","Risk"].includes(r.status)&&r.sec!=="Open points") : [];
+  const asked=k=>!!k && (req.includes(k) || (k==="data_details"&&yes(f.personal_data)));
+  const improve=rows.filter(r=>r.status==="Risk"||asked(keyOf(r.sec)));
+  const groups={};
+  rows.filter(r=>!improve.includes(r)).forEach(r=>{ const why=optionalWhy(r.sec, r); if(!why) return; const k=keyOf(r.sec), g=k&&FACTS[k]?k:"_"+r.sec;
+    (groups[g]=groups[g]||{key:k&&FACTS[k]?k:null, secs:[], why, fix:r.fix}).secs.push(r.sec); });
+  return {improve, optional:Object.values(groups)};
+}
 function qualityHTML(){
   const q=S.quality; if(!q) return "";
   const cls={Strong:"q-strong",Good:"q-good",Fair:"q-fair","Needs work":"q-needs"}[q.rating];
-  const oks=q.points.filter(p=>p.lvl==="ok").length, items=[];
+  const oks=q.points.filter(p=>p.lvl==="ok").length, items=[], gaps=qualityGaps();
   q.points.filter(p=>p.lvl!=="ok").forEach(p=>items.push({lvl:p.lvl,html:esc(p.text)}));
-  if(S.sd&&S.sd.detail) sectionQuality().filter(r=>["Partial","To be determined","Risk"].includes(r.status)&&r.sec!=="Open points")
-    .forEach(r=>items.push({lvl:r.status==="Risk"?"warn":"info", html:`<span><b>${esc(r.sec)}</b>: ${esc(r.issue||r.status.toLowerCase())}${r.fix?`. ${esc(r.fix)}`:""}</span>`}));
+  gaps.improve.forEach(r=>items.push({lvl:r.status==="Risk"?"warn":"info", html:`<span><b>${esc(r.sec)}</b>: ${esc(r.issue||r.status.toLowerCase())}${r.fix?`. ${esc(r.fix)}`:""}</span>`}));
+  const names=s=>{ const x=s.map((n,i)=>i?n.toLowerCase():n); return x.length>1?x.slice(0,-1).join(", ")+" and "+x[x.length-1]:x[0]; };
+  const openTxt=(S.sd&&S.sd.detail&&S.sd.detail.open_points||[]).map(x=>String(x).toLowerCase());
+  const optional=gaps.optional.filter(g=>!g.secs.some(sec=>openTxt.some(x=>x.startsWith(sec.toLowerCase())))).map(g=>`<li class="opt"><span><b>${esc(names(g.secs))}</b>: ${g.key?`worth adding because ${esc(g.why)}.`:`${esc(cap1(g.why))}. ${esc(g.fix)}.`}</span>${g.key&&!S.submitted?`<button class="lnk" data-act="addopt" data-key="${g.key}">Add</button>`:""}</li>`);
   const seen=new Set(), list=items.filter(x=>{ const k=x.html.replace(/<[^>]+>/g,"").toLowerCase().slice(0,60); if(seen.has(k)) return false; seen.add(k); return true; });
   const secs=new Set(items.map(x=>(x.html.match(/^<span><b>([^<]+)<\/b>/)||[])[1]).filter(Boolean).map(x=>x.toLowerCase()));
   const open=(S.sd&&S.sd.detail&&S.sd.detail.open_points||[]).filter(x=>!seen.has(String(x).toLowerCase().slice(0,60)) && !secs.has(String(x).split(":")[0].trim().toLowerCase()));
   return `<div class="sec qual"><div class="qhead"><span class="qbadge ${cls}">${q.rating}</span><span>Quality check · ${q.score}/100 · ${q.complete}% of the needed details given${oks?` · ${oks} answer${oks>1?"s":""} clarified`:""}</span></div>
     ${list.length?`<h5 class="qh">To improve</h5><ul class="qlist">${list.map(p=>`<li class="${p.lvl}">${/^<span>/.test(p.html)?p.html:`<span>${p.html}</span>`}</li>`).join("")}</ul>`:""}
     ${open.length?`<h5 class="qh">Still open (${open.length})</h5><ul class="qlist">${open.map(x=>`<li class="info"><span>${esc(x)}</span></li>`).join("")}</ul>`:""}
-    ${!list.length&&!open.length?`<ul class="qlist"><li class="ok">No gaps or inconsistencies found.</li></ul>`:""}</div>`;
+    ${optional.length?`<h5 class="qh">Optional for this request</h5><ul class="qlist">${optional.join("")}</ul>`:""}
+    ${!list.length&&!open.length&&!optional.length?`<ul class="qlist"><li class="ok">No gaps or inconsistencies found.</li></ul>`:""}</div>`;
 }
 function sdText(){ const d=S.sd.desc||{};
   if(d.exec!==undefined) return [`${S.sd.title}${d.tagline?` | ${d.tagline}`:""}`, d.headline, "Executive service description\n"+d.exec,
@@ -3062,7 +3122,7 @@ function bind(){
   const o=$("#ovr"); if(o) o.onchange=e=>{S.override=e.target.value;render();};
   document.querySelectorAll("[data-act]").forEach(b=>b.onclick=()=>{
     const a=b.dataset.act;
-    if(a==="submit") submit(); if(a==="json") download(); if(a==="brd") openBRD();
+    if(a==="submit") submit(); if(a==="json") download(); if(a==="brd") openBRD(); if(a==="addopt") startOptional(b.dataset.key);
     if(a==="more"){ S.showMore=!S.showMore; render(); }
     if(a==="copy") navigator.clipboard?.writeText(sdText()).then(()=>b.textContent="Copied");
     if(a==="copycompact") navigator.clipboard?.writeText(S.sd.compact||"").then(()=>b.textContent="Copied");

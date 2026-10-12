@@ -254,3 +254,48 @@ test("the catalogue is offered only when the value fits the catalogue price", as
   }, CASES);
   expect(got).toEqual(Object.fromEntries(Object.entries(CASES).map(([name, [, want]]) => [name, want])));
 });
+
+// "To improve" keeps what this route did not ask as optional points, chosen for the demand, and each can be added in the chat
+test("optional points are tailored to the demand and can be added in the chat", async ({ page }) => {
+  await openApp(page);
+  await say(page, "A new HR system to replace our payroll tool.");
+  await answerUntilDone(page, ANSWERS);
+  const optional = page.locator(".sd .qual li.opt");
+  await expect(page.locator(".sd .qual")).toContainText("Optional for this request");
+  await expect(optional.filter({ hasText: /change management/i })).toHaveCount(1);
+  await optional.locator('[data-act="addopt"]').first().click();
+  await idle(page);
+  await expect(page.locator("#msgs .m.a").last()).toContainText("Sure, let's add it.");
+});
+
+test("a one-off event gets no governance or change management points", async ({ page }) => {
+  await openApp(page);
+  await say(page, "An agency for a client dinner for 40 people, around 30k.");
+  const EVENT = [
+    [/business problem/i, "We host our top 40 clients once a year; without an agency we cannot organise it in time"],
+    [/use today/i, "Our assistants organised it in the past, but they have no capacity this year"],
+    [/How long will the work run/i, "One evening, a one-off event"],
+    [/kind of data/i, "Guest names and email addresses, stored in the EU"],
+    [/Where and how/i, "At a venue in Frankfurt"],
+  ];
+  await answerUntilDone(page, [...EVENT, ...ANSWERS]);
+  await expect(page.locator(".sd .qual")).not.toContainText(/governance|change management|escalation/i);
+});
+
+test("a description built without the AI reads as sentences", async ({ page }) => {
+  await openApp(page);
+  const got = await page.evaluate(() => {
+    Object.assign(S.f, { category: "software", demand_type: "software", users: "Procurement colleagues",
+      background: "providing a single entry to procurement, reducing cycle time",
+      must_haves: "handle approval workflows, would you measure success by cycle time, chatbot intake",
+      acceptance: "success will be judged by cycle time and user satisfaction" });
+    const t = offlineExec(firstPerson("Buy a process orchestration platform for procurement"));
+    return { head: t.headline, exec: t.exec, item: itemFrom("Buy a process orchestration platform for procurement") };
+  });
+  expect(got.item).toBe("Process orchestration platform");
+  expect(got.head).toContain("with a process orchestration platform for procurement.");
+  expect(got.exec).toMatch(/^The organisation needs a process orchestration platform for procurement\./);
+  expect(got.exec).toContain("The goal is providing a single entry to procurement");
+  expect(got.exec).toContain("Success means: cycle time and user satisfaction");
+  expect(got.exec).not.toMatch(/with buy|Today, providing|measured by success|would you/i);
+});
