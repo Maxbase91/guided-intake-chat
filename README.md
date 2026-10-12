@@ -83,6 +83,6 @@ Below the threshold (business-led) the same flow is lighter. Any question can be
 
 **Outsourcing** is determined per legal entity: entity → regulator → instrument → that instrument's test → confirmed facts → result with reasons. The rule matrix (EBA/GL/2019/02, PRA SS2/21, MAS Notice 658, HKMA SA-2, APRA CPS 230, OSFI B-10, US Interagency Guidance 2023) and the change watch are data in the code and must be replaced with the organisation's own entity-to-regulator matrix. Results are flags for the outsourcing review, never final determinations. ICT (DORA) is a separate flag.
 
-**Outputs** for new demand: executive service description; detailed service description (25 sections); structured sourcing input attributes; materiality and governance input summary (materiality always "to be determined"); compact sourcing request text and a version of 500 characters or less; quality check by section; final Level 4 validation.
+**Outputs** for new demand: executive service description; detailed service description (25 sections); structured sourcing input attributes; materiality and governance input summary (materiality always "to be determined"); compact sourcing request text; quality check by section; final Level 4 validation.
 
 All entities, categories and suppliers in the code are mock data.

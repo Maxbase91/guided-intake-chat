@@ -2014,12 +2014,6 @@ function offlineCompact(){
     (d.open_points||[]).length?`Open points: ${d.open_points.slice(0,3).join(" ")}`:""];
   return parts.filter(x=>x&&x.length>1).join(" ").replace(/\s+/g," ").trim();
 }
-function clampChars(t, max){ t=String(t||"").replace(/\s+/g," ").trim(); if(t.length<=max) return t; const cut=t.slice(0,max), e=cut.lastIndexOf(". "); return e>max*0.5?cut.slice(0,e+1):cut.slice(0,cut.lastIndexOf(" ")).replace(/[,;:]$/,"")+"."; }
-function offlineShort(){
-  const f=S.f, a=accessFlags(f), g=k=>givenText(f[k]).replace(/\.$/,""), d=S.sd&&S.sd.detail||{};
-  const ob=(d.scope_in||[]).map(x=>x.replace(/^The Service Provider shall /,"").replace(/\.$/,"")).slice(0,2);
-  return clampChars([`${S.sd?S.sd.title:workingTitle()}:`, ob.length?`the provider shall ${listJoin(ob)}.`:"", g("background")&&`Purpose: ${g("background").charAt(0).toLowerCase()+g("background").slice(1)}.`, a.any?`Access to ${g("data_details")||"our data or systems"}.`:"No data access.", g("duration")&&`Period: ${g("duration")}.`].filter(Boolean).join(" "), 500);
-}
 
 // full business requirements document built from the answers alone (no AI); the AI version is merged on top
 function offlineBRD(risk){
@@ -2160,8 +2154,7 @@ ${S.det&&NEW_DEMAND(S.det.route)?`   For this new demand fill only requirements,
    separate confirmed information from assumptions and open points; write "To be determined" where something is unknown and list it in open_points; never invent service levels, access, legal terms or materiality outcomes;
    do not include intellectual property terms (flag them for Legal review if the user raised them). Captured details (dates, locations, access) belong here.
 4. "compact": a compact sourcing request description in one paragraph (what the provider provides, purpose, key deliverables, timeline and location, access or technology, service levels or acceptance, important open points). No artificial limit, but concise. Do not cut sentences.
-5. "short500": a very short version of at most 500 characters keeping the nature of the service, its purpose and key access information.
-   In "compact" and "short500": no abbreviations or shorthand (write "accounts payable", "8,000", "January", "enterprise resource planning system"), and use exactly the same figures as in "detail".
+5. In "compact": no abbreviations or shorthand (write "accounts payable", "8,000", "January", "enterprise resource planning system"), and use exactly the same figures as in "detail".
 6. "l4_final": re-check the Level 4 classification against the full description: {"code":"one code from the list","match":0-100,"reason":"short plain reason","uncertainty":""}.`:""}
 Rules for the brd: use every fact and detail from the conversation. Never invent names, numbers or dates. Where something important is unknown, put it in open_points.
 Money: the currency is ${CONFIG.currency} (€). Quote the value exactly as given in value_display. Never recalculate or re-estimate amounts.
@@ -2179,7 +2172,7 @@ Return JSON only:
   "commercials":[""],"evaluation":[{"criterion":"","weight":"40%"}],"stakeholders":[{"role":"","who":""}],
   "assumptions":[""],"dependencies":[""],"open_points":[""]},
  ${S.det&&NEW_DEMAND(S.det.route)?`"detail":{"purpose":"","scope_in":[""],"scope_out":[""],"our_deps":[""],"assumptions":[""],"delivery":"","timeline":"","deliverables":[""],"acceptance":"","acceptance_test":"","service_levels":[""],"kpis":[""],"tools":[""],"qualifications":"","volumes":"","access":[""],"gov_meetings":"","reporting":"","change_mgmt":"","escalation":"","supplier_docs":"","open_points":[""]},
- "compact":"","short500":"","l4_final":{"code":"","match":0,"reason":"","uncertainty":""},`:""}
+ "compact":"","l4_final":{"code":"","match":0,"reason":"","uncertainty":""},`:""}
  "quality_remarks":["at most 3 short remarks a buyer would raise: gaps, inconsistencies or risks in this request; empty if none"]}`;
 
 const nonEmpty = v => Array.isArray(v) ? v.filter(x=>x&&(typeof x!=="object"||Object.values(x).some(Boolean))).length>0 : !!(v&&String(v).trim());
@@ -2219,7 +2212,6 @@ async function buildDoc(cid=S.cid){
   if(NEW_DEMAND(S.det.route)){
     S.sd.detail = mergeDetail(offlineDetail(S.sd.brd), ai&&ai.detail);
     S.sd.compact = ai&&typeof ai.compact==="string"&&words(ai.compact)>=25 ? ai.compact.trim() : offlineCompact();
-    S.sd.short500 = clampChars(ai&&typeof ai.short500==="string"&&words(ai.short500)>=10 ? ai.short500 : offlineShort(), 500);
     S.sd.l4Final = finalL4(ai&&ai.l4_final);
   }
   S.quality = computeQuality(ai&&Array.isArray(ai.quality_remarks)?ai.quality_remarks:[]);
@@ -2339,8 +2331,6 @@ function recHTML(R){
     <div class="rec-h"><div class="eyebrow">Recommended route</div><h2>${c.name}</h2>
       <div class="meta">Typically ${c.days} working days${known(f.value)?` · ${money(Number(f.value))}${f.value_is_estimate?" estimated":""}`:""}</div></div>
     <div class="sec"><h4>Why</h4>${esc(R.why)}</div>
-    <div class="sec"><h4>What happens next</h4><ol>${R.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol></div>
-    ${R.controls.length?`<div class="sec"><h4>Checks along the way</h4>${R.controls.map(([k,t,d])=>`<div class="chk"><i class="${k}">✓</i><div>${esc(t)}<br><span>${esc(d)}</span></div></div>`).join("")}</div>`:`<div class="sec"><h4>Checks along the way</h4>None. Standard items go straight through.</div>`}
     <div class="acts">
       <span class="muted">The service description is above.</span>
       <button class="lnk" data-act="more">${S.showMore?"Fewer options":"More options"}</button>
@@ -2372,8 +2362,7 @@ function sdHTML(){
     <div class="sec desc">${descHTML(true)}</div>
     <div class="sec record"><h4>Captured for procurement <span class="muted">not part of the description</span></h4><div class="kvg">${rec.map(([k,v])=>`<span>${esc(k)}</span><span>${esc(v)}</span>`).join("")}</div></div>
     ${d.detail?`<div class="sec srq"><h4>Sourcing request text</h4><p class="cmp">${esc(d.compact)}</p>
-      <div class="shortv"><span class="muted">Short version, ${d.short500.length} of 500 characters</span><p>${esc(d.short500)}</p></div>
-      <div class="cpy"><button class="lnk" data-act="copycompact">Copy sourcing text</button><button class="lnk" data-act="copyshort">Copy short version</button></div></div>`:""}
+      <div class="cpy"><button class="lnk" data-act="copycompact">Copy sourcing text</button></div></div>`:""}
     ${qualityHTML()}
     <div class="sec brdlink"><div><b>${d.detail?"Detailed service description":"Business requirements document"}</b><br><span class="muted">${d.detail?`25 sections, ${n} obligations, outsourcing and ICT determination, sourcing attributes, quality check by section`:`${n} requirements, risk and compliance, commercial terms, evaluation, approvals`}${S.sd._ai?"":" · built from your answers"}</span></div>
       <button class="btn btn-a" data-act="brd">Open document</button></div>
@@ -2498,7 +2487,6 @@ function detailHTML(){
   <h2>Part 3. Structured sourcing input attributes</h2>${attrs}
   <h2>Part 4. Materiality and governance input summary</h2>${mat}
   <h2>Part 5. Compact sourcing request description</h2><div class="lead"><p>${esc(d.compact)}</p></div>
-  <h3>Optional very short description (500 characters or fewer)</h3><p>${esc(d.short500)}</p>
   <h2>Part 6. Service description quality check</h2><p><b>${esc(S.quality?S.quality.rating:"")}</b>${S.quality?`, ${S.quality.score}/100`:""}.</p>${qtab}
   <h2>Part 7. Level 4 classification, final validation</h2>${kv([["Final",fin.code?`${fin.name} (${fin.code})${fin.match?`, ${fin.match}% match`:""}`:"—"],["Reasoning",fin.reason],["Remaining uncertainty",fin.uncertainty||"None noted"]])}
   <p><b>${fin.changed?"The Level 4 classification has changed due to refined scope.":"The initial Level 4 classification is confirmed."}</b>${fin.changed?` Initial: ${esc(fin.from.name)} (${esc(fin.from.code)}). Final: ${esc(fin.name)} (${esc(fin.code)}). ${esc(fin.why)}`:""}</p>
@@ -2537,7 +2525,6 @@ function bind(){
     if(a==="more"){ S.showMore=!S.showMore; render(); }
     if(a==="copy") navigator.clipboard?.writeText(sdText()).then(()=>b.textContent="Copied");
     if(a==="copycompact") navigator.clipboard?.writeText(S.sd.compact||"").then(()=>b.textContent="Copied");
-    if(a==="copyshort") navigator.clipboard?.writeText(S.sd.short500||"").then(()=>b.textContent="Copied");
   });
   document.querySelectorAll("[data-sd]").forEach(el=>el.addEventListener("blur",()=>{const k=el.dataset.sd; S.sd[k]=el.textContent.trim(); S.brdEdited=null;}));
   document.querySelectorAll("[data-sec]").forEach(el=>el.addEventListener("blur",()=>{const k=el.dataset.sec, d=S.sd.desc;
