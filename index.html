@@ -2095,7 +2095,7 @@ function mergeDesc(base, ai){
 function intakeRecord(){
   const f=S.f, D=S.det, route=S.override||D.route, cl=classify(f), o=cl.o, a=accessFlags(f), nd=NEW_DEMAND(route), v=k=>known(f[k])&&!isTBD(f[k])?show(k,f[k]):null;
   const supplier = hasSupplier(f) ? `${f.supplier}${givenText(f.supplier_reason)?` (${f.supplier_reason})`:""}` : nd ? "Open"+((PREFERRED[f.category]||[]).length?`, preferred: ${PREFERRED[f.category].join(", ")}`:"") : null;
-  const fin=S.sd&&S.sd.l4Final, ini=(S.l4Initial||[])[0];
+  const ini=(S.l4Initial||[])[0], fin=(S.sd&&S.sd.l4Final) || (f.l4&&ini&&f.l4!==ini.code&&l4ByCode(f.l4) ? finalL4(null) : null);
   const rows=[["Buying route",CHANNELS[route].name],
     ["Category (Level 4)", fin ? `${fin.name} (${fin.code})${ini?(ini.code===fin.code?", initial classification confirmed":`, changed from ${ini.name}`):""}` : ini ? `${ini.name} (${ini.code}), ${ini.match}% match` : null],
     ["Budget",known(f.value)?money(Number(f.value))+(f.value_is_estimate?" (estimate)":""):null], ["Budget approved",v("budget_approved")],
