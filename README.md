@@ -71,7 +71,7 @@ For the profile points (audience, functions, benefits, unique selling points, KP
 
 New demand combines the front door with a tiered version of a detailed service-description intake:
 
-1. **Your need**: what, value, duration, and whether technology is involved (only if the rules can't tell). The first message is classified against a Level 4 category list (mock) with match % and reasoning.
+1. **Your need**: what, value, duration, and whether technology is involved (only if the rules can't tell). The first message is classified against a Level 4 category list (mock) with match % and reasoning. Software is not asked "how many users or licences" up front: the chat asks who will use it and roughly how many people together with the audience ("not sure yet" is fine), and the licence count and pricing model are listed as points to confirm with suppliers. Catalogue orders still ask the count first.
 2. **Purpose and profile**: problem and impact of delay, audience and functions (suggested), today's solution and why external, unique selling points, benefits and regulatory benefits (suggested).
 3. **Scope and deliverables**: what the provider does (played back as "The Service Provider shall…"), out of scope (suggested), acceptance and sign-off (suggested), staff qualifications, volumes.
 4. **Running the service** (ongoing services): service levels and KPIs, support model and tools (technology only), governance, reporting, change and escalation (suggested standard pack).

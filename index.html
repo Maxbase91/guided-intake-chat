@@ -399,7 +399,7 @@ const DELIV_EX = {
 const FACTS = {
   need:           {label:"What you need",   q:()=>"Could you tell me a bit more about what you need?", ex:()=>"For example: \"an agency to run a client dinner for 40 people in March\"."},
   item:           {label:"Item",            q:f=>f.demand_type==="services"?"What exactly are you buying?":"Which item or product do you need?", ex:f=>f.demand_type==="software"?"For example: \"a project-tracking tool for 25 users\".":f.demand_type==="services"?"For example: \"one ticket for the Procurement Leaders conference\".":"For example: \"a 27-inch monitor\" or a product link."},
-  quantity:       {label:"Quantity",        q:f=>f.demand_type==="software"?"How many users or licences?":"How many do you need?", ex:()=>""},
+  quantity:       {label:"Quantity",        q:f=>f.demand_type==="software"&&S.det&&NEW_DEMAND(S.det.route)?"Who will use it, and roughly how many people? A rough number is fine.":f.demand_type==="software"?"How many users or licences?":"How many do you need?", ex:f=>f.demand_type==="software"&&S.det&&NEW_DEMAND(S.det.route)?"For example: \"about 400 buyers and requesters across Europe\", or \"not sure yet\". The licence count and pricing model are agreed with suppliers later.":"", choices:f=>f.demand_type==="software"&&S.det&&NEW_DEMAND(S.det.route)?["Not sure yet"]:null},
   value:          {label:"Budget",          q:()=>"Roughly what will this cost in total?", ex:f=>`A rough figure is fine${f.duration?`, for the full ${f.duration}`:""}. If you don't know, just say so and I'll estimate it.`, why:()=>"The amount decides how much competition is needed."},
   deliverables:   {label:"Deliverables",    q:f=>f.demand_type==="contingent_labour"?"What will they work on?":"What should the supplier deliver?", ex:f=>f.demand_type==="contingent_labour"?"For example: \"building the new payments API with our team\".":`For example: ${DELIV_EX[f.category]||DELIV_EX._}.`},
   duration:       {label:"Duration",        q:f=>f.wants_renewal?"How long should the renewed contract run?":"How long will the work run?", ex:()=>"", choices:["Under 3 months","3–6 months","6–12 months","Over a year"]},
@@ -424,7 +424,7 @@ const FACTS = {
   deps_pack:      {label:"Dependencies and assumptions", sug:true, q:()=>"What will we need to provide, and what is the provider assuming?", ex:()=>""},
   other_risks:    {label:"Anything else",   q:()=>"Anything else I should know, for example risks, constraints or a hand-over from today's provider?", ex:()=>"", choices:["Nothing else"]},
   confirm_derived:{label:"Checked by you",  q:()=>"Please check what I've worked out.", ex:()=>""},
-  audience_fn:    {label:"Audience and functions", sug:true, q:()=>"Who is it for, and which teams or functions does it support?", ex:()=>""},
+  audience_fn:    {label:"Audience and functions", sug:true, q:f=>f&&f.demand_type==="software"?"Who will use it, roughly how many people, and which teams or functions does it support? A rough number is fine.":"Who is it for, and which teams or functions does it support?", ex:()=>""},
   value_props:    {label:"Benefits and selling points", sug:true, q:()=>"What makes it different, what are the main benefits, and does it bring regulatory or control benefits?", ex:()=>""},
   budget_approved:{label:"Budget approved", q:()=>"Is the budget already approved?", ex:()=>"", why:()=>"Sourcing only starts once the budget is confirmed.", choices:["Yes","Not yet","Partly"]},
   role:           {label:"Role",            q:()=>"What role do you need to fill?", ex:()=>"For example: \"senior Java developer\" or \"interim project manager\"."},
@@ -492,11 +492,11 @@ function requiredFor(route, f){
                            : ["deliverables",...on(!contractAgreed(f),"contract_ok"),"needed_by","duration","value","personal_data",...on(yes(f.personal_data)&&!known(f.data_details),"data_details")];
     // business-led: the same structure, lighter (profile points bundled into one suggestion)
     case "quote":      return g
-      ? ["item","quantity","value",...on(sw,"must_haves"),"background","profile",...on(sw,"scope_out"),"acceptance_pack","needed_by",...on(!sw,"location"),"supplier",...access(),...classif(),"confirm_derived"]
+      ? ["item",...on(!sw,"quantity"),"value",...on(sw,"must_haves"),"background",...on(sw,"quantity"),"profile",...on(sw,"scope_out"),"acceptance_pack","needed_by",...on(!sw,"location"),"supplier",...access(),...classif(),"confirm_derived"]
       : [...role(),"value",...on(f.category!=="marketing","duration"),"background","profile","scope_in","scope_out","acceptance_pack",...on(REL.volume(f),"volume"),"needed_by","location",...on(cont,"day_rate"),"supplier",...access(),...classif(),"confirm_derived"];
     // procurement-led: full depth
     case "sourcing":   return g
-      ? ["item","quantity","value","background",...impact(),"audience_fn",...on(sw,"current_solution"),"value_props","must_haves",...on(sw,"scope_out"),"acceptance_pack",...on(sw,"kpis_pack"),...on(ictOng,"service_model"),
+      ? ["item",...on(!sw,"quantity"),"value","background",...impact(),"audience_fn",...on(sw,"current_solution"),"value_props","must_haves",...on(sw,"scope_out"),"acceptance_pack",...on(sw,"kpis_pack"),...on(ictOng,"service_model"),
          "needed_by",...on(!sw,"location"),"budget_approved","supplier",...on(hasSupplier(f),["supplier_reason","supplier_terms"]),...access(),...classif(),...on(sw,"deps_pack"),"other_risks","confirm_derived"]
       : [...role(),"value",...on(f.category!=="marketing","duration"),"background",...impact(),"audience_fn","current_solution","value_props","scope_in","scope_out","acceptance_pack",...on(!cont,"qualifications"),...on(REL.volume(f),"volume"),
          "kpis_pack",...on(ictOng,"service_model"),...on(ong,"governance"),"needed_by","location",...on(cont,"day_rate"),"budget_approved","supplier",...on(hasSupplier(f),["supplier_reason","supplier_terms"]),
@@ -521,10 +521,13 @@ const STAGES=[
   {id:"check",   name:"Check",                intro:"Before I write anything, please check what I've worked out.", facts:["confirm_derived"]},
   {id:"review",  name:"Review",               intro:"Here's the route, the service description and the full documents.", facts:[]}
 ];
-const stageOf = k => { const i=STAGES.findIndex(st=>st.facts.includes(k)); return i<0?0:i; };
-const posIn = k => { const st=STAGES[stageOf(k)]; return st.facts.indexOf(k); };
+// software as new demand: the user count is asked with "who is it for", not up front
+const swNewDemand = () => S.f && S.f.demand_type==="software" && S.det && NEW_DEMAND(S.det.route);
+const factsOf = st => !swNewDemand() ? st.facts : st.id==="need" ? st.facts.filter(k=>k!=="quantity") : st.id==="purpose" ? [...st.facts.slice(0,2),"quantity",...st.facts.slice(2)] : st.facts;
+const stageOf = k => { const i=STAGES.findIndex(st=>factsOf(st).includes(k)); return i<0?0:i; };
+const posIn = k => { const st=STAGES[stageOf(k)]; return factsOf(st).indexOf(k); };
 const stageById = id => STAGES.find(st=>st.id===id);
-const stageFacts = id => (S.req||[]).filter(k=>stageById(id).facts.includes(k));
+const stageFacts = id => (S.req||[]).filter(k=>factsOf(stageById(id)).includes(k));
 const stageDone = id => id==="review" ? !!S.completed : stageFacts(id).every(k=>known(S.f[k]));
 const currentStage = () => S.missing.length && S.det ? STAGES[stageOf(S.missing[0])].id : (S.det?"review":"need");
 
@@ -727,11 +730,19 @@ function classify(f){
   const out={flag:o.code==="yes"?"Yes":o.code==="no"?"No":"To confirm", text:`${o.result}${o.fw?` under ${o.fw.short}`:""}. ${o.reasons.join(" ")} Flag for the outsourcing review; not a final determination.`};
   return {ict, out, type, o};
 }
+// software, new demand: a rough user count given with the audience ("about 400 buyers") fills the count
+function usersFromAudience(f){
+  if(f.demand_type!=="software"||!S.det||!NEW_DEMAND(S.det.route)) return null;
+  const t=[f.users,typeof f.audience_fn==="string"&&f.audience_fn!=="Confirmed"?f.audience_fn:""].filter(Boolean).join(" ").replace(/(\d),(\d{3})/g,"$1$2");
+  const m=t.match(/(\d+)\s*(k)?\+?\s*(?:[a-z-]+\s+){0,2}?(users?|people|colleagues|staff|employees|seats|licen[cs]es|buyers|requesters|approvers|agents|members)\b/i);
+  return m ? +m[1]*(m[2]?1000:1) : null;
+}
 function deriveFacts(f){
   const d=S.derived;
   const derive=(k,fn)=>{ if(k in d && f[k]!==d[k]) delete d[k];   // the user or the AI set it: keep theirs
     if(!known(f[k]) || k in d){ const v=fn(f); if(v===null||v===undefined){ if(k in d){ f[k]=null; delete d[k]; } } else { f[k]=v; d[k]=v; } } };
   derive("tech_service", techFromRules);
+  derive("quantity", usersFromAudience);
   derive("entity", entityFrom);
   derive("in_house", inHouseFromText);
   derive("offshore", ff=>{ const e=entityById(ff.entity), loc=String(ff.location||""); if(!e||!loc) return null;
@@ -755,7 +766,7 @@ function refresh(){
   S.det = determine();
   const req = requiredFor(S.det.route, f);
   S.req = req;
-  S.stageIds = STAGES.filter(st=>st.id==="review"||req.some(k=>st.facts.includes(k))).map(st=>st.id);
+  S.stageIds = STAGES.filter(st=>st.id==="review"||req.some(k=>factsOf(st).includes(k))).map(st=>st.id);
   const order = [...req].sort((a,b)=>(stageOf(a)-stageOf(b))||(posIn(a)-posIn(b)));
   S.missing = order.filter(k=>!known(f[k]));
 }
@@ -856,7 +867,8 @@ function computeQuality(aiRemarks){
     else if(fl.status==="corrected") pts.push({lvl:"ok",text:`${label(fl.fact)} clarified during the intake.`});
     else if(fl.status==="unanswered") pts.push({lvl:"warn",text:`${label(fl.fact)}: no usable answer given.`});
   }
-  req.filter(k=>(f[k]==="Not given"||f[k]==="unsure") && !S.flags.some(x=>x.fact===k&&x.status==="unanswered")).forEach(k=>pts.push({lvl:"warn",text:`${label(k)}: still to be clarified.`}));
+  const swCount=k=>k==="quantity"&&f.demand_type==="software"&&NEW_DEMAND(route);
+  req.filter(k=>(f[k]==="Not given"||f[k]==="unsure") && !S.flags.some(x=>x.fact===k&&x.status==="unanswered")).forEach(k=>pts.push(swCount(k)?{lvl:"info",text:"Number of users: to confirm with suppliers."}:{lvl:"warn",text:`${label(k)}: still to be clarified.`}));
   if(f.value_is_estimate && !["catalogue"].includes(route)) pts.push({lvl:"info",text:`The budget of ${money(Number(f.value))} is an estimate.`});
   if(route==="sourcing" && f.budget_approved && f.budget_approved!=="yes") pts.push({lvl:"warn",text:"Budget not yet approved. Sourcing can only start once it is."});
   if(known(f.needed_by) && !S.flags.some(x=>x.fact==="needed_by")){ const d=parseWhen(f.needed_by); if(d){ const days=(d-new Date())/864e5; if(days<(LEAD_DAYS[route]||0)) pts.push({lvl:"info",text:`Tight timeline: ${CHANNELS[route].name} usually takes ${CHANNELS[route].days} working days.`}); } }
@@ -1560,7 +1572,9 @@ function extractAll(text, asked){
   }
   if(/\b(offshore|nearshore|other country|another country)\b/.test(t)) o.offshore=true;
   // --- quantities, people and volume
-  const qn=raw.match(/\b(\d+(?:,\d{3})*)\s+(?:x\s+)?(?:new\s+|more\s+|additional\s+)?([a-z-]+)/gi)||[];
+  // numbers that belong to a product name ("Microsoft 365", "Windows 11", "iPhone 15") are not quantities
+  const PRODUCT_NUM=/\b(microsoft|office|m|dynamics|windows|iphone|ipad|galaxy|pixel|version|v|server|java|python|ios|android|macos|sap|s\/4hana|ecc)\s*$/i;
+  const qn=[...raw.matchAll(/\b(\d+(?:,\d{3})*)\s+(?:x\s+)?(?:new\s+|more\s+|additional\s+)?([a-z-]+)/gi)].filter(x=>!PRODUCT_NUM.test(raw.slice(0,x.index))).map(x=>x[0]);
   for(const m of qn){
     const [, n, noun]=m.match(/(\d+(?:,\d{3})*)\s+(?:x\s+)?(?:new\s+|more\s+|additional\s+)?([a-z-]+)/i), num=+n.replace(/,/g,""), w=noun.toLowerCase();
     if(/^(months?|weeks?|days?|years?|hours?|minutes?|k|m|eur|euros?|percent|evenings?|st|nd|rd|th)$/.test(w) || /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/.test(w)) continue;
@@ -1667,7 +1681,7 @@ function readAnswer(k, text){
   if(k==="entity"){ const e=ENTITIES.find(x=>t.includes(x.name.toLowerCase())||x.re.test(text)||(x.abbr&&x.abbr.test(text))); return e?e.id:/another|other/.test(t)?null:"Not given"; }
   if(k==="supplier_terms") return /^no\b|none/.test(t)?"No":/not sure|unsure/.test(t)?"Not sure":text.trim();
   if(k==="value"){ const v=parseMoney(text); if(v!=null){S.f.value_is_estimate=false;return v;} if(/know|sure|idea|estimate/.test(t)){S.f.value_is_estimate=true;return defaultEstimate();} return null; }
-  if(k==="quantity"||k==="headcount"){ const n=t.match(/\d+/); return n?+n[0]:(/more/.test(t)?"4+":null); }
+  if(k==="quantity"||k==="headcount"){ const n=t.replace(/(\d),(\d{3})/g,"$1$2").match(/\d+/); return n?+n[0]:/not sure|don.?t know|unknown|no idea|tbc|to be confirmed/.test(t)?"unsure":(/more/.test(t)?"4+":null); }
   if(k==="criticality"){ if(/client|customer|regulat|payment|trading|can.?t|cannot|outage|down|serious/.test(t) && !/nothing serious|no impact|minor/.test(t)) S.f.critical_service=true; return text.trim(); }
   if(k==="current_supplier" && /^(no|none|new|it.?s new)/.test(t)) return "None";
   if(k==="contract_ok"){ if(/^(y|yes|sure|ok|okay|happy|fine|please|go ahead|use)/.test(t) && !/^no/.test(t)){ if(S.det&&S.det.contract) S.f.supplier=S.det.contract.supplier; return true; }
@@ -1922,9 +1936,10 @@ const DETAIL_SECTIONS=[["title","Service title"],["purpose","Purpose and backgro
   ["supplier_docs","Supplier documents, URLs and incorporated materials"],["open_points","Open points and items to be determined"]];
 const TBDX="To be determined";
 function openPoints(){
-  const f=S.f, out=(S.req||[]).filter(k=>FACTS[k]&&(isTBD(f[k])||f[k]==="unsure")).map(k=>`${FACTS[k].label}: to be determined.`);
+  const f=S.f, swND=f.demand_type==="software"&&S.det&&NEW_DEMAND(S.det.route), out=(S.req||[]).filter(k=>FACTS[k]&&(isTBD(f[k])||f[k]==="unsure")&&!(swND&&k==="quantity")).map(k=>`${FACTS[k].label}: to be determined.`);
   const o=outsourcing(f); if(o.code==="tbd" && f.demand_type!=="goods") out.push("Outsourcing: whether our own teams would otherwise do this is still open.");
   if(!o.entity && f.demand_type!=="goods") out.push("Legal entity: to be confirmed; it decides the applicable outsourcing rules.");
+  if(swND) out.push(`${known(f.quantity)&&f.quantity!=="unsure"&&!isTBD(f.quantity)?`Around ${fmtN(f.quantity)} users. `:"Number of users, "}${known(f.quantity)&&f.quantity!=="unsure"&&!isTBD(f.quantity)?"Licence count":"licence count"} and pricing model (per user, per transaction or flat fee): to confirm with suppliers.`);
   if(f.value_is_estimate) out.push(`Value: ${money(Number(f.value))} is an estimate.`);
   if(isOngoing(f)) out.push("Service level failure consequences: to be agreed in sourcing (Legal and commercial review).");
   if(f.supplier_terms && !/^no$/i.test(String(f.supplier_terms))) out.push("Supplier standard terms: obtain a fixed (static) copy before relying on them.");
@@ -2319,7 +2334,7 @@ function renderStepbar(){
 function recapHTML(m, expanded){
   const names=m.stages.map(id=>stageById(id).name);
   if(!expanded) return `<div class="recap mini"><div class="rh">✓ ${esc(names.join(" · "))}</div></div>`;
-  const rows=m.stages.flatMap(id=>m.req.filter(k=>stageById(id).facts.includes(k)&&known(m.facts[k])).map(k=>`<div class="rr"><span>${esc(FACTS[k].label)}</span><span>${esc(show(k,m.facts[k]))}</span></div>`));
+  const rows=m.stages.flatMap(id=>m.req.filter(k=>factsOf(stageById(id)).includes(k)&&known(m.facts[k])).map(k=>`<div class="rr"><span>${esc(FACTS[k].label)}</span><span>${esc(show(k,m.facts[k]))}</span></div>`));
   return `<div class="recap"><div class="rh">✓ ${esc(names.join(" and "))}: here's what I have</div><div class="rb">${rows.join("")}</div><div class="rf">Anything wrong? Just tell me, for example "the budget is 60k".</div></div>`;
 }
 function msgHTML(m,i,lastRec,lastSd){
