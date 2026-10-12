@@ -356,29 +356,24 @@ const L4 = [
   {code:"L4-2803", name:"Payments and banking operations", cat:"bpo", kw:["payments operations","payment processing","reconciliation","settlement","corporate actions","custody","swift"], desc:"Payment processing, settlements, reconciliations and other banking operations run by a provider."},
   {code:"L4-2801", name:"Business process services", cat:"bpo", kw:["invoice processing","accounts payable","payroll","back office","call centre","contact centre","kyc","claims","document processing","processing"], desc:"The provider runs a business process for us on an ongoing basis, such as invoice processing or payroll."}
 ];
-/* Legal entities (mock) and the regulatory rule set that decides "outsourcing or not" for each. Versioned; replace with the real entity-to-regulator matrix. */
-const RULESET_VERSION = "Prototype rule set, October 2026";
+/* Provisioning legal entities (mock). The outsourcing test is one group-wide rule set for every entity (not per jurisdiction). */
 const ENTITIES = [
-  {id:"EU", name:"EU banking entity (Germany)", country:"Germany", fw:"EU", re:/frankfurt|germany|berlin|munich|hamburg|cologne|düsseldorf|stuttgart|europe\b/i, abbr:/\bEU\b/},
-  {id:"UK", name:"UK banking entity (London)", country:"United Kingdom", fw:"UK", re:/london|united kingdom|england|britain|edinburgh/i, abbr:/\bUK\b/},
-  {id:"SG", name:"Singapore branch", country:"Singapore", fw:"SG", re:/singapore/i},
-  {id:"HK", name:"Hong Kong branch", country:"Hong Kong", fw:"HK", re:/hong kong/i},
-  {id:"US", name:"US entity (New York)", country:"United States", fw:"US", re:/new york|united states|america/i, abbr:/\b(?:US|USA)\b/},
-  {id:"AU", name:"Australia branch", country:"Australia", fw:"AU", re:/sydney|melbourne|australia/i},
-  {id:"CA", name:"Canada branch", country:"Canada", fw:"CA", re:/toronto|canada/i}
+  {id:"EU", name:"EU banking entity (Germany)", country:"Germany", re:/frankfurt|germany|berlin|munich|hamburg|cologne|düsseldorf|stuttgart|europe\b/i, abbr:/\bEU\b/},
+  {id:"UK", name:"UK banking entity (London)", country:"United Kingdom", re:/london|united kingdom|england|britain|edinburgh/i, abbr:/\bUK\b/},
+  {id:"SG", name:"Singapore branch", country:"Singapore", re:/singapore/i},
+  {id:"HK", name:"Hong Kong branch", country:"Hong Kong", re:/hong kong/i},
+  {id:"US", name:"US entity (New York)", country:"United States", re:/new york|united states|america/i, abbr:/\b(?:US|USA)\b/},
+  {id:"AU", name:"Australia branch", country:"Australia", re:/sydney|melbourne|australia/i},
+  {id:"CA", name:"Canada branch", country:"Canada", re:/toronto|canada/i}
 ];
-const FRAMEWORKS = {
-  EU:{regulator:"European Banking Authority", instrument:"EBA Guidelines on outsourcing arrangements (EBA/GL/2019/02)", short:"EBA/GL/2019/02", test:"binary",
-      watch:"EBA/GL/2026/09 on third-party risk for non-ICT services: finalised, not yet applicable; replaces EBA/GL/2019/02 once applicable."},
-  UK:{regulator:"Prudential Regulation Authority", instrument:"PRA Supervisory Statement SS2/21, Outsourcing and third party risk management", short:"PRA SS2/21", test:"binary",
-      watch:"Updated SS2/21 (published March 2026) becomes effective on 18 March 2027."},
-  SG:{regulator:"Monetary Authority of Singapore", instrument:"MAS Notice 658 and MAS Guidelines on Outsourcing (Banks)", short:"MAS Notice 658", test:"binary"},
-  HK:{regulator:"Hong Kong Monetary Authority", instrument:"HKMA Supervisory Policy Manual SA-2, Outsourcing", short:"HKMA SA-2", test:"binary", newCounts:true},
-  AU:{regulator:"Australian Prudential Regulation Authority", instrument:"APRA CPS 230 Operational Risk Management", short:"APRA CPS 230", test:"material"},
-  CA:{regulator:"Office of the Superintendent of Financial Institutions", instrument:"OSFI Guideline B-10, Third-Party Risk Management", short:"OSFI B-10", test:"binary"},
-  US:{regulator:"Federal Reserve, OCC and FDIC", instrument:"Interagency Guidance on Third-Party Relationships: Risk Management (2023)", short:"US Interagency Guidance 2023", test:"thirdparty",
-      watch:"Proposed replacement guidance; comments due 16 November 2026. Not yet effective."}
+// the group standard for "is this outsourcing?", and the rule set that will replace it (kept separate, never used for the result until switched on)
+const RULESETS = {
+  current:{id:"EBA/GL/2019/02", short:"EBA/GL/2019/02", status:"Applicable (group standard)", issuer:"European Banking Authority",
+    instrument:"EBA Guidelines on outsourcing arrangements (EBA/GL/2019/02)", role:"Primary classification source: definition of outsourcing and criteria for whether an arrangement is outsourcing (paragraphs 26 to 28); critical or important functions (paragraphs 29 to 31)."},
+  future:{id:"EBA/GL/2026/09", short:"EBA/GL/2026/09", status:"Finalised 18 September 2026; not yet applicable (application date not set)", issuer:"European Banking Authority",
+    instrument:"EBA Guidelines on the sound management of third-party risk related to non-ICT services (EBA/GL/2026/09)", role:"Future rule set, versioned separately. Repeals EBA/GL/2019/02 once applicable; covers all non-ICT third-party arrangements."}
 };
+const RULESET_VERSION = `Current: ${RULESETS.current.short} (group standard) · Future: ${RULESETS.future.short} (not yet applicable) · prototype, October 2026`;
 const ALL_SUPPLIERS = [...new Set([...CONTRACTS.map(c=>c.supplier),...Object.values(PREFERRED).flat(),...CATALOGUE.map(c=>c.supplier)])];
 
 /* =========================================================
@@ -428,8 +423,8 @@ const FACTS = {
   service_model:  {label:"Support and tools", sug:true, q:()=>"How will the technology be supported: support model, service hours and tools?", ex:()=>""},
   governance:     {label:"Governance and reporting", sug:true, q:()=>"How should the service be governed? Here's a standard set of meetings, reports, change and escalation rules.", ex:()=>""},
   supplier_terms: {label:"Supplier standard terms", q:f=>`Will the service rely on any of ${hasSupplier(f)?f.supplier:"the provider"}'s standard terms, policies or online documents?`, ex:()=>"Online terms can change without notice, so they need a fixed copy.", choices:["No","Yes","Not sure"]},
-  entity:         {label:"Legal entity",    q:()=>"Which part of the organisation will use this and sign the contract?", ex:()=>"This decides which regulator's rules apply.", choices:["UK banking entity (London)","EU banking entity (Germany)","US entity (New York)","Another entity"]},
-  in_house:       {label:"Done by our teams today", q:()=>"Is this something our own teams do today, or would normally do themselves?", ex:()=>"This is the key question for whether it counts as outsourcing.", choices:["Yes, our teams do it today","We'd normally do it ourselves","No, we'd always buy this in","Not sure"]},
+  entity:         {label:"Provisioning legal entity", q:()=>"Which legal entity of the bank will receive this service and sign the contract?", ex:()=>"It goes on the contract and into the register of third-party arrangements.", choices:["UK banking entity (London)","EU banking entity (Germany)","US entity (New York)","Another entity"]},
+  in_house:       {label:"Work the bank could do itself", q:()=>"Is this work the bank does itself today, or could realistically do itself?", ex:()=>"This is the key question for whether it counts as outsourcing: it can apply even if we have never done it ourselves, as long as a bank could realistically do it.", choices:["Yes, we do it today","We could realistically do it","No, a bank wouldn't do this itself","Not sure"]},
   deps_pack:      {label:"Dependencies and assumptions", sug:true, q:()=>"What will we need to provide, and what is the provider assuming?", ex:()=>""},
   other_risks:    {label:"Anything else",   q:()=>"Anything else I should know, for example risks, constraints or a hand-over from today's provider?", ex:()=>"", choices:["Nothing else"]},
   confirm_derived:{label:"Checked by you",  q:()=>"Please check what I've worked out.", ex:()=>""},
@@ -594,7 +589,7 @@ function controlsFor(route, ctr){
   if(accessFlags(f).personal) out.push(["w","Data protection review","The provider will see personal or client data."]);
   if(yes(f.tech_service) && (NEW_DEMAND(route)||f.demand_type==="contingent_labour")) out.push(["w","ICT review (DORA)", REL.ongoingSvc(f)?`Likely an ICT service: ${ictType(f)}.`:`Possibly an ICT service: ${ictType(f)}. The review confirms.`]);
   if(NEW_DEMAND(route) && f.demand_type!=="goods"){ const o=outsourcing(f);
-    if(o.code==="yes") out.push(["w","Outsourcing assessment",`${o.result}${o.fw?` under ${o.fw.short}`:""}.`]);
+    if(o.code==="yes") out.push(["w","Outsourcing assessment",`${o.result} under ${o.rs.short}.`]);
     else if(o.code==="tbd") out.push(["w","Outsourcing assessment","Whether this is outsourcing is still open."]);
     if(isImportant(f)) out.push(["w","Critical or important function check","It may support a critical or important business function."]);
     const a=accessFlags(f); if(a.money||/Privileged|Administrative/.test(a.level)) out.push(["w","Access review",`${a.money?"Money or account access":""}${a.money&&/Priv|Admin/.test(a.level)?"; ":""}${/Priv|Admin/.test(a.level)?a.level+" access":""}.`]); }
@@ -682,18 +677,26 @@ function entityFrom(f){
 const entityById = id => ENTITIES.find(e=>e.id===id) || null;
 const isOngoing = f => known(f.ongoing) && !isTBD(f.ongoing) ? yes(f.ongoing) : f.demand_type==="contingent_labour" ? (known(f.duration)?monthsOf(f.duration)>=3:true) : (GOODSLIKE(f)&&f.demand_type!=="software") ? false : REL.ongoingSvc(f) && !(known(f.duration) && monthsOf(f.duration)<3);
 // types that the outsourcing definitions generally leave out
+// EBA/GL/2019/02 paragraph 28: arrangements that are not outsourcing
 function excludedType(f){
-  if(f.demand_type==="goods") return "a purchase of goods";
-  return ({legal:"legal advice", training:"training", marketing:"events and marketing services", facilities:"facility services such as cleaning or catering",
-    "market-data":"market information services", telecom:"network and telecom services", contingent:"temporary staff working under our direction", office:"a purchase of goods", "it-hardware":"a purchase of goods"})[f.category]
-    || (f.category==="consulting" && !isOngoing(f) ? "one-off advice" : null);
+  const t=demandText(f);
+  if(f.demand_type==="goods" || ["office","it-hardware"].includes(f.category)) return "a purchase of goods (paragraph 28(g))";
+  if(/\bstatutory audit\b/.test(t)) return "a function the law requires a provider to perform, such as the statutory audit (paragraph 28(a))";
+  if(/\b(visa|mastercard|card scheme)\b/.test(t)) return "use of a global network infrastructure (paragraph 28(c))";
+  if(/\b(clearing house|central counterpart|settlement arrangement)\b/.test(t)) return "a clearing and settlement arrangement (paragraph 28(d))";
+  if(/\bswift\b/.test(t) && !/operations|investigat|processing/.test(t)) return "use of a global financial messaging infrastructure (paragraph 28(e))";
+  if(/\bcorrespondent bank/.test(t)) return "correspondent banking (paragraph 28(f))";
+  return ({legal:"legal advice or representation, which the bank would not otherwise perform (paragraph 28(g))", facilities:"facility services such as cleaning, catering or maintenance (paragraph 28(g))",
+    "market-data":"a market information service (paragraph 28(b))", telecom:"telecom lines and utilities (paragraph 28(g))",
+    training:"a service the bank would not otherwise perform itself (paragraph 28(g))", marketing:"a service the bank would not otherwise perform itself, such as event services (paragraph 28(g))",
+    contingent:"temporary staff working under our direction, not a function run by the provider"})[f.category] || null;
 }
 // would we otherwise do this ourselves? true / false / null (unclear)
 function inHouseFromText(f){
   const t=demandText(f);
   if(/\b(always (?:bought|buy) (?:this|it) in|never done (?:it|this)? ?(?:ourselves|internally|in[- ]house)|we (?:don.?t|do not) (?:do|have) (?:this|it) (?:today|ourselves)|not something (?:we|our teams?) (?:do|would do))\b/.test(t)) return false;
   if(/\b(our (?:own )?(?:team|teams|staff|people|colleagues)\b[^.]{0,40}\b(?:do|does|did|run|runs|handle|handles|process|processes|manage|manages)\b|in[- ]house today|today (?:we|our team)|we (?:currently )?(?:do|run|process|handle|manage) (?:it|this|them)|take over|on our behalf|instead of (?:us|our team)|run (?:our|the) [a-z ]*process|operate (?:our|the)|managed service|outsourc)/.test(t)) return true;
-  if(f.category==="bpo") return true;
+  if(bankDomain(f) || f.category==="bpo") return true;   // work banks typically run themselves
   return null;
 }
 function importantHint(f){
@@ -717,18 +720,34 @@ const PLAIN_ICT={"Cloud services: SaaS":"software the provider hosts and runs fo
   "ICT facilities and hosting (excluding cloud)":"hosting in a data centre","ICT project management":"technology project management"};
 // the outsourcing determination for the entity's jurisdiction: result, reasons and the instrument it rests on
 function outsourcing(f){
-  const ent=entityById(f.entity), fw=ent?FRAMEWORKS[ent.fw]:null, ex=excludedType(f), ong=isOngoing(f), ih=known(f.in_house)&&!isTBD(f.in_house)&&f.in_house!=="unsure"?yes(f.in_house):null;
-  const reasons=[]; let result, code;
-  if(ex){ result="Not outsourcing"; code="no"; reasons.push(`It is ${ex}, which outsourcing definitions generally leave out.`); }
-  else if(!ong){ result="Not outsourcing"; code="no"; reasons.push("It is a one-off delivery, not an ongoing service."); }
-  else if(ih===true){ result="Outsourcing (likely)"; code="yes"; reasons.push("It is an ongoing service.", "The provider would do something our own teams would otherwise do."); }
-  else if(ih===false && fw && fw.newCounts){ result="Outsourcing (likely)"; code="yes"; reasons.push("It is an ongoing service.", "Under this rule set a new service launched through a provider also counts."); }
-  else if(ih===false){ result="Not outsourcing (likely)"; code="no"; reasons.push("It is an ongoing service, but not something our own teams would otherwise do."); }
-  else { result="To be determined"; code="tbd"; reasons.push("It is an ongoing service; whether our own teams would otherwise do it is not clear yet."); }
-  if(fw && fw.test==="material") { result = code==="no" ? "Service-provider arrangement, not material (likely)" : `Service-provider arrangement${isImportant(f)?", may be material":""}: materiality to be assessed`; }
-  if(fw && fw.test==="thirdparty") { result = "Third-party relationship (no separate outsourcing test): risk-based oversight"; }
-  if(!ent) reasons.push("The legal entity is not known yet, so the applicable rule set is open.");
-  return {result, code, reasons, entity:ent, fw, important:isImportant(f), ex, ong, inHouse:ih};
+  const ent=entityById(f.entity), rs=RULESETS.current, ex=excludedType(f), ong=isOngoing(f), ih=known(f.in_house)&&!isTBD(f.in_house)&&f.in_house!=="unsure"?yes(f.in_house):null;
+  const reasons=[], steps=[]; let result, code;
+  steps.push(["Excluded under paragraph 28", ex?`Yes: ${ex}`:"No"]);
+  if(ex){ result="Not outsourcing"; code="no"; reasons.push(`It is ${ex}.`); }
+  else {
+    steps.push(["Performed on a recurrent or ongoing basis (paragraph 26)", ong?"Yes":"No, a one-off delivery"]);
+    if(!ong){ result="Not outsourcing (likely)"; code="no"; reasons.push("It is a one-off delivery, not performed on a recurrent or ongoing basis."); }
+    else {
+      steps.push(["Would or could realistically be performed by the bank itself (paragraph 26)", ih===true?"Yes":ih===false?"No":"Not clear yet"]);
+      if(ih===true){ result="Outsourcing (likely)"; code="yes"; reasons.push("It is performed on an ongoing basis.", "It is work the bank would or could realistically perform itself."); }
+      else if(ih===false){ result="Not outsourcing (likely)"; code="no"; reasons.push("It is performed on an ongoing basis, but it is not work the bank would or could realistically perform itself."); }
+      else { result="To be determined"; code="tbd"; reasons.push("It is performed on an ongoing basis; whether the bank would or could realistically perform it itself is not clear yet."); }
+    }
+  }
+  steps.push(["Critical or important function (paragraphs 29 to 31)", isImportant(f)?"May apply (flag)":"No indication"]);
+  return {result, code, reasons, steps, entity:ent, rs, fw:rs, important:isImportant(f), ex, ong, inHouse:ih, future:futureRule(f)};
+}
+// preview under the future rule set; shown separately, never decides the result
+function futureRule(f){
+  const ict = yes(f.tech_service) && isOngoing(f), t=demandText(f), rs=RULESETS.future;
+  let result, why;
+  if(f.demand_type==="goods" || ["office","it-hardware"].includes(f.category)){ result="Out of scope (likely)"; why="A purchase of goods, not a service arrangement."; }
+  else if(ict){ result="Out of scope: ICT service under DORA"; why="ICT services within the scope of DORA stay under DORA; mixed services need a check against both."; }
+  else if(/\bstatutory audit\b/.test(t)){ result="Out of scope"; why="A legally required service such as the statutory audit."; }
+  else if(f.category==="market-data"){ result="Out of scope"; why="A market information service."; }
+  else if(/\b(visa|mastercard|card scheme|swift)\b/.test(t) && !/operations|investigat|processing/.test(t)){ result="Out of scope"; why="A global payment network infrastructure."; }
+  else { result="Non-ICT third-party arrangement, in scope"; why=isImportant(f)?"A non-ICT service from a third party that may support a critical or important function, so the full requirements (including exit planning) would apply.":"A non-ICT service from a third party; proportionate requirements apply unless it is immaterial."; }
+  return {result, why, rs};
 }
 function classify(f){
   const ong=isOngoing(f), type=ictType(f);
@@ -736,7 +755,7 @@ function classify(f){
     : f.tech_service==="unsure" ? {flag:"To confirm",text:"Not clear yet whether this is an ICT service. The ICT review confirms."}
     : f.tech_service===false ? {flag:"No",text:"Not an ICT service, based on the answers."} : null;
   const o=outsourcing(f);
-  const out={flag:o.code==="yes"?"Yes":o.code==="no"?"No":"To confirm", text:`${o.result}${o.fw?` under ${o.fw.short}`:""}. ${o.reasons.join(" ")} Flag for the outsourcing review; not a final determination.`};
+  const out={flag:o.code==="yes"?"Yes":o.code==="no"?"No":"To confirm", text:`${o.result} under ${o.rs.short} (group standard). ${o.reasons.join(" ")} Flag for the outsourcing review; not a final determination.`};
   return {ict, out, type, o};
 }
 // software, new demand: a rough user count given with the audience ("about 400 buyers") fills the count
@@ -969,7 +988,7 @@ Your job each turn:
    (for example a budget far too low for the work described, a start date that has passed, "no personal data" for an HR or payroll system).
    Reasonable answers are ok, even if short. Never challenge an item listed in already_checked.
    When ok is false, "reply" must be only a short, friendly follow-up that names the issue and asks to confirm or correct it. Do not ask the next item in that case.
-7. Corrections: if the user changes something they said or confirmed earlier (for example a different category, budget, number of users, start date, duration, supplier, legal entity, location or title), put only the corrected items in "corrections" (same keys as facts; category as a category id) and NOT in "facts". Set "answers_question" false when the message does not also answer your last question; then do not record anything for that question.
+7. Corrections: if the user changes something they said or confirmed earlier (for example a different category, budget, number of users, start date, duration, supplier, provisioning legal entity, location or title), put only the corrected items in "corrections" (same keys as facts; category as a category id) and NOT in "facts". Set "answers_question" false when the message does not also answer your last question; then do not record anything for that question.
 6. If pending_check is set, the user is answering your earlier check on that item: update the fact if they corrected it, keep it if they confirmed it.
 Keep the conversation light: ask only what is in still_needed, and never ask about cost centres, payment models, subcontractors, certifications, service levels, ownership of work or evaluation weights unless the user raises them.
 
@@ -991,7 +1010,7 @@ When one answer covers several items (for example the problem, who it is for and
 The personal_data question also asks which data and where it is stored: record data_details from the same answer. If the user says the supplier will host or run it, also set ict_outsourcing true.
 New demand facts: scope_in (what the provider must do and deliver; also record deliverables from the same answer), scope_out, acceptance, acc_review, qualifications, service_levels, kpis,
 support_model, service_hours, tools, gov_meetings, reporting, change_mgmt, escalation, supplier_terms, our_deps, prov_assumptions, other_risks,
-entity (the legal entity that uses the service and signs: one of ${ENTITIES.map(e=>`${e.id} = ${e.name}`).join("; ")}), in_house (true if our own teams do this today or would normally do it themselves, false if we would always buy it in),
+entity (the provisioning legal entity that receives the service and signs the contract: one of ${ENTITIES.map(e=>`${e.id} = ${e.name}`).join("; ")}), in_house (true if this is work the bank does itself or could realistically do itself (EBA/GL/2019/02 paragraph 26), false if a bank would not do it itself),
 ongoing (true for an ongoing service, false for a one-off), important_fn (true only if the user says it supports a critical or important function), title (working title), l4 (Level 4 code, see below).
 Level 4 list: ${L4.map(e=>`${e.code} ${e.name}`).join("; ")}. On the first message set l4 to the best matching code, l4_match (0-100) and l4_reason (one short plain sentence).
 If the user types "skip", record nothing for that item.
@@ -1062,7 +1081,7 @@ const CORR_FIELDS=[
   {k:"needed_by",re:/\b(start date|start|deadline|go[- ]live|needed by|delivery date)\b/i},
   {k:"duration", re:/\b(duration|contract length|term|period)\b/i},
   {k:"supplier", re:/\b(supplier|vendor)\b/i},
-  {k:"entity",   re:/\b(legal entity|entity|branch)\b/i},
+  {k:"entity",   re:/\b(provisioning legal entity|provisioning entity|legal entity|entity|branch)\b/i},
   {k:"location", re:/\b(location|delivery address|delivered to)\b/i},
   {k:"title",    re:/\b(working title|title)\b/i}
 ];
@@ -1514,9 +1533,9 @@ function checkMessage(){
   if(e) L.push(`Category (Level 4): **${e.name}** (${e.code}${ini&&ini.code===e.code?`, ${ini.match}% match`:""})`);
   if(f.demand_type==="goods") L.push("It's a **purchase of goods**, so it is not outsourcing");
   else {
-    L.push(o.entity ? `It's for the **${o.entity.name}**` : "The legal entity is **not known yet**");
+    L.push(o.entity ? `Provisioning legal entity: **${o.entity.name}**` : "The provisioning legal entity is **not known yet**");
     L.push(o.ex ? `It's **${o.ex}**` : o.ong ? `It's an **ongoing service**${givenText(f.duration)?` (${f.duration})`:""}, not a one-off` : "It's a **one-off delivery**, not an ongoing service");
-    if(!o.ex && o.ong) L.push(o.inHouse===true ? "It's something **our own teams would otherwise do** themselves" : o.inHouse===false ? "It's **not** something our own teams would do themselves" : "Whether our own teams would otherwise do it is **not clear yet**");
+    if(!o.ex && o.ong) L.push(o.inHouse===true ? "It's work **the bank does or could realistically do itself**" : o.inHouse===false ? "It's **not** work a bank would do itself" : "Whether the bank would or could realistically do this itself is **not clear yet**");
     L.push(yes(f.tech_service) ? `It **involves technology**: ${PLAIN_ICT[cl.type]||cl.type}` : f.tech_service===false ? "It does **not** involve a technology service" : "Whether technology is involved is **not clear yet**");
     const ih=importantHint(f);
     const dI=!ih&&!known(f.important_fn)&&(bankDomain(f)||{}).important;
@@ -1526,7 +1545,7 @@ function checkMessage(){
     if(yes(f.offshore)||/other country|offshore/i.test(f.location||"")) L.push("Work happens **outside the entity's country**");
   }
   const means=[];
-  if(f.demand_type!=="goods") means.push(`Outsourcing: **${o.result}**${o.fw?` under ${o.fw.short}`:""}`);
+  if(f.demand_type!=="goods") means.push(`Outsourcing: **${o.result}** under ${o.rs.short} (group standard)`);
   const rev=S.det.controls.filter(c=>c[0]!=="i").map(c=>c[1]); if(rev.length) means.push(`Reviews needed: ${rev.join(", ")}`);
   return `${S.checkRound?"Thanks, I've updated it. ":""}Here's what I've worked out from your answers. Please check it:\n${L.map((x,i)=>`${i+1}. ${x}.`).join("\n")}${means.length?`\n\nWhat this means:\n${means.map(x=>"• "+x).join("\n")}`:""}\n\nIs this right? If not, tell me what's wrong.`;
 }
@@ -2012,7 +2031,7 @@ const cap1 = x => x ? String(x).charAt(0).toUpperCase()+String(x).slice(1) : x;
 const CLOSED=["in_house","entity","supplier_terms","contract_ok","value","quantity","headcount","tech_service","personal_data","ict_outsourcing","system_access","budget_approved","subcontracting"];
 function readAnswer(k, text){
   const t=text.trim().toLowerCase();
-  if(k==="in_house"){ if(/not sure|unsure|don.?t know/.test(t)) return "unsure"; if(/always buy|buy (?:this|it) in|^no\b|never/.test(t)) return false; if(/^yes|our teams|normally do|ourselves|in[- ]house|we do/.test(t)) return true; return null; }
+  if(k==="in_house"){ if(/not sure|unsure|don.?t know/.test(t)) return "unsure"; if(/always buy|buy (?:this|it) in|^no\b|never|wouldn.?t do this|would not do this/.test(t)) return false; if(/^yes|our teams|normally do|ourselves|in[- ]house|we do|could (?:realistically )?do/.test(t)) return true; return null; }
   if(k==="entity"){ const e=ENTITIES.find(x=>t.includes(x.name.toLowerCase())||x.re.test(text)||(x.abbr&&x.abbr.test(text))); return e?e.id:/another|other/.test(t)?null:"Not given"; }
   if(k==="supplier_terms") return /^no\b|none/.test(t)?"No":/not sure|unsure/.test(t)?"Not sure":text.trim();
   if(k==="value"){ const v=parseMoney(text); if(v!=null){S.f.value_is_estimate=false;return v;} if(/know|sure|idea|estimate/.test(t)){S.f.value_is_estimate=true;return defaultEstimate();} return null; }
@@ -2251,10 +2270,11 @@ function intakeRecord(){
     ["Quantity",v("quantity")], ["People",v("headcount")], ["Day rate",v("day_rate")], ["Volume",v("volume")],
     ["Start or delivery",v("needed_by")], ["Duration",v("duration")], ["Where and how",v("location")],
     ["Supplier",supplier], ["Existing contract",D.contract&&route==="contract"?`${D.contract.title} with ${D.contract.supplier} (${D.contract.id})`:null],
-    ["Legal entity", nd && f.demand_type!=="goods" ? (o.entity?o.entity.name:"To be determined") : null],
+    ["Provisioning legal entity", nd && f.demand_type!=="goods" ? (o.entity?o.entity.name:"To be determined") : null],
     ["Data and system access", known(f.personal_data) ? (a.any?`Yes${givenText(f.data_details)?`: ${f.data_details}`:""}${a.money?" (money or accounts)":""}`:show("personal_data",f.personal_data)) : null],
     ["System access",v("system_access")],
-    ["Outsourcing", nd && f.demand_type!=="goods" ? `${o.result}${o.fw?` (${o.fw.short})`:""}` : null],
+    ["Outsourcing", nd && f.demand_type!=="goods" ? `${o.result} (${o.rs.short}, group standard)` : null],
+    ["Future rule set", nd ? `${o.future.result} (${RULESETS.future.short}, not yet applicable)` : null],
     ["ICT service (DORA)",cl.ict?cl.ict.flag+(["Yes","Possible"].includes(cl.ict.flag)?` · ${cl.type}`:""):null],
     ["Critical or important function", nd && f.demand_type!=="goods" ? (isImportant(f)?"May apply, flagged for review":"No indication") : null],
     ["Materiality", nd ? "To be determined in the materiality process" : null],
@@ -2272,8 +2292,8 @@ const DETAIL_SECTIONS=[["title","Service title"],["purpose","Purpose and backgro
 const TBDX="To be determined";
 function openPoints(){
   const f=S.f, swND=f.demand_type==="software"&&S.det&&NEW_DEMAND(S.det.route), out=(S.req||[]).filter(k=>FACTS[k]&&(isTBD(f[k])||f[k]==="unsure")&&!(swND&&k==="quantity")).map(k=>`${FACTS[k].label}: to be determined.`);
-  const o=outsourcing(f); if(o.code==="tbd" && f.demand_type!=="goods") out.push("Outsourcing: whether our own teams would otherwise do this is still open.");
-  if(!o.entity && f.demand_type!=="goods") out.push("Legal entity: to be confirmed; it decides the applicable outsourcing rules.");
+  const o=outsourcing(f); if(o.code==="tbd" && f.demand_type!=="goods") out.push("Outsourcing: whether the bank would or could realistically do this itself is still open.");
+  if(!o.entity && f.demand_type!=="goods") out.push("Provisioning legal entity: to be confirmed for the contract and the register.");
   if(swND) out.push(`${known(f.quantity)&&f.quantity!=="unsure"&&!isTBD(f.quantity)?`Around ${fmtN(f.quantity)} users. `:"Number of users, "}${known(f.quantity)&&f.quantity!=="unsure"&&!isTBD(f.quantity)?"Licence count":"licence count"} and pricing model (per user, per transaction or flat fee): to confirm with suppliers.`);
   if(f.value_is_estimate) out.push(`Value: ${money(Number(f.value))} is an estimate.`);
   if(isOngoing(f)) out.push("Service level failure consequences: to be agreed in sourcing (Legal and commercial review).");
@@ -2319,7 +2339,7 @@ function sourcingAttributes(){
   const f=S.f, cl=classify(f), o=cl.o, a=accessFlags(f), d=S.sd&&S.sd.detail||{}, fin=S.sd&&S.sd.l4Final||{}, jn=x=>Array.isArray(x)?x.join("; "):x||TBDX;
   return [
     ["Classification",[["Level 4 code",fin.code||TBDX],["Level 4 name",fin.name||TBDX],["Match quality",fin.match?fin.match+"%":TBDX],["Reasoning",fin.reason||""],["Uncertainty",fin.uncertainty||"None noted"]]],
-    ["Service qualification",[["ICT service",cl.ict?cl.ict.flag:TBDX],["Critical or important function",isImportant(f)?"May apply (flagged)":"No indication"],["Outsourcing",`${o.result}${o.fw?` (${o.fw.short})`:""}`],
+    ["Service qualification",[["ICT service",cl.ict?cl.ict.flag:TBDX],["Critical or important function",isImportant(f)?"May apply (flagged)":"No indication"],["Outsourcing",`${o.result}${` (${o.rs.short})`}`],
       ["Materiality-related inputs",[known(f.value)&&`Value ${money(Number(f.value))}`, isImportant(f)&&"possible important function", a.any&&"data or system access", (yes(f.offshore)||/offshore|other country/i.test(f.location||""))&&"cross-border"].filter(Boolean).join("; ")||"None noted"],["Final materiality outcome",TBDX]]],
     ["Scope",[["Service purpose",d.purpose||TBDX],["In scope",jn(d.scope_in)],["Out of scope",jn(d.scope_out)],["Deliverables",jn(d.deliverables)],["Service period",givenText(f.duration)||TBDX],["Delivery location",givenText(f.location)||TBDX],
       ["Entity",o.entity?`${o.entity.name}, ${o.entity.country}`:TBDX],["Volumes",d.volumes||TBDX]]],
@@ -2336,7 +2356,7 @@ function sectionQuality(){
   const fromSug=(sec,keys,fixTBD)=>{ const k0=keys.find(k=>has(k)); if(!k0) return add(sec,"To be determined","Not provided",fixTBD); add(sec,"Complete",sug(Object.keys(BUNDLES).filter(b=>BUNDLES[b].some(([,x])=>keys.includes(x))).concat(keys))?"Suggested by the assistant and confirmed by you":"" , sug(Object.keys(BUNDLES).filter(b=>BUNDLES[b].some(([,x])=>keys.includes(x))).concat(keys))?"Check the wording against your actual need":""); };
   const ins=(d.scope_in||[]).length, outs=(d.scope_out||[]).length;
   add("Scope", ins&&outs?"Complete":ins||outs?"Partial":"To be determined", !ins?"In-scope activities missing":!outs?"Exclusions missing":"", !ins?"List the provider's main activities":!outs?"Add what is explicitly not included":"");
-  add("Service qualification", f.confirm_derived&&!isTBD(f.confirm_derived)&&o.entity?"Complete":"Partial", o.entity?"Derived by the rules"+(f.confirm_derived?", checked by you":""):"Legal entity not known", o.entity?"":"Confirm which entity signs the contract");
+  add("Service qualification", f.confirm_derived&&!isTBD(f.confirm_derived)&&o.entity?"Complete":"Partial", o.entity?"Derived by the rules"+(f.confirm_derived?", checked by you":""):"Provisioning legal entity not known", o.entity?"":"Confirm which entity signs the contract");
   add("Information and communication technology relevance", f.tech_service==="unsure"?"To be determined":"Complete", S.derived.tech_service!==undefined?"Derived from the description":"", "");
   add("Critical or important function relevance", known(f.important_fn)&&!isTBD(f.important_fn)?"Complete":"Partial", isImportant(f)?"Indicated by your impact answer; not a final decision":"No indication from your answers", "Confirm in the outsourcing and materiality review");
   add("Active obligations", ins>=2?"Complete":ins?"Partial":"To be determined", ins?"":"No provider obligations captured", ins<2?"Describe what the provider shall do":"");
@@ -2554,7 +2574,7 @@ async function buildDoc(cid=S.cid){
       const convo=S.msgs.filter(m=>!m.kind).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
       const docMsg=[{role:"user",content:`Conversation:\n${convo}\n\nFacts: ${JSON.stringify({...cleanFacts(), value_display: known(S.f.value)?money(Number(S.f.value))+(S.f.value_is_estimate?" (estimate)":""):"unknown"})}\nCategory: ${catById(S.f.category).name}\n`+
         `ICT service (DORA): ${cl.ict?cl.ict.text:"not assessed"}\nOutsourcing: ${cl.out?cl.out.text:"not assessed"}\n`+
-        (NEW_DEMAND(S.det.route)?`Critical or important function: ${isImportant(S.f)?"may apply (flag only)":"no indication"}\nLegal entity: ${(entityById(S.f.entity)||{}).name||"to be determined"}\nDerived facts checked by the requester: ${givenText(S.f.confirm_derived)||"no"}\n`+
+        (NEW_DEMAND(S.det.route)?`Critical or important function: ${isImportant(S.f)?"may apply (flag only)":"no indication"}\nProvisioning legal entity: ${(entityById(S.f.entity)||{}).name||"to be determined"}\nDerived facts checked by the requester: ${givenText(S.f.confirm_derived)||"no"}\n`+
           `Initial Level 4 classification: ${(S.l4Initial||[]).map(x=>`${x.code} ${x.name} (${x.match}%)`).join("; ")}\nLevel 4 list: ${L4.map(e=>`${e.code} ${e.name}: ${e.desc}`).join(" | ")}\n`:"")+
         `Recommended route: ${CHANNELS[S.det.route].name}. ${S.det.why}\nChecks triggered: ${S.det.controls.map(c=>c[1]).join(", ")||"none"}\nExisting contract: ${S.det.contract?`${S.det.contract.title} with ${S.det.contract.supplier}`:"none"}\nPreferred suppliers: ${(PREFERRED[S.f.category]||[]).join(", ")||"none"}`}];
       for(let attempt=0; attempt<2; attempt++){
@@ -2818,9 +2838,10 @@ function detailHTML(){
   const qual=`<h3>Category (Level 4)</h3>${kv([["Initial classification",ini?`${ini.name} (${ini.code}), ${ini.match}% match`:"—"],["Final classification",fin.code?`${fin.name} (${fin.code})${fin.match?`, ${fin.match}% match`:""}`:"—"],["Reasoning",fin.reason],["Uncertainty",fin.uncertainty||"None noted"]])}
     <h3>Information and communication technology</h3><p>${esc(cl.ict?cl.ict.text:"To be determined.")}</p>
     <h3>Critical or important function</h3><p>${isImportant(f)?"May apply, based on the impact described. Flagged for the outsourcing and materiality review; not a final decision.":"Nothing in the answers indicates a critical or important function. To be confirmed in the review."}</p>
-    <h3>Outsourcing determination</h3>${kv([["Legal entity",o.entity?`${o.entity.name}, ${o.entity.country}`:"To be determined"],["Regulator",o.fw?o.fw.regulator:"To be determined"],["Applicable instrument",o.fw?o.fw.instrument:"To be determined"],
-      ["Result",o.result],["Based on",o.reasons.join(" ")],["Checked by the requester",givenText(f.confirm_derived)||"No"],["Rule set",RULESET_VERSION],["Regulatory change watch",o.fw&&o.fw.watch?o.fw.watch:"None recorded"]])}
-    <p class="small">This is a flag for the outsourcing review, not a final determination. The test applied is the one for the legal entity's jurisdiction; a third-party arrangement is not treated as outsourcing by default.</p>
+    <h3>Outsourcing determination</h3>${kv([["Provisioning legal entity",o.entity?`${o.entity.name}, ${o.entity.country}`:"To be determined"],["Rule set",`${o.rs.instrument}. ${o.rs.status}.`],
+      ...o.steps.map(([a,b])=>[a,b]),["Result",o.result],["Based on",o.reasons.join(" ")],["Checked by the requester",known(f.confirm_derived)&&!isTBD(f.confirm_derived)?(f.confirm_derived==="Confirmed"?"Yes, confirmed":String(f.confirm_derived)):"No"]])}
+    <h3>Future rule set (versioned separately)</h3>${kv([["Rule set",`${RULESETS.future.instrument}. ${RULESETS.future.status}.`],["Indicative result",o.future.result],["Why",o.future.why],["Use","For information only; it does not change the result above until it applies."]])}
+    <p class="small">This is a flag for the outsourcing review, not a final determination. EBA/GL/2019/02 is applied as the group standard for every provisioning legal entity; local requirements may add to it. ICT services are assessed separately under DORA. Rule set: ${esc(RULESET_VERSION)}.</p>
     <h3>Materiality</h3><p>Materiality cannot be finally determined from this intake alone. The captured attributes are input to the applicable materiality determination process.</p>`;
   const sections={title:`<p><b>${esc(d.title)}</b></p>`, purpose:val(X.purpose), qualification:qual,
     scope:`<div class="two"><div><h3>In scope</h3>${val(X.scope_in)}</div><div><h3>Out of scope</h3>${val(X.scope_out)}</div></div>`,
@@ -2829,7 +2850,7 @@ function detailHTML(){
   const body=DETAIL_SECTIONS.map(([k,t],i)=>`<h3 class="dsec">${i+1}. ${esc(t)}</h3>${sections[k]!==undefined?sections[k]:val(X[k])}`).join("");
   const attrs=sourcingAttributes().map(([g,rows])=>`<h3>${esc(g)}</h3>${kv(rows)}`).join("");
   const a=accessFlags(f);
-  const mat=`<ul>${[`Information and communication technology: ${cl.ict?cl.ict.flag:"To be determined"}`,`Critical or important function: ${isImportant(f)?"may apply":"no indication"}`,`Outsourcing: ${o.result}${o.fw?` (${o.fw.short})`:""}`,
+  const mat=`<ul>${[`Information and communication technology: ${cl.ict?cl.ict.flag:"To be determined"}`,`Critical or important function: ${isImportant(f)?"may apply":"no indication"}`,`Outsourcing: ${o.result}${` (${o.rs.short})`}`,
     `Data, system, money and account access: ${a.any?(givenText(f.data_details)||"yes"):f.personal_data===false?"none":"to be determined"}${a.money?" (money or accounts)":""}`,`Location and cross-border: ${givenText(f.location)||"to be determined"}${(yes(f.offshore)||/offshore|other country/i.test(f.location||""))?" (cross-border)":""}`,
     `Estimated value: ${known(f.value)?money(Number(f.value))+(f.value_is_estimate?" (estimate)":""):"to be determined"}`,`Subcontracting: ${known(f.subcontracting)?show("subcontracting",f.subcontracting):"to be determined"}`,
     `Known dependencies: ${L(X.our_deps).join("; ")||"none stated"}`,`Known assumptions: ${L(X.assumptions).join("; ")||"none stated"}`,`Open points: ${L(X.open_points).length}`].map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
