@@ -70,7 +70,7 @@ test("an off-topic answer is asked again once, then recorded as not given", asyn
   await say(page, DINNER);
   await say(page, "Mix flour, eggs and milk, then fry the pancakes in butter");
   await expect(lastAssistant(page)).toContainText("That doesn't seem to answer my question");
-  await expect(page.locator("#msgs .m.u").last()).toContainText("Answer quality 1/10");
+  await expect(page.locator("#msgs .m.u").last()).not.toContainText("Answer quality");   // no per-answer score is shown
   await say(page, "Bake the cake for 40 minutes at 180 degrees");
   expect((await sideFacts(page))["Problem to solve"]).toBe("To be determined");
 });

@@ -91,6 +91,17 @@ test("external workers: contractors go through the staffing contract", async ({ 
   expect(errors).toEqual([]);
 });
 
+test("external workers: a total budget given as the 'rate or budget' is not printed as a day rate", async ({ page }) => {
+  await openApp(page);
+  await say(page, "Two Java developers as contractors for 9 months.");
+  await answerUntilDone(page, [[/day rate/i, "40k"], ...ANSWERS]);
+  await expect(page.locator(".sd .record")).toContainText("€40,000");
+  await expect(page.locator(".sd .record")).not.toContainText("Day rate");
+  await page.click("[data-act=brd]");
+  await expect(page.locator("#paper")).toBeVisible();
+  await expect(page.locator("#paper")).not.toContainText("Day rate not above");
+});
+
 test("new demand under the threshold: business-led sourcing with three quotes", async ({ page }) => {
   const errors = await openApp(page);
   await say(page, "An agency for a client dinner for 40 people, around 30k.");

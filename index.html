@@ -79,8 +79,6 @@ button,input,select,textarea{font:inherit;color:inherit}
 .classcard .cc{color:var(--ink-3);font-size:12px}.classcard .cm{display:inline-block;margin-left:6px;padding:0 8px;border-radius:99px;background:var(--line-2);font-size:12px;font-weight:600}
 .classcard .cx{color:var(--ink-2);font-size:12.5px;margin-top:2px}.classcard .cf{color:var(--ink-3);font-size:12px;margin-top:6px}
 .ucol{display:flex;flex-direction:column;align-items:flex-end;max-width:min(600px,85%)}.ucol .bub{max-width:100%}
-.ascore{font-size:11px;margin-top:4px;padding:1px 8px;border-radius:99px;font-weight:600}
-.ascore.shi{color:#1d6b43;background:#e6f4ec}.ascore.smid{color:#8a5d00;background:#fdf3dc}.ascore.slo{color:#b42318;background:#fdecea}
 .m.a .bub{background:#f3f5fa;border-bottom-left-radius:5px}
 .m.a .bub b{color:var(--navy)}
 .m .wide{flex:1;min-width:0;max-width:680px}
@@ -825,7 +823,7 @@ function refresh(){
     if(!known(f.item)) f.item = S.det.catalogue.map(i=>i.name).join(", ");
     if(known(f.quantity) && !known(f.value)){ f.value = S.det.catalogue[0].price*(parseInt(f.quantity)||1); f.value_is_estimate=true; }
   }
-  if(f.demand_type==="contingent_labour" && !known(f.value) && known(f.day_rate)){ const v=parseMoney(f.day_rate); if(v) f.value = v<5000 ? v*20*monthsOf(f.duration) * (parseInt(f.headcount)||1) : v; if(v) f.value_is_estimate=v<5000; }
+  if(f.demand_type==="contingent_labour" && !known(f.value) && known(f.day_rate)){ const v=parseMoney(f.day_rate); if(v) f.value = rateIsTotal(f.day_rate) ? v : v*20*monthsOf(f.duration) * (parseInt(f.headcount)||1); if(v) f.value_is_estimate=!rateIsTotal(f.day_rate); }
   S.det = determine();
   const req = requiredFor(S.det.route, f);
   S.req = req;
@@ -851,6 +849,8 @@ function parseWhen(str){
     let y=m[5]?+m[5]:now.getFullYear(); let d=new Date(y,mi,day); if(!m[5] && d < new Date(+d0-20*864e5)) d=new Date(y+1,mi,day); return d; }
   return null;
 }
+// the answer to "a day rate or a total budget?": €5,000 or more is the total, so it is never printed as a day rate
+const rateIsTotal = r => (parseMoney(r)||0) >= 5000;
 const LEAD_DAYS={catalogue:3,contract:7,quote:14,sourcing:45};
 const NEW_DEMAND = r => r==="quote"||r==="sourcing";
 const words = v => String(v||"").trim().split(/\s+/).filter(Boolean).length;
@@ -1354,7 +1354,7 @@ async function handleTurn(text, cid, opts={}){
     const tt=text.trim();
     if(!S.checkWait && /^(yes|yep|yeah|correct|that'?s (?:all )?(?:right|correct)|all (?:good|correct|right)|looks (?:good|right)|confirm(?:ed)?)\b/i.test(tt) && !/\bbut\b/i.test(tt)) S.f.confirm_derived="Confirmed";
     else if(!S.checkWait && /^(?:no|nope|something'?s (?:wrong|not right)|not (?:quite )?right|wrong)[.!]?$/i.test(tt)){
-      S.checkWait=true; S.f.confirm_derived=null; um.score=null;
+      S.checkWait=true; S.f.confirm_derived=null;
       S.msgs.push({role:"assistant",text:"What's not right? Tell me in your own words, for example \"it's a one-off\", \"our teams don't do this today\", \"it's for the Singapore branch\" or \"the category should be technology consulting\"."});
       S.lastAsked="confirm_derived"; S.busy=false; render(); return;
     } else {
@@ -1398,11 +1398,12 @@ async function handleTurn(text, cid, opts={}){
   let issue = findIssue(changed);
   if(issue && issue.kind!=="offtopic" && S.challengeCount>=3) issue=null;
   const aiOff = aiCheck && /off.?topic|unrelated|not related|does(?:n.?t| not) (?:answer|relate)|irrelevant|nothing to do/i.test(aiCheck.issue||"");
-  if(!issue && aiOff && FACTS[aiCheck.fact] && !S.offChecked[aiCheck.fact] && aiCheck.fact!==(pend&&pend.fact)) issue=offTopicIssue(aiCheck.fact);
+  // only for the question just asked: an off-topic verdict on another item would say "doesn't answer my question" and ask something else
+  if(!issue && aiOff && aiCheck.fact===asked && FACTS[asked] && !S.offChecked[asked] && asked!==(pend&&pend.fact)) issue=offTopicIssue(asked);
   if(!issue && aiCheck && S.challengeCount<3 && changed.includes(aiCheck.fact) && !S.challenged[aiCheck.fact] && FACTS[aiCheck.fact])
     issue={fact:aiCheck.fact, issue:String(aiCheck.issue||"needs a second look").slice(0,140), message:String(cleanReply(aiCheck.follow_up||"")||reply||"").trim()||`Could you double-check this? ${FACTS[aiCheck.fact].q(S.f)}`};
-  um.score = skipped ? null : asked==="confirm_derived" ? null : answerScore(asked, text, issue, sugResult, aiScore, pend);
-  if(!issue && !pend && !skipped && asked && TIPS[asked] && um.score!=null && um.score<=CONFIG.thresholds.answerTip && !S.thinChecked[asked] && S.thinCount<3 && S.det && NEW_DEMAND(S.det.route) && givenText(S.f[asked])) issue=thinIssue(asked);
+  const ansScore = skipped ? null : asked==="confirm_derived" ? null : answerScore(asked, text, issue, sugResult, aiScore, pend);
+  if(!issue && !pend && !skipped && asked && TIPS[asked] && ansScore!=null && ansScore<=CONFIG.thresholds.answerTip && !S.thinChecked[asked] && S.thinCount<3 && S.det && NEW_DEMAND(S.det.route) && givenText(S.f[asked])) issue=thinIssue(asked);
   if(issue){
     if(issue.kind==="offtopic") S.offChecked[issue.fact]=true; else if(issue.kind==="thin"){ S.thinChecked[issue.fact]=true; S.thinCount++; } else { S.challenged[issue.fact]=true; S.challengeCount++; }
     S.pending={fact:issue.fact, prev:S.f[issue.fact], issue:issue.issue, kind:issue.kind||"", flip:!!issue.flip};
@@ -1598,7 +1599,7 @@ const TIPS={background:"say what goes wrong today and what it costs or risks, fo
   deliverables:"list each deliverable with its format and who receives it, for example: a monthly report to the head of accounts payable."};
 const MEASURABLE=["kpis_pack","acceptance_pack"];
 function thinIssue(k){ return {fact:k, kind:"thin", issue:"answer too thin for sourcing", message:`That's a start. To make it usable for sourcing, ${TIPS[k]} Could you add a bit more, or keep it as it is?`, choices:["Keep it as is"]}; }
-// how useful was this answer? shown as a small score under the user's message
+// how useful was this answer? not shown; a low score offers one tip (CONFIG.thresholds.answerTip)
 function answerScore(asked, text, issue, sugResult, aiScore, pend){
   if(issue && (issue.fact===asked || issue.kind==="offtopic")) return issue.kind==="offtopic"?1:/vague/.test(issue.issue||"")?4:6;
   if(sugResult) return sugResult==="extended"?10:9;
@@ -2308,7 +2309,7 @@ function intakeRecord(){
   const rows=[["Buying route",CHANNELS[route].name],
     ["Category (Level 4)", fin ? `${fin.name} (${fin.code})${ini?(ini.code===fin.code?", initial classification confirmed":`, changed from ${ini.name}`):""}` : ini ? `${ini.name} (${ini.code}), ${ini.match}% match` : null],
     ["Budget",known(f.value)?money(Number(f.value))+(f.value_is_estimate?" (estimate)":""):null], ["Budget approved",v("budget_approved")],
-    ["Quantity",v("quantity")], ["People",v("headcount")], ["Day rate",v("day_rate")], ["Volume",v("volume")],
+    ["Quantity",v("quantity")], ["People",v("headcount")], ["Day rate",rateIsTotal(f.day_rate)?null:v("day_rate")], ["Volume",v("volume")],
     ["Start or delivery",v("needed_by")], ["Duration",v("duration")], ["Where and how",v("location")],
     ["Supplier",supplier], ["Existing contract",D.contract&&route==="contract"?`${D.contract.title} with ${D.contract.supplier} (${D.contract.id})`:null],
     ["Provisioning legal entity", nd && f.demand_type!=="goods" ? (o.entity?o.entity.name:"To be determined") : null],
@@ -2452,7 +2453,7 @@ function offlineBRD(risk){
     split(g("skills")).forEach(x=>req("Skills",`Candidates must have ${lf(x)}.`));
     if(g("deliverables")) req("Scope",`Work on ${lf(g("deliverables"))}.`);
     if(g("location")) req("Location",`Work ${/^on.?site|^remote|^hybrid/i.test(g("location"))?lf(g("location")):"in "+g("location")}.`);
-    if(g("day_rate")) req("Commercial",`Day rate not above ${g("day_rate").replace(/\s*(a|per)\s*day/i,"")} per person.`,"Should");
+    if(g("day_rate") && !rateIsTotal(f.day_rate)) req("Commercial",`Day rate not above ${g("day_rate").replace(/\s*(a|per)\s*day/i,"")} per person.`,"Should");
   } else if(goods){
     req("Supply", f.demand_type==="software" ? `Provide ${lf(g("item")||c.name)}${g("quantity")?` for ${fmtN(g("quantity"))} users`:""}.` : `Supply ${g("quantity")?fmtN(g("quantity"))+" × ":""}${lf(g("item")||c.name)}.`);
     if(g("location")||g("needed_by")) req("Delivery",`${f.demand_type==="software"?"Make available":"Deliver"}${g("location")?` to ${g("location")}`:""}${g("needed_by")?` by ${g("needed_by")}`:""}.`);
@@ -2511,7 +2512,7 @@ function offlineBRD(risk){
     ...(yes(f.system_access)?["System accounts set up before the start"]:[]),...(/on.?site/i.test(f.location||"")&&!goods?["Building access for the supplier"]:[])];
   const open_points=Object.entries(f).filter(([k,v])=>(v==="Not given"||v==="unsure")&&FACTS[k]).map(([k])=>`${FACTS[k].label}: to be confirmed`);
   const commercials=[known(f.value)&&`Estimated value: ${money(Number(f.value))}${f.value_is_estimate?" (estimate)":""}`, g("pricing_model")&&`Payment model: ${g("pricing_model")}`,
-    g("day_rate")&&`Rate: ${g("day_rate")}`, g("duration")&&`Contract term: ${g("duration")}`, g("budget_approved")&&`Budget approved: ${cap(g("budget_approved"))}`,
+    g("day_rate")&&!rateIsTotal(f.day_rate)&&`Rate: ${g("day_rate")}`, g("duration")&&`Contract term: ${g("duration")}`, g("budget_approved")&&`Budget approved: ${cap(g("budget_approved"))}`,
     g("ip_ownership")&&`Ownership of work: ${g("ip_ownership")}`, D.contract&&route==="contract"&&`Existing contract: ${D.contract.title} with ${D.contract.supplier} (${D.contract.id}), ends ${fmtDate(D.contract.expires)}`,
     hasSupplier(f)?`Supplier: ${f.supplier}${g("supplier_reason")?` (${g("supplier_reason")})`:""}`:(PREFERRED[f.category]||[]).length?`Supplier: open; preferred are ${PREFERRED[f.category].join(", ")}`:null,
     g("current_supplier")&&g("current_supplier")!=="None"&&`Current provider: ${g("current_supplier")}`, g("performance")&&`Current supplier performance: ${g("performance")}`].filter(Boolean);
@@ -2734,7 +2735,7 @@ function recapHTML(m, expanded){
   return `<div class="recap"><div class="rh">✓ ${esc(names.join(" and "))}: here's what I have</div><div class="rb">${rows.join("")}</div><div class="rf">Anything wrong? Just tell me, for example "the budget is 60k".</div></div>`;
 }
 function msgHTML(m,i,lastRec,lastSd){
-  if(m.role==="user") return `<div class="m u"><div class="ucol"><div class="bub">${esc(m.text)}</div>${m.score?`<div class="ascore s${m.score>=8?"hi":m.score>=5?"mid":"lo"}">Answer quality ${m.score}/10</div>`:""}</div></div>`;
+  if(m.role==="user") return `<div class="m u"><div class="ucol"><div class="bub">${esc(m.text)}</div></div></div>`;
   if(m.kind==="sys") return `<div class="sys">${esc(m.text)}</div>`;
   if(m.kind==="class"){ const r=S.l4Initial||[]; return `<div class="m a"><div class="av">G</div><div class="classcard"><div class="ch">Category (Level 4), initial</div>${r.map(x=>`<div class="cr"><b>${esc(x.name)}</b> <span class="cc">${esc(x.code)}</span> <span class="cm">${x.match}% match</span><div class="cx">${esc(x.reason)}${x.uncertainty?` <i>${esc(x.uncertainty)}</i>`:""}</div></div>`).join("")}<div class="cf">Based on your first message. I'll check it again at the end; if it's wrong, just tell me.</div></div></div>`; }
   if(m.kind==="stage"){ const st=stageById(m.stage); return `<div class="stagemark"><span><b>Step ${m.idx} of ${m.total} · ${esc(st.name)}</b><br>${esc(st.intro)}</span></div>`; }

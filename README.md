@@ -95,7 +95,7 @@ An answer that has nothing to do with the question (a recipe, a joke) is caught 
 
 Two thresholds sit in `CONFIG.thresholds` and in the **Rules** panel:
 
-- **Per-answer tip** (`answerTip`, default 5): when an answer for new demand scores 5/10 or less (for example KPIs or acceptance without any number), the chat gives one specific tip with an example and asks for a bit more. "Keep it as is" keeps the answer and notes it for the buyer; anything else is added to the answer. At most once per question and three times per conversation.
+- **Per-answer tip** (`answerTip`, default 5): when an answer for new demand scores 5/10 or less on an internal score that is not shown (for example KPIs or acceptance without any number), the chat gives one specific tip with an example and asks for a bit more. "Keep it as is" keeps the answer and notes it for the buyer; anything else is added to the answer. At most once per question and three times per conversation.
 - **Minimum quality** (`qualityMin`, default 75 = Good): when the finished new-demand request scores below it, the chat says so after the route card, lists the points that would strengthen it (skipped or thin answers, weak sections) and offers to go through them. Afterwards the description is rebuilt and the new rating is shown. "Submit anyway" stays available; the submission, the payload and the document record that it was submitted below the threshold.
 
 The score: 100, minus 15 per warning (skipped detail, unusable answer, kept despite a check), minus 5 per note, minus half the share of missing details, minus 3 per partial section and 8 per risk section in the detailed description (at most 30). Floor 35. Strong ≥ 90, Good ≥ 75, Fair ≥ 55, otherwise Needs work.

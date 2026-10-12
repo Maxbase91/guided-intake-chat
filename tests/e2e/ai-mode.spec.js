@@ -83,6 +83,15 @@ test("an answer the AI flags as off-topic is asked again", async ({ page }) => {
   await expect(lastAssistant(page)).toContainText(/doesn't seem to answer|business problem/);
 });
 
+test("an off-topic verdict on a question that was not asked is ignored", async ({ page, request }) => {
+  await openApp(page, { kind: "ai" });
+  await say(page, HR);
+  await mock(request, { nextChat: { assessment: { fact: "system_access", ok: false, issue: "off-topic", follow_up: "", score: 1 } } });
+  await say(page, "About 400k");
+  await expect(page.locator("#msgs")).not.toContainText("doesn't seem to answer");
+  await expect(page.locator("#msgs")).not.toContainText("Answer quality");
+});
+
 test("turning the AI off under Rules switches to offline questions without reloading", async ({ page, request }) => {
   await openApp(page, { kind: "ai" });
   await page.click("#cfgBtn");

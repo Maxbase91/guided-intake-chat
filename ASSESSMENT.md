@@ -2,6 +2,21 @@
 
 Reviewed at commit `c4d3e98`, October 2026, and updated for commit `7baf311` and the catalogue fix (see the next two sections). The review covered three things: a read of `index.html`, `api/llm.js`, `vercel.json` and the README; running the app locally; and the automated test suite added with this assessment (`npm test`).
 
+## Update: per-answer scores removed, two defects from a test conversation fixed
+
+A test conversation in AI mode (two Java contractors, €40k) showed scores that looked random. Here is where each one came from:
+- **1/10 for "Offshore or another country":** the AI judged a *different* question (system access) off-topic. The app accepted that and said "That doesn't seem to answer my question", asked the system-access question, and still recorded the location.
+- **6/10 for "next week":** the tight-timeline check counted as an answer defect.
+- **8/10 for "It can move":** a fixed value for any reply to a check.
+- **10/10 for "bank data":** the AI's own number, although where the data is stored was not answered.
+- **9/10 for "Yes, use it":** the AI's own number, which overrides the rule that gives a clear yes 10.
+
+**Changes:**
+- **Scores:** "Answer quality N/10" is no longer shown under answers. The overall quality check and its "To improve" list stay. The internal score only decides whether to offer one tip for a thin new-demand answer (`answerTip`).
+- **Off-topic:** the AI's off-topic verdict counts only for the question just asked.
+- **Day rate:** an answer of €5,000 or more to "day rate or total budget?" is a total budget (`rateIsTotal`). It is no longer printed as "Day rate 40000" in the record, as "Day rate not above 40000 per person" in the requirements document, or as the rate in the commercial terms.
+- **Tests:** an AI-mode test for the wrong-question verdict and a contractor conversation with "40k". Both fail on the previous code with exactly the symptoms above.
+
 ## Update: category ties fixed (finding 21)
 
 - **Ties:** two categories with the same number of keywords no longer go to whichever is listed first (IT hardware). The category named last in the head of the first message wins: the words before "for", "to", "with", "that" or a comma (`bestCategory`). "Software to manage our laptop fleet" is software, "a transaction monitoring system" is software and "laptops for the software team" is IT hardware.
@@ -69,7 +84,7 @@ Three things blocked real users. The first is now fixed:
 | Suite | Result |
 | --- | --- |
 | API (`tests/api`, node:test) | 18 passed, 1 known bug recorded as `todo` |
-| End-to-end (`tests/e2e`, Playwright, Chromium) | 51 passed: 45 behaviour tests and 6 known-issue tests that fail as expected |
+| End-to-end (`tests/e2e`, Playwright, Chromium) | 53 passed: 47 behaviour tests and 6 known-issue tests that fail as expected |
 | Run time | About a minute. Needs no keys and no network. |
 
 **Covered:**
@@ -135,8 +150,8 @@ Each finding says how it was confirmed:
 | # | Finding | Confirmed by |
 | --- | --- | --- |
 | 15 | **Acronyms lose their capitals in generated text:** "fits it hardware", "It provides hR operations", "External java developer". | Test and run |
-| 16 | **A closing remark after the results gets a misleading reply.** "thanks" gets an answer score and "Updated. Here are the revised service description and route." although nothing changed. | Test |
-| 17 | **The second off-topic answer is shown as "Answer quality 8/10" with "That helps."** It is correctly stored as "To be determined", but the feedback contradicts that. | Run |
+| 16 | **A closing remark after the results gets a misleading reply.** "thanks" gets "Updated. Here are the revised service description and route." although nothing changed. | Test |
+| 17, **partly fixed** | **The second off-topic answer is shown as "Answer quality 8/10" with "That helps."** It is correctly stored as "To be determined", but the feedback contradicts that. The score is no longer shown; the "That helps." reply is unchanged. | Run |
 | 18 | **The improvement round asks the start date again** when the timeline is only partial, instead of asking for the missing end date or duration. The result card above drops the date while the round runs. | Run |
 | 19 | **The browser-key Gemini path puts the key in the URL** (`?key=`). The server sends it in a header. | Code |
 | 20 | **The mock contract CTR-7120 expires on 30 November 2026**, so demo requests in that category will switch to new demand. There are no security headers (CSP, frame-ancestors). | Code |
