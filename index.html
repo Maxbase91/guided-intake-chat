@@ -156,8 +156,17 @@ button,input,select,textarea{font:inherit;color:inherit}
 .qlist li{display:flex;gap:8px;font-size:13.5px;padding:3px 0}
 .qlist li:before{flex:none;width:18px;text-align:center;font-weight:700}
 .qlist li.warn:before{content:"!";color:var(--warn)} .qlist li.info:before{content:"i";color:var(--info)} .qlist li.ok:before{content:"✓";color:var(--ok)}
-.side .grp{font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:12px 0 2px;display:flex;justify-content:space-between}
-.side .grp em{font-style:normal;color:var(--ok);letter-spacing:0;text-transform:none}
+.side .grp{font:inherit;font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:6px 0 0;padding:7px 0;display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;background:none;border:0;border-top:1px solid var(--line-2);cursor:pointer;text-align:left}
+.side .grp span{display:flex;align-items:center;gap:6px}
+.side .grp span:before{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s;flex:none}
+.side .grp.open span:before{transform:rotate(45deg)}
+.side .grp:hover,.side .grp:focus-visible{color:var(--navy-3)}
+.side .grp em,.side .grp i{font-style:normal;color:var(--ok);letter-spacing:0;text-transform:none;font-weight:500}
+.side .grp i{color:var(--ink-3)}
+.fact.long{flex-wrap:wrap}
+.fact.long .k{flex:1;width:auto}
+.fact.long .v{order:3;flex-basis:calc(100% - 28px);margin-left:28px;text-align:left;font-weight:400;color:var(--ink-2);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+.fact.long.full .v{display:block}
 .sec.desc{background:#fbfaf5;border-left:3px solid var(--amber)}
 .ds{margin:0 0 10px}.ds:last-child{margin:0}.ds h5{margin:0 0 2px;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--amber-ink)}
 .ds p{margin:0;font-size:14.5px;line-height:1.55}
@@ -2070,7 +2079,7 @@ function extractAll(text, asked){
   const qn=[...raw.matchAll(/\b(\d+(?:,\d{3})*)\s+(?:x\s+)?(?:new\s+|more\s+|additional\s+)?([a-z-]+)/gi)].filter(x=>!PRODUCT_NUM.test(raw.slice(0,x.index))).map(x=>x[0]);
   for(const m of qn){
     const [, n, noun]=m.match(/(\d+(?:,\d{3})*)\s+(?:x\s+)?(?:new\s+|more\s+|additional\s+)?([a-z-]+)/i), num=+n.replace(/,/g,""), w=noun.toLowerCase();
-    if(/^(months?|weeks?|days?|years?|hours?|minutes?|k|m|eur|euros?|percent|evenings?|st|nd|rd|th)$/.test(w) || /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/.test(w)) continue;
+    if(/^(months?|weeks?|days?|years?|hours?|minutes?|k|m|eur|euros?|percent|evenings?|st|nd|rd|th|million|millions|mn|mio|bn|billion|thousand|tsd|usd|gbp|chf|dollars?|pounds?)$/.test(w) || /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/.test(w)) continue;
     if(contingent && /^(developers?|engineers?|people|contractors?|consultants?|analysts?|testers?|designers?|managers?|persons?|resources?|senior|junior|java|python|\.net)$/.test(w)) { o.headcount=o.headcount||num; continue; }
     if(/^(people|guests?|participants?|attendees?|delegates?|employees?|staff|users?|seats?|licen[cs]es?|sites?|offices?|countries|locations?|lines?|learners?)$/.test(w)){
       if(f.demand_type==="software" && /^(users?|seats?|licen[cs]es?|employees?|staff|people)$/.test(w)) o.quantity=o.quantity||num;
@@ -3068,12 +3077,18 @@ function renderSide(){
   const f=S.f, D=S.det;
   if(!D){ $("#side").innerHTML=`<div class="panel"><div class="eyebrow">Your request</div><p class="muted" style="margin:8px 0 0">Start by describing what you need. The route and what's needed for it appear here.</p></div>${sideNote()}`; return; }
   const req=S.req||[], done=req.filter(k=>known(f[k])).length, pct=req.length?Math.round(done/req.length*100):100;
+  // only the step being asked is open; the others fold to one line and open with a click.
+  // Long answers sit under their label, cut to two lines, and show in full when clicked.
+  S.sideOpen=S.sideOpen||{}; S.sideFull=S.sideFull||{};
   const groups=S.stageIds.filter(id=>id!=="review").map(id=>{
-    const ks=stageFacts(id); const all=ks.every(k=>known(f[k]));
-    return `<div class="grp"><span>${esc(stageById(id).name)}</span>${all?"<em>✓ done</em>":""}</div>`+
-      ks.map(k=>{const ok=known(f[k]), nx=!ok&&S.missing[0]===k, can=ok&&canEdit(k);
+    const ks=stageFacts(id), n=ks.filter(k=>known(f[k])).length, all=n===ks.length;
+    const open = S.sideOpen[id]!==undefined ? S.sideOpen[id] : ks.includes(S.missing[0]) || ks.includes(S.editing);
+    return `<button class="grp${open?" open":""}" data-grp="${id}" aria-expanded="${open}"><span>${esc(stageById(id).name)}</span>${all?`<em>✓ ${n} ${n===1?"detail":"details"}</em>`:`<i>${n} of ${ks.length}</i>`}</button>`+
+      `<div class="gfacts"${open?"":" hidden"}>`+
+      ks.map(k=>{const ok=known(f[k]), nx=!ok&&S.missing[0]===k, can=ok&&canEdit(k), v=ok?show(k,f[k]):nx?"asking now":"—", long=ok&&String(v).length>34;
         if(S.editing===k) return `<div class="fact ok editing"><span class="ic">✓</span><span class="k">${FACTS[k].label}</span>${editorHTML(k)}</div>`;
-        return `<div class="fact ${ok?"ok":""} ${nx?"next":""}"><span class="ic">${ok?"✓":""}</span><span class="k">${FACTS[k].label}</span><span class="v">${ok?esc(show(k,f[k])):nx?"asking now":"—"}</span>${can?`<button class="ed" data-edit="${k}" title="Change" aria-label="Change ${esc(FACTS[k].label)}">✎</button>`:""}</div>`;}).join("");
+        return `<div class="fact ${ok?"ok":""} ${nx?"next":""}${long?" long":""}${long&&S.sideFull[k]?" full":""}"><span class="ic">${ok?"✓":""}</span><span class="k">${FACTS[k].label}</span><span class="v"${long?` data-full="${k}" title="${S.sideFull[k]?"Show less":"Show all"}"`:""}>${esc(v)}</span>${can?`<button class="ed" data-edit="${k}" title="Change" aria-label="Change ${esc(FACTS[k].label)}">✎</button>`:""}</div>`;}).join("")+
+      `</div>`;
   }).join("");
   $("#side").innerHTML=`<div class="panel">
       <div class="eyebrow">Route ${S.missing.length?"so far":""}</div>
@@ -3099,6 +3114,8 @@ function editorHTML(k){
 }
 function bindEdits(){
   const side=$("#side");
+  side.querySelectorAll("[data-grp]").forEach(b=>b.onclick=()=>{ S.sideOpen[b.dataset.grp]=b.getAttribute("aria-expanded")!=="true"; renderSide(); });
+  side.querySelectorAll("[data-full]").forEach(v=>v.onclick=()=>{ S.sideFull[v.dataset.full]=!S.sideFull[v.dataset.full]; renderSide(); });
   side.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{ if(S.busy) return; S.editing=b.dataset.edit; renderSide(); const x=$("#edv"); if(x){ x.focus(); if(x.select) x.select(); } });
   side.querySelectorAll("[data-ecancel]").forEach(b=>b.onclick=()=>{ S.editing=null; renderSide(); });
   const x=$("#edv"); if(x) x.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); side.querySelector("[data-esave]").click(); } if(e.key==="Escape"){ S.editing=null; renderSide(); } };

@@ -49,6 +49,7 @@ test("an unclear correction is confirmed before anything changes", async ({ page
 test("a captured detail edited in the side panel updates the route", async ({ page }) => {
   await openApp(page);
   await say(page, DINNER);
+  await page.click('#side [data-grp="need"]');   // a finished step is folded; one click opens it
   await page.click('#side [data-edit="value"]');
   await expect(page.locator("#edv")).toHaveValue("30000");
   await page.fill("#edv", "250000");
@@ -201,4 +202,28 @@ test("acronyms keep their capitals in generated text", async ({ page }) => {
   await say(page, "We need 15 laptops for new joiners in Frankfurt.");
   await expect(page.locator("#msgs")).toContainText("which fits IT hardware");
   await expect(page.locator("#msgs")).not.toContainText("fits it hardware");
+});
+
+test("the side panel folds finished steps and shortens long answers until clicked", async ({ page }) => {
+  await openApp(page);
+  await say(page, "A new HR system to replace our payroll tool.");
+  await say(page, "About 400k");
+  await say(page, "Our payroll tool is end of life in 2027 and payroll runs on manual spreadsheets, so we get errors every month; if this is delayed we miss the statutory reporting deadline");
+  // the step being asked is open, a finished one is folded to a single line
+  const need = page.locator('#side [data-grp="need"]');
+  await expect(need).toHaveAttribute("aria-expanded", "false");
+  await expect(need).toContainText(/✓ \d+ details?/);
+  await expect(page.locator("#side .fact.next")).toBeVisible();
+  // a long answer is cut to two lines under its label, and shown in full on a click
+  const purpose = page.locator('#side [data-grp="purpose"]');
+  if ((await purpose.getAttribute("aria-expanded")) !== "true") await purpose.click();
+  const problem = page.locator("#side .fact.long", { hasText: "Problem to solve" });
+  await expect(problem).toBeVisible();
+  const short = await problem.locator(".v").evaluate((e) => e.getBoundingClientRect().height);
+  await problem.locator(".v").click();
+  await expect(page.locator("#side .fact.long.full", { hasText: "Problem to solve" })).toBeVisible();
+  const full = await page.locator("#side .fact.long.full .v").first().evaluate((e) => e.getBoundingClientRect().height);
+  expect(full).toBeGreaterThan(short);
+  // the captured text itself is complete either way
+  expect((await sideFacts(page))["Problem to solve"]).toMatch(/so we get errors every month$/);
 });

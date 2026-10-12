@@ -140,3 +140,12 @@ test("an AI suggestion given as an object shows its content, not its keys", asyn
   expect(got.kpis).toBe("Service levels: 98% of reviews on time\nKPIs: Quality pass rate above 95%");
   expect(got.dated).not.toMatch(/2026|March|…/);
 });
+
+test("an amount in words is a budget, not a quantity ('2 million' was 'Quantity 2' and '2 users')", async ({ page }) => {
+  await openApp(page);
+  const got = await page.evaluate(() => {
+    S.f.demand_type = "software";
+    return ["2 million", "about 1.5 million euros", "300 thousand", "2 million for 400 users"].map((t) => extractAll(t, "value").quantity ?? null);
+  });
+  expect(got).toEqual([null, null, null, 400]);
+});

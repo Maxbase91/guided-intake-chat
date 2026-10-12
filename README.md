@@ -111,6 +111,8 @@ A correction is never stored as the answer to the current question. The app upda
 
 Captured details can also be changed directly in the side panel (pencil icon): the category from the Level 4 list, the budget, dates and other details. The same rules apply.
 
+The side panel keeps only the step being asked open. Finished steps fold to one line (for example "✓ 4 details"), and a click opens them. Long answers sit under their label, cut to two lines; a click shows them in full.
+
 ## Executive service description (new demand)
 
 New demand gets the format of an executive service description: a headline (name, tagline and 50–100 words), an executive description of 150–250 words and a service summary table (service name, target audience, supported functions, business problem solved, key capabilities, key benefits, unique selling points, KPIs / success measures, regulatory / governance benefits). Business-led demand gets the same parts, shorter. Catalogue orders and call-offs keep a short description.
