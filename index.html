@@ -157,6 +157,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .ds{margin:0 0 10px}.ds:last-child{margin:0}.ds h5{margin:0 0 2px;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--amber-ink)}
 .ds p{margin:0;font-size:14.5px;line-height:1.55}
 .ds.narr{margin-top:14px;padding-top:12px;border-top:1px dashed #e6d9b0}
+.qual h5.qh{margin:10px 0 2px;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)}
 .sec.srq .cmp{margin:4px 0 8px;font-size:14px;line-height:1.55}.sec.srq .shortv{background:var(--line-2);border-radius:10px;padding:8px 10px;font-size:13px}.sec.srq .shortv p{margin:3px 0 0}
 .sec.srq .cpy{display:flex;gap:14px;margin-top:6px}.qcounts{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px}.qc{font-size:12px;padding:2px 9px;border-radius:99px;font-weight:600}
 .qc.ok{background:#e6f4ec;color:#1d6b43}.qc.pa{background:#fdf3dc;color:#8a5d00}.qc.tb{background:#eef1f8;color:#3c4a6b}.qc.rk{background:#fdecea;color:#b42318}.qc.na{background:#f3f4f6;color:#6b7280}
@@ -1126,13 +1127,13 @@ async function handleTurn(text, cid){
 
   if(!S.missing.length){
     stageTransition("review");
-    const lead = S.completed ? "Updated. Here are the revised route, service description and requirements document." : `${complete && reply && !aiCheck ? reply.replace(/\s*$/,"") : wrapUp()} Below are the route I recommend, the service description and the full business requirements document. Please check them before you submit.`;
+    const lead = S.completed ? "Updated. Here are the revised service description and route." : `${complete && reply && !aiCheck ? reply.replace(/\s*$/,"") : wrapUp()} I'm writing the service description now. Below it you'll find the route I recommend and the full document. Please check them before you submit.`;
     S.msgs.push({role:"assistant",text:lead});
-    showRecommendation();
     S.lastAsked=null; S.completed=true;
     render();
     try{ await buildDoc(cid); }
     catch(e){ if(e instanceof Stale) throw e; console.error(e); S.msgs.push({role:"assistant",kind:"sys",text:"Something went wrong while writing the documents. Please tell me to try again."}); }
+    showRecommendation();
   } else {
     let next=S.missing[0];
     const aiAskedOk = reply && !complete && !aiCheck && aiAsking && S.missing.slice(0,2).includes(aiAsking) && stageOf(aiAsking)===stageOf(S.missing[0]);
@@ -1635,7 +1636,7 @@ function offlineQuestion(k, prevRoute, stageChanged){
 function showRecommendation(){
   const D=S.det, snap={...D,f:{...S.f}};
   const last=[...S.msgs].reverse().find(m=>m.kind==="rec");
-  if(last && last.rec.route===D.route){ last.rec=snap; return; }   // same route: refresh the card in place
+  if(last && last.rec.route===D.route){ S.msgs.splice(S.msgs.indexOf(last),1); S.msgs.push({role:"assistant",kind:"rec",rec:snap}); return; }   // same route: move the card below the latest description
   S.override=""; S.msgs.push({role:"assistant",kind:"rec",rec:snap});
 }
 
@@ -1917,7 +1918,7 @@ function sectionQuality(){
   else ["Governance","Reporting","Change management","Escalation"].forEach(x=>add(x,"Not applicable","One-off delivery",""));
   add("Supplier documents and URLs", !hasSupplier(f)?"Not applicable":/^no$/i.test(String(f.supplier_terms||""))?"Complete":known(f.supplier_terms)&&!isTBD(f.supplier_terms)&&!/not sure/i.test(f.supplier_terms)?"Risk":"To be determined",
     known(f.supplier_terms)&&!/^no$/i.test(String(f.supplier_terms))?"Relies on supplier documents":"", known(f.supplier_terms)&&!/^no$/i.test(String(f.supplier_terms))?"Review a fixed copy; avoid changing online terms":"");
-  const op=(d.open_points||[]).length; add("Open points", op?"Partial":"Complete", op?`${op} open point${op>1?"s":""}`:"", op?"Close them before the sourcing request":"");
+  const op=(d.open_points||[]).length; add("Open points", op?"Partial":"Complete", op?(d.open_points||[]).map(x=>String(x).replace(/\.$/,"")).join("; "):"", op?"Close them before the sourcing request":"");
   return R;
 }
 // outputs E and F: compact sourcing request text and a very short version
@@ -2253,7 +2254,7 @@ function recHTML(R){
     <div class="sec"><h4>What happens next</h4><ol>${R.steps.map(s=>`<li>${esc(s)}</li>`).join("")}</ol></div>
     ${R.controls.length?`<div class="sec"><h4>Checks along the way</h4>${R.controls.map(([k,t,d])=>`<div class="chk"><i class="${k}">✓</i><div>${esc(t)}<br><span>${esc(d)}</span></div></div>`).join("")}</div>`:`<div class="sec"><h4>Checks along the way</h4>None. Standard items go straight through.</div>`}
     <div class="acts">
-      <span class="muted">The full summary follows below.</span>
+      <span class="muted">The service description is above.</span>
       <button class="lnk" data-act="more">${S.showMore?"Fewer options":"More options"}</button>
     </div>
     ${S.showMore?`<div class="more">
@@ -2286,7 +2287,6 @@ function sdHTML(){
       <div class="shortv"><span class="muted">Short version, ${d.short500.length} of 500 characters</span><p>${esc(d.short500)}</p></div>
       <div class="cpy"><button class="lnk" data-act="copycompact">Copy sourcing text</button><button class="lnk" data-act="copyshort">Copy short version</button></div></div>`:""}
     ${qualityHTML()}
-    ${d.detail?sectionSummaryHTML():""}
     <div class="sec brdlink"><div><b>${d.detail?"Detailed service description":"Business requirements document"}</b><br><span class="muted">${d.detail?`25 sections, ${n} obligations, outsourcing and ICT determination, sourcing attributes, quality check by section`:`${n} requirements, risk and compliance, commercial terms, evaluation, approvals`}${S.sd._ai?"":" · built from your answers"}</span></div>
       <button class="btn btn-a" data-act="brd">Open document</button></div>
     <div class="acts">${S.submitted?`<span class="muted">Submitted as <b>${esc(S.submitted)}</b></span>`:`<button class="btn btn-p" data-act="submit">Looks right, submit</button>`}
@@ -2300,9 +2300,17 @@ function sectionSummaryHTML(){
 function qualityHTML(){
   const q=S.quality; if(!q) return "";
   const cls={Strong:"q-strong",Good:"q-good",Fair:"q-fair","Needs work":"q-needs"}[q.rating];
-  const pts=q.points.filter(p=>p.lvl!=="ok"), oks=q.points.filter(p=>p.lvl==="ok").length;
+  const oks=q.points.filter(p=>p.lvl==="ok").length, items=[];
+  q.points.filter(p=>p.lvl!=="ok").forEach(p=>items.push({lvl:p.lvl,html:esc(p.text)}));
+  if(S.sd&&S.sd.detail) sectionQuality().filter(r=>["Partial","To be determined","Risk"].includes(r.status)&&r.sec!=="Open points")
+    .forEach(r=>items.push({lvl:r.status==="Risk"?"warn":"info", html:`<b>${esc(r.sec)}</b>: ${esc(r.issue||r.status.toLowerCase())}${r.fix?`. ${esc(r.fix)}`:""}`}));
+  const seen=new Set(), list=items.filter(x=>{ const k=x.html.replace(/<[^>]+>/g,"").toLowerCase().slice(0,60); if(seen.has(k)) return false; seen.add(k); return true; });
+  const secs=new Set(items.map(x=>(x.html.match(/^<b>([^<]+)<\/b>/)||[])[1]).filter(Boolean).map(x=>x.toLowerCase()));
+  const open=(S.sd&&S.sd.detail&&S.sd.detail.open_points||[]).filter(x=>!seen.has(String(x).toLowerCase().slice(0,60)) && !secs.has(String(x).split(":")[0].trim().toLowerCase()));
   return `<div class="sec qual"><div class="qhead"><span class="qbadge ${cls}">${q.rating}</span><span>Quality check · ${q.score}/100 · ${q.complete}% of the needed details given${oks?` · ${oks} answer${oks>1?"s":""} clarified`:""}</span></div>
-    ${pts.length?`<ul class="qlist">${pts.slice(0,5).map(p=>`<li class="${p.lvl}">${esc(p.text)}</li>`).join("")}</ul>`:`<ul class="qlist"><li class="ok">No gaps or inconsistencies found.</li></ul>`}</div>`;
+    ${list.length?`<h5 class="qh">To improve</h5><ul class="qlist">${list.map(p=>`<li class="${p.lvl}">${p.html}</li>`).join("")}</ul>`:""}
+    ${open.length?`<h5 class="qh">Still open (${open.length})</h5><ul class="qlist">${open.map(x=>`<li class="info">${esc(x)}</li>`).join("")}</ul>`:""}
+    ${!list.length&&!open.length?`<ul class="qlist"><li class="ok">No gaps or inconsistencies found.</li></ul>`:""}</div>`;
 }
 function sdText(){ const d=S.sd.desc||{};
   if(d.exec!==undefined) return [`${S.sd.title}${d.tagline?` | ${d.tagline}`:""}`, d.headline, "Executive service description\n"+d.exec,
@@ -2508,7 +2516,7 @@ function openSettings(){
     document.querySelectorAll("#prov button").forEach(b=>b.onclick=()=>{CONFIG.provider=b.dataset.p;document.querySelectorAll("#prov button").forEach(x=>x.classList.toggle("on",x===b));pf();render();});
   }
   [["#t2","quickQuoteMax"],["#t3","materialityMin"]].forEach(([id,k])=>$(id).oninput=e=>{const v=parseFloat(e.target.value);if(!isNaN(v))CONFIG.thresholds[k]=v;});
-  const close=()=>{$("#drawerRoot").innerHTML=""; if(S.det){refresh(); if(!S.missing.length) showRecommendation();} render();};
+  const close=()=>{$("#drawerRoot").innerHTML=""; if(S.det){refresh(); if(!S.missing.length && S.sd) showRecommendation();} render();};
   $("#close").onclick=close; $("#scrim").onclick=close;
 }
 
