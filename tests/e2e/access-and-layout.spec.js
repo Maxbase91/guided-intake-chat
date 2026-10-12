@@ -82,3 +82,12 @@ test("the side panel has no general note about rules and the AI", async ({ page 
   await expect(page.locator("#side")).not.toContainText("fixed rules");
   await expect(page.locator("#side .route")).toHaveText("Catalogue order");
 });
+
+// the welcome screen fits without scrolling on a small laptop window (1366x768 screen with the browser bar) and on a phone
+for (const viewport of [{ width: 1366, height: 650 }, { width: 1280, height: 720 }, { width: 390, height: 844 }]) {
+  test(`the welcome screen fits in ${viewport.width}x${viewport.height} without scrolling`, async ({ page }) => {
+    await openApp(page, { viewport });
+    await expect(page.locator(".welcome [data-try]")).toHaveCount(9);
+    expect(await page.locator("#msgs").evaluate((b) => b.scrollHeight - b.clientHeight)).toBeLessThanOrEqual(0);
+  });
+}
