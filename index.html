@@ -724,6 +724,10 @@ function deriveFacts(f){
   derive("tech_service", techFromRules);
   derive("entity", entityFrom);
   derive("in_house", inHouseFromText);
+  derive("offshore", ff=>{ const e=entityById(ff.entity), loc=String(ff.location||""); if(!e||!loc) return null;
+    if(/offshore|another country|other country/i.test(loc)) return true;
+    const places=PLACES.split("|").filter(p=>p.length>2 && new RegExp(`\\b${p}\\b`,"i").test(loc));
+    return places.length && places.some(p=>!e.re.test(p) && !(e.abbr&&e.abbr.test(p))) ? true : null; });
   derive("l4", ff=>{ const r=classifyL4(ff); return r[0]&&r[0].code; });
 }
 
@@ -1415,7 +1419,7 @@ function itemFrom(text){
   return x.length>2 && x.length<90 ? x.charAt(0).toUpperCase()+x.slice(1) : null;
 }
 
-const PLACES="London|Frankfurt|Berlin|Munich|Hamburg|Cologne|Düsseldorf|Stuttgart|Bielefeld|Münster|Paris|Lisbon|Madrid|Barcelona|Amsterdam|Dublin|Zurich|Geneva|Vienna|Milan|Rome|Brussels|Luxembourg|Warsaw|Prague|Bucharest|Stockholm|Copenhagen|Oslo|Helsinki|New York|Singapore|Hong Kong|Tokyo|Sydney|Toronto|Mumbai|Pune|Bangalore|Bengaluru|Jaipur|Germany|the UK|UK|United Kingdom|England|France|Spain|Portugal|Italy|the Netherlands|Netherlands|Ireland|Switzerland|Austria|Belgium|Poland|Romania|India|the US|USA|the EU|EU|Europe|EMEA|APAC";
+const PLACES="Poland|Krakow|Kraków|Wroclaw|Philippines|Manila|Portugal|Czech Republic|Hungary|Budapest|London|Frankfurt|Berlin|Munich|Hamburg|Cologne|Düsseldorf|Stuttgart|Bielefeld|Münster|Paris|Lisbon|Madrid|Barcelona|Amsterdam|Dublin|Zurich|Geneva|Vienna|Milan|Rome|Brussels|Luxembourg|Warsaw|Prague|Bucharest|Stockholm|Copenhagen|Oslo|Helsinki|New York|Singapore|Hong Kong|Tokyo|Sydney|Toronto|Mumbai|Pune|Bangalore|Bengaluru|Jaipur|Germany|the UK|UK|United Kingdom|England|France|Spain|Portugal|Italy|the Netherlands|Netherlands|Ireland|Switzerland|Austria|Belgium|Poland|Romania|India|the US|USA|the EU|EU|Europe|EMEA|APAC";
 const MONTH="(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
 const NUMW={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,twelve:12};
 const NEG=/\b(no|not|without|won't|will not|doesn't|does not|don't|do not|never|none|nothing)\b/;
@@ -2074,6 +2078,7 @@ ${S.det&&NEW_DEMAND(S.det.route)?`   For this new demand fill only requirements,
    do not include intellectual property terms (flag them for Legal review if the user raised them). Captured details (dates, locations, access) belong here.
 4. "compact": a compact sourcing request description in one paragraph (what the provider provides, purpose, key deliverables, timeline and location, access or technology, service levels or acceptance, important open points). No artificial limit, but concise. Do not cut sentences.
 5. "short500": a very short version of at most 500 characters keeping the nature of the service, its purpose and key access information.
+   In "compact" and "short500": no abbreviations or shorthand (write "accounts payable", "8,000", "January", "enterprise resource planning system"), and use exactly the same figures as in "detail".
 6. "l4_final": re-check the Level 4 classification against the full description: {"code":"one code from the list","match":0-100,"reason":"short plain reason","uncertainty":""}.`:""}
 Rules for the brd: use every fact and detail from the conversation. Never invent names, numbers or dates. Where something important is unknown, put it in open_points.
 Money: the currency is ${CONFIG.currency} (€). Quote the value exactly as given in value_display. Never recalculate or re-estimate amounts.
