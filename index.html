@@ -1623,15 +1623,17 @@ const execSpec = () => { const L=execLimits(); return `1. "description": the EXE
    Fields:
    name: the service name, at most 6 words (a clear label, not a sentence).
    tagline: a short distinguishing label after the name, at most 8 words (for example "One front door for procurement").
-   headline: ${L.headMin} to ${L.head} words that summarise the service: what it is, who it is for and its main value.
-   exec: ${L.execMin} to ${L.exec} words in 2 to 4 short paragraphs (separate them with a blank line): what the service is, who it is for, which functions it supports, how it works at business level, and why it is valuable.
+   headline: ${L.headMin} to ${L.head} words (count them; never fewer than ${L.headMin}) that summarise the service: what it is, who it is for and its main value.
+   exec: ${L.execMin} to ${L.exec} words (count them; never fewer than ${L.execMin}) in 2 to 4 short paragraphs (separate them with a blank line): what the service is, who it is for,
+   which functions it supports, the problem it solves, how it works at business level, its benefits and how success is measured, and its regulatory or control value where confirmed.
+   Reach the length by covering these points from the conversation, not by adding new ones.
    audience, functions, problem, usp, regulatory: one sentence or a short list each, for the summary table.
    capabilities, benefits, kpis: arrays of short items for the summary table.
    Base everything on the conversation and the confirmed facts (users = target audience, functions, benefits, usp = unique selling points, acceptance = KPIs, reg_benefits = regulatory benefits).
    regulatory: "" when reg_benefits says there is no specific benefit.
    STRICT: the description must NOT contain amounts or budgets, dates, timing or duration, delivery location, supplier names or preferences, budget approval, cost centres,
    the buying route, contracts or frameworks, or the risk answers about this purchase (personal data, system access, whether it is outsourcing, criticality, subcontracting). These are captured separately.
-   Never copy the user's raw wording such as "I don't know" or typos. Never invent facts.`; };
+   Never copy the user's raw wording such as "I don't know" or typos. Never invent facts: do not add capabilities, integrations, technologies, benefits or outcomes the user did not state or confirm.`; };
 const DOC_SYSTEM = () => `You write two things for a corporate procurement request, based on the conversation and the facts.
 ${S.det&&NEW_DEMAND(S.det.route)?execSpec():`1. "description": the SERVICE DESCRIPTION, for review by senior stakeholders. It says WHAT is being bought and WHY. Professional, concise, business-focused, third person.
    Fields (plain strings unless stated):
