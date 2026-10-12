@@ -12,6 +12,13 @@
    - Rules decide the buying route AND what must be known for that route.
    - The AI only talks: it phrases one question at a time and reads the answers.
    ========================================================= */
+#gate{position:fixed;inset:0;z-index:1000;background:var(--navy);display:flex;align-items:center;justify-content:center;padding:16px}
+#gate[hidden],#gate form[hidden]{display:none}
+#gate form{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:360px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+#gate h2{margin:0 0 6px;font-size:20px;color:var(--ink)} #gate p{margin:0 0 16px;color:var(--ink-2);font-size:14px}
+#gate input{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:15px}
+#gate button{margin-top:12px;width:100%;padding:11px;border:0;border-radius:10px;background:var(--navy);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+#gate button:disabled{opacity:.6} #gate .err{color:var(--bad);font-size:13px;min-height:18px;margin-top:8px}
 :root{
   --navy:#0f2147; --navy-2:#1b3266; --navy-3:#2c4a8a;
   --amber:#f2a900; --amber-soft:#fff4d6; --amber-ink:#8a5d00;
@@ -225,6 +232,8 @@ body.doc-open{overflow:hidden}
 <style id="doccss"></style>
 </head>
 <body>
+<div id="gate"><form id="gateForm" autocomplete="off" hidden><h2>Guided Intake</h2><p>Enter the access code for this demo.</p>
+<input id="gateCode" type="password" placeholder="Access code" aria-label="Access code"><button id="gateBtn" type="submit">Continue</button><div class="err" id="gateErr"></div></form></div>
 
 <header class="top">
   <div class="top-in">
@@ -2607,13 +2616,27 @@ inp.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDef
 $("#comp").onsubmit=e=>{e.preventDefault();const t=inp.value;inp.value="";inp.style.height="auto";handleUser(t);};
 $("#doccss").textContent=DOC_CSS;
 $("#cfgBtn").onclick=openSettings; $("#newBtn").onclick=reset; $("#sumBtn").onclick=()=>$("#side").classList.toggle("open");
+// access gate: the page stays locked until the server confirms the code
+async function verifyCode(c){
+  try{ const r=await fetch("/api/llm?verify=1",{headers:{"x-access-code":c}}); return r.ok; }catch(e){ return null; }
+}
+async function accessGate(){
+  let saved=CONFIG.accessCode; if(!saved){ try{saved=sessionStorage.getItem("ac")||"";}catch(e){} }
+  if(saved && await verifyCode(saved)===true){ CONFIG.accessCode=saved; $("#gate").hidden=true; return; }
+  try{sessionStorage.removeItem("ac");}catch(e){}
+  const g=$("#gate"), inpC=$("#gateCode"), btn=$("#gateBtn"), err=$("#gateErr");
+  $("#gateForm").hidden=false; inpC.focus();
+  await new Promise(done=>{
+    $("#gateForm").onsubmit=async e=>{ e.preventDefault(); const c=inpC.value.trim(); if(!c){ err.textContent="Please enter the code."; return; }
+      btn.disabled=true; err.textContent=""; const ok=await verifyCode(c); btn.disabled=false;
+      if(ok===true){ CONFIG.accessCode=c; try{sessionStorage.setItem("ac",c);}catch(x){} g.hidden=true; done(); }
+      else { err.textContent= ok===null ? "Can't reach the server. Please try again." : "That code isn't right."; inpC.value=""; inpC.focus(); } };
+  });
+}
 (async()=>{
   render(); await detectServer(); resolveProvider();
-  if(CONFIG.provider==="server" && SERVER.accessRequired && !CONFIG.accessCode){
-    try{CONFIG.accessCode=sessionStorage.getItem("ac")||"";}catch(e){}
-    if(!CONFIG.accessCode){ const c=prompt("Enter the access code for this demo:"); if(c){CONFIG.accessCode=c.trim(); try{sessionStorage.setItem("ac",CONFIG.accessCode);}catch(e){}} }
-  }
-  render();
+  if(SERVER && SERVER.accessRequired) await accessGate(); else $("#gate").hidden=true;
+  render(); $("#inp").focus();
 })();
 </script>
 </body>

@@ -262,6 +262,13 @@ module.exports = async (req, res) => {
       accessRequired: !!process.env.ACCESS_CODE,
     };
     const q = req.query || {};
+    // gate for the page: confirm the access code without calling any provider
+    if (q.verify) {
+      const vc = req.headers["x-access-code"] || "";
+      if (!process.env.ACCESS_CODE || vc === process.env.ACCESS_CODE) return res.status(200).json({ ok: true });
+      await new Promise(r => setTimeout(r, 700)); // slows down guessing
+      return res.status(401).json({ ok: false, error: "Wrong access code" });
+    }
     if (!q.check) return res.status(200).json(base);
     const code = req.headers["x-access-code"] || q.code;
     if (process.env.ACCESS_CODE && code !== process.env.ACCESS_CODE) return res.status(401).json({ error: "Access code required" });
