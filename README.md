@@ -91,6 +91,8 @@ Category and catalogue keywords match whole words, plurals included ("monitor" m
 
 An answer that has nothing to do with the question (a recipe, a joke) is caught by rules and by the AI, and the question is asked again once. If the second answer is still unrelated, the detail is recorded as not given and listed as an open point; it never reaches the description. One answer can fill several details (for example the problem, who it is for, today's solution and the impact of delay), and nothing the user already said is asked again. Chat replies never show internal field names or values.
 
+If the answer to the data question doesn't say where the data is stored, the chat asks once more. A short reply such as "in the EU" is added to the answer. "Not sure" leaves an open point in the quality check. A relative start ("next week", "ASAP", "next month") is stored as the date it stood for, for example "19 Oct 2026 (next week)", so the buyer reads a real date later.
+
 ## Quality thresholds and improvement round
 
 Two thresholds sit in `CONFIG.thresholds` and in the **Rules** panel:

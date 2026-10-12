@@ -16,6 +16,9 @@ A test conversation in AI mode (two Java contractors, €40k) showed scores that
 - **Off-topic:** the AI's off-topic verdict counts only for the question just asked.
 - **Day rate:** an answer of €5,000 or more to "day rate or total budget?" is a total budget (`rateIsTotal`). It is no longer printed as "Day rate 40000" in the record, as "Day rate not above 40000 per person" in the requirements document, or as the rate in the commercial terms.
 - **Tests:** an AI-mode test for the wrong-question verdict and a contractor conversation with "40k". Both fail on the previous code with exactly the symptoms above.
+- **Data location:** "bank data" was accepted for "what data, and where is it stored?". Now one follow-up asks where (`saysWhere`), and a short reply is added to the answer: "bank data, stored in the EU". "Not sure" keeps the answer, and the quality check lists "where the data is stored is not given".
+- **Data in the record:** in the contractor flow only system access is asked, so the record dropped the data details entirely. The "Data and system access" row now shows whenever there is access.
+- **Relative dates:** "next week", "ASAP" and "next month" are stored as the date they stood for: "19 Oct 2026 (next week)" (`datedWhen`). Answers with a number or a month stay as given.
 
 ## Update: category ties fixed (finding 21)
 
@@ -84,7 +87,7 @@ Three things blocked real users. The first is now fixed:
 | Suite | Result |
 | --- | --- |
 | API (`tests/api`, node:test) | 18 passed, 1 known bug recorded as `todo` |
-| End-to-end (`tests/e2e`, Playwright, Chromium) | 53 passed: 47 behaviour tests and 6 known-issue tests that fail as expected |
+| End-to-end (`tests/e2e`, Playwright, Chromium) | 56 passed: 50 behaviour tests and 6 known-issue tests that fail as expected |
 | Run time | About a minute. Needs no keys and no network. |
 
 **Covered:**

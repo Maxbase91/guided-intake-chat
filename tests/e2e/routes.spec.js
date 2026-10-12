@@ -102,6 +102,38 @@ test("external workers: a total budget given as the 'rate or budget' is not prin
   await expect(page.locator("#paper")).not.toContainText("Day rate not above");
 });
 
+// the conversation from a real test run: "next week" for the start and "bank data" for the data question
+const CONTRACTOR_TEST_RUN = [[/day rate/i, "40k"], [/When (do you need it|should it start)/i, "next week"], [/fixed deadline/i, "It can move"], [/kind of data/i, "bank data"]];
+
+test("external workers: 'bank data' is asked where it is stored, and 'next week' is kept as a date", async ({ page }) => {
+  await openApp(page);
+  await say(page, "Two Java developers as contractors for 9 months.");
+  await answerUntilDone(page, [...CONTRACTOR_TEST_RUN, [/where will that data be stored/i, "in the EU"], ...ANSWERS]);
+  await expect(page.locator("#msgs")).toContainText("where will that data be stored or processed");
+  const record = page.locator(".sd .record");
+  await expect(record).toContainText(/bank data, stored in the EU/i);
+  await expect(record).toContainText("19 Oct 2026 (next week)");
+  await expect(page.locator(".sd .qual")).not.toContainText("where the data is stored");
+});
+
+test("external workers: a data answer without a place is listed in the quality check", async ({ page }) => {
+  await openApp(page);
+  await say(page, "Two Java developers as contractors for 9 months.");
+  await answerUntilDone(page, [...CONTRACTOR_TEST_RUN, [/where will that data be stored/i, "Not sure"], ...ANSWERS]);
+  await expect(page.locator(".sd .record")).toContainText(/bank data/i);
+  await expect(page.locator(".sd .qual")).toContainText("Data involved: where the data is stored is not given.");
+});
+
+test("a data answer says where it is stored; a relative start is kept as the date it stood for", async ({ page }) => {
+  await openApp(page);
+  const WHERE = { "bank data": false, "client names and IDs": false, "employee names and salaries, stored in the EU": true, "client data in Germany": true,
+    "client data on our own systems": true, "the supplier hosts it": true, "kept on premises": true };
+  const WHEN = { "next week": "19 Oct 2026 (next week)", "ASAP": "12 Oct 2026 (ASAP)", "by next month": "1 Nov 2026 (by next month)",
+    "1 February 2027": "1 February 2027", "start of March, we're hiring now": "start of March, we're hiring now", "19 Oct 2026 (next week)": "19 Oct 2026 (next week)" };
+  const got = await page.evaluate(([w, d]) => [Object.fromEntries(w.map((t) => [t, saysWhere(t)])), Object.fromEntries(d.map((t) => [t, datedWhen(t)]))], [Object.keys(WHERE), Object.keys(WHEN)]);
+  expect(got).toEqual([WHERE, WHEN]);
+});
+
 test("new demand under the threshold: business-led sourcing with three quotes", async ({ page }) => {
   const errors = await openApp(page);
   await say(page, "An agency for a client dinner for 40 people, around 30k.");

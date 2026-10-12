@@ -813,9 +813,18 @@ function deriveFacts(f){
   derive("l4", ff=>{ const r=classifyL4(ff); return r[0]&&r[0].code; });
 }
 
+// "next week" or "ASAP" means nothing to the buyer a week later, so it is kept as the date it stood for: "19 Oct 2026 (next week)"
+function datedWhen(v){
+  // only a purely relative answer: anything with a number or a month ("start of March, we're hiring now") stays as given
+  if(typeof v!=="string" || /\d|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|\bq[1-4]\b/i.test(v)
+     || !/^(?:(?:by|from|starting|start|in|within|ideally|latest)\s+)?(?:asap|as soon as possible|immediately|urgent(?:ly)?|right away|now|next (?:week|month|quarter|year))\b/i.test(v.trim())) return v;
+  const d=parseWhen(v); return d ? `${fmtDate(d)} (${v.trim().replace(/[.!]$/,"")})` : v;
+}
+
 function refresh(){
   const f=S.f;
   if(!known(f.category)){ S.det=null; S.missing=["need"]; return; }
+  f.needed_by=datedWhen(f.needed_by);
   deriveFacts(f);
   // catalogue items: fill item and an estimated value automatically
   S.det = determine();
@@ -886,6 +895,9 @@ function findIssue(changed){
       if((VAGUE.test(v.trim()) && !((k==="renewal_change"||k==="impact_delay")&&/no/i.test(v))) || tooShort)
         return {fact:k, issue:"too vague to act on", message:`Could you say a little more? "${v}" is hard for ${k==="supplier_reason"?"procurement to accept as a reason":"a supplier to work with"}. ${FACTS[k].ex(f)||FACTS[k].q(f)}`.trim()};
     }
+    // the data question has two parts; "bank data" alone leaves the data protection review without a location
+    if(k==="data_details" && givenText(v) && !saysWhere(v))
+      return {fact:k, kind:"where", issue:"where the data is stored is missing", message:`Thanks. And where will that data be stored or processed? For example "in the EU", "in Germany" or "on our own systems".`, choices:["Not sure"]};
     if(k==="value" && known(v)){
       const val=Number(v), mo=monthsOf(f.duration);
       if(f.demand_type==="contingent_labour" && known(f.day_rate)){
@@ -934,6 +946,7 @@ function computeQuality(aiRemarks){
   }
   const swCount=k=>k==="quantity"&&f.demand_type==="software"&&NEW_DEMAND(route);
   req.filter(k=>(f[k]==="Not given"||f[k]==="unsure") && !S.flags.some(x=>x.fact===k&&x.status==="unanswered")).forEach(k=>pts.push(swCount(k)?{lvl:"info",text:"Number of users: to confirm with suppliers."}:{lvl:"warn",text:`${label(k)}: still to be clarified.`}));
+  if(givenText(f.data_details) && !saysWhere(f.data_details)) pts.push({lvl:"warn",text:"Data involved: where the data is stored is not given."});
   if(f.value_is_estimate && !["catalogue"].includes(route)) pts.push({lvl:"info",text:`The budget of ${money(Number(f.value))} is an estimate.`});
   if(route==="sourcing" && f.budget_approved && f.budget_approved!=="yes") pts.push({lvl:"warn",text:"Budget not yet approved. Sourcing can only start once it is."});
   if(known(f.needed_by) && !S.flags.some(x=>x.fact==="needed_by")){ const d=parseWhen(f.needed_by); if(d){ const days=(d-new Date())/864e5; if(days<(LEAD_DAYS[route]||0)) pts.push({lvl:"info",text:`Tight timeline: ${CHANNELS[route].name} usually takes ${CHANNELS[route].days} working days.`}); } }
@@ -1374,6 +1387,15 @@ async function handleTurn(text, cid, opts={}){
       else { if(pend.prev && typeof nv==="string" && !nv.includes(String(pend.prev)) && words(nv)<15) S.f[pend.fact]=`${pend.prev}; ${nv}`;
         if(BUNDLES[pend.fact]){ BUNDLES[pend.fact].forEach(([,x])=>{ if(isTBD(S.f[x])) S.f[x]=null; }); const free={kpis_pack:"kpis"}[pend.fact]; if(free) S.f[free]=String(S.f[pend.fact]); else setFromSuggestion(pend.fact,String(S.f[pend.fact])); }
         S.flags.push({fact:pend.fact,issue:pend.issue,status:"corrected"}); }
+    } else if(pend.kind==="where"){
+      // a place is added to the data already given ("Bank data, stored in the EU"); a full new answer replaces it
+      const nv=S.f[pend.fact], loc=typeof nv==="string" ? nv.trim().replace(/[.!]$/,"").replace(/^(?:it(?:'s| is| will be)|they(?:'re| are| will be))\s+/i,"") : "";
+      if(loc && loc!==pend.prev && saysWhere(loc)){
+        const short=words(loc)<=6 && (/^(?:stored|hosted|held|kept|processed|in|on|at|within)\b/i.test(loc) || new RegExp(`^(?:${PLACES})$`,"i").test(loc));
+        const where=/^(?:stored|hosted|held|kept|processed)\b/i.test(loc) ? loc.replace(/^\w/,c=>c.toLowerCase()) : /^(?:in|on|at|within)\b/i.test(loc) ? "stored "+loc.replace(/^\w/,c=>c.toLowerCase()) : "stored in "+loc;
+        S.f[pend.fact] = short ? `${pend.prev}, ${where}` : cap1(loc);
+        S.flags.push({fact:pend.fact,issue:pend.issue,status:"corrected"});
+      } else { S.f[pend.fact]=pend.prev; S.flags.push({fact:pend.fact,issue:"where the data is stored is not given",status:"missing"}); }
     } else if(pend.kind==="offtopic"){
       const nv=S.f[pend.fact];
       if(!known(nv) || offTopic(pend.fact, nv) || nv===pend.prev){ S.f[pend.fact]="Not given"; S.flags.push({fact:pend.fact,issue:"no usable answer given",status:"unanswered"}); }
@@ -1914,6 +1936,9 @@ function itemFrom(text){
 }
 
 const PLACES="Poland|Krakow|Kraków|Wroclaw|Philippines|Manila|Portugal|Czech Republic|Hungary|Budapest|London|Frankfurt|Berlin|Munich|Hamburg|Cologne|Düsseldorf|Stuttgart|Bielefeld|Münster|Paris|Lisbon|Madrid|Barcelona|Amsterdam|Dublin|Zurich|Geneva|Vienna|Milan|Rome|Brussels|Luxembourg|Warsaw|Prague|Bucharest|Stockholm|Copenhagen|Oslo|Helsinki|New York|Singapore|Hong Kong|Tokyo|Sydney|Toronto|Mumbai|Pune|Bangalore|Bengaluru|Jaipur|Germany|the UK|UK|United Kingdom|England|France|Spain|Portugal|Italy|the Netherlands|Netherlands|Ireland|Switzerland|Austria|Belgium|Poland|Romania|India|the US|USA|the EU|EU|Europe|EMEA|APAC";
+// does the data answer say where the data is kept? ("stored in the EU", "on our own systems", "in Germany")
+const WHERE_STORED=new RegExp(`\\b(?:stor\\w*|host\\w*|held|kept|servers?|cloud|on.?prem\\w*|data cent(?:re|er)s?|our (?:own )?systems|in.?house|onshore|offshore|locally)\\b|\\b(?:${PLACES})\\b`,"i");
+const saysWhere = v => WHERE_STORED.test(String(v||""));
 const MONTH="(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
 const NUMW={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,twelve:12};
 const NEG=/\b(no|not|without|won't|will not|doesn't|does not|don't|do not|never|none|nothing)\b/;
@@ -2313,7 +2338,7 @@ function intakeRecord(){
     ["Start or delivery",v("needed_by")], ["Duration",v("duration")], ["Where and how",v("location")],
     ["Supplier",supplier], ["Existing contract",D.contract&&route==="contract"?`${D.contract.title} with ${D.contract.supplier} (${D.contract.id})`:null],
     ["Provisioning legal entity", nd && f.demand_type!=="goods" ? (o.entity?o.entity.name:"To be determined") : null],
-    ["Data and system access", known(f.personal_data) ? (a.any?`Yes${givenText(f.data_details)?`: ${f.data_details}`:""}${a.money?" (money or accounts)":""}`:show("personal_data",f.personal_data)) : null],
+    ["Data and system access", known(f.personal_data) || a.any ? (a.any?`Yes${givenText(f.data_details)?`: ${f.data_details}`:""}${a.money?" (money or accounts)":""}`:show("personal_data",f.personal_data)) : null],
     ["System access",v("system_access")],
     ["Outsourcing", nd && f.demand_type!=="goods" ? `${o.result} (${o.rs.short}, group standard)` : null],
     ["Future rule set", nd ? `${o.future.result} (${RULESETS.future.short}, not yet applicable)` : null],
