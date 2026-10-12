@@ -299,3 +299,23 @@ test("a description built without the AI reads as sentences", async ({ page }) =
   expect(got.exec).toContain("Success means: cycle time and user satisfaction");
   expect(got.exec).not.toMatch(/with buy|Today, providing|measured by success|would you/i);
 });
+
+test("'trading desk', 'service desk' and 'help desk' are teams, not office furniture", async ({ page }) => {
+  await openApp(page);
+  const CASES = {
+    "A call recording service for the trading desk": null,
+    "A new service desk tool for our IT team": "software",
+    "A help desk for our staff": "it-services",
+    "We need 10 standing desks for the new office": "office",
+  };
+  const got = await page.evaluate((texts) => Object.fromEntries(texts.map((t) => [t, (bestCategory(` ${t.toLowerCase()} `) || { id: null }).id])), Object.keys(CASES));
+  expect(got).toEqual(CASES);
+});
+
+test("a service no keyword knows is new demand, not a call-off on the consulting framework", async ({ page }) => {
+  await openApp(page);
+  await say(page, "Translation of our annual report into five languages, around 25k.");
+  await expect(page.locator("#side .route")).toHaveText("New demand: business-led sourcing");
+  await expect(page.locator("#msgs")).not.toContainText("This sounds like management consulting");
+  await expect(page.locator("#msgs")).not.toContainText("Lakeshore");
+});

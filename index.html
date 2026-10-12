@@ -62,6 +62,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .welcome h1{font-size:26px}
 .welcome p{color:var(--ink-2);margin:8px 0 18px}
 .tries{border-top:1px solid var(--line-2)}
+.tryh{margin:18px 0 6px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)} .tryh:first-of-type{margin-top:4px}
 .tries button{display:flex;gap:12px;align-items:baseline;width:100%;border:0;border-bottom:1px solid var(--line-2);background:none;padding:11px 4px;text-align:left;cursor:pointer;color:var(--ink-2);font-size:14.5px}
 .tries button:hover{color:var(--navy);background:#fafbfd}
 .tries small{flex:none;width:118px;font-size:11.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--amber-ink)}
@@ -577,7 +578,8 @@ const userText = () => " "+S.msgs.filter(m=>m.role==="user").map(m=>m.text).join
 // whole words with an optional plural, so "pens" no longer hits "expenses" or "screen" hits "screening"; "consult*" is a stem
 const kwRe = (k, flags) => new RegExp(k.endsWith("*") ? "\\b"+k.slice(0,-1) : "\\b"+k+"(?:e?s)?\\b", flags);
 const kwHit = (t, k) => kwRe(k).test(t);
-// the category with the most keywords in the text. A goods noun right after "to" is a verb ("a tool to monitor alerts"), so it does not count.
+// the category with the most keywords in the text. A goods noun right after "to" is a verb ("a tool to monitor alerts"), and after "trading",
+// "service" or "help" it names a team ("trading desk", "service desk"), so neither counts.
 // A tie goes to the category named last in the head of the first message, the words before "for", "to", "with", "that" or a comma:
 // the head noun ends that phrase ("software to manage our laptops" is software, "a transaction monitoring system" is a system).
 function bestCategory(t, first=t){
@@ -586,7 +588,7 @@ function bestCategory(t, first=t){
   for(const c of CATEGORIES){
     let s=0, k2=-1;
     for(const k of c.kw){
-      const ends=[...t.matchAll(kwRe(k,"g"))].filter(m=>!(c.type==="goods" && /\bto $/.test(t.slice(0,m.index)))).map(m=>m.index+m[0].length);
+      const ends=[...t.matchAll(kwRe(k,"g"))].filter(m=>!(c.type==="goods" && /\b(?:to|trading|dealing|service|help|front|back|cash|sales|support|treasury) $/.test(t.slice(0,m.index)))).map(m=>m.index+m[0].length);
       if(ends.length){ s++; k2=Math.max(k2, ...ends.filter(e=>e<=head)); }
     }
     if(s>score || (s && s===score && k2>key)){ best=c; score=s; key=k2; }
@@ -606,6 +608,7 @@ const daysTo = d => (new Date(d) - new Date())/864e5;
 
 function contractFor(f){
   if(f.decline_contract) return null;
+  if(S.catGuess && S.catGuess===f.category) return null;   // "translation of our annual report" is not a call-off on the consulting framework
   const today=new Date(), list=CONTRACTS.filter(c=>c.category===f.category && new Date(c.expires)>today);
   if(!hasSupplier(f)) return list[0]||null;
   const s=String(f.supplier).toLowerCase();
@@ -1274,7 +1277,7 @@ function applyChanges(ch){
       const code=v.l4||(L4.find(e=>e.cat===v.cat)||{}).code;
       if(v.cat===f.category && (!code||code===f.l4)) continue;
       const from=catById(f.category).name, c=catById(v.cat);
-      f.category=v.cat; f.demand_type=c.type;
+      f.category=v.cat; f.demand_type=c.type; S.catGuess=null;
       if(code){ f.l4=code; delete S.derived.l4; f.l4_reason="Set by you during the intake."; }
       f.contract_ok=null; f.decline_contract=null; S.override="";
       // suggestions prepared for the old category no longer fit
@@ -1621,6 +1624,7 @@ function mergeFacts(nf){
   }
   if(nf.value_is_estimate!==undefined && known(nf.value)) S.f.value_is_estimate=!!nf.value_is_estimate;
   if(S.f.category && !CATEGORIES.some(c=>c.id===S.f.category)) S.f.category=null;
+  if(nf.category && S.f.category===nf.category) S.catGuess=null;   // the AI named the category: no longer a guess
   if(typeof nf.entity==="string"){ const e=ENTITIES.find(x=>x.id===nf.entity.toUpperCase()||nf.entity.toLowerCase().includes(x.name.toLowerCase().split(" (")[0])||x.re.test(nf.entity)||(x.abbr&&x.abbr.test(nf.entity))); S.f.entity=e?e.id:S.f.entity; }
   if(typeof nf.l4==="string" && !l4ByCode(nf.l4)) S.f.l4=null;
   if(S.f.category && !S.f.demand_type) S.f.demand_type=catById(S.f.category).type;
@@ -1998,8 +2002,8 @@ function offlineRead(text, asked){
     let best=bestCategory(all, " "+(first?first.text:"").toLowerCase());
     if(/contractor|freelance|temporary staff|interim|day rate|\ba day\b|per day/.test(all) && /developer|engineer|analyst|manager|designer|tester|contractor|freelance|interim/.test(all)) best=catById("contingent");
     if(best && best.id==="cloud" && /\b(hr|payroll|crm|erp|finance|accounting|procurement|ticketing)\b[^.]*\b(system|tool|platform|software|application)\b/.test(all)) best=catById("software");
-    if(best){ f.category=best.id; f.demand_type=best.type; }
-    else if(asked==="need" || text.split(/\s+/).length>3){ f.category="consulting"; f.demand_type="services"; }
+    if(best){ f.category=best.id; f.demand_type=best.type; S.catGuess=null; }
+    else if(asked==="need" || text.split(/\s+/).length>3){ f.category="consulting"; f.demand_type="services"; S.catGuess="consulting"; }   // no keyword: a guess
     if(known(f.category)){
       f.summary=f.summary||firstSentence(text);
       if(f.demand_type!=="contingent_labour" && !known(f.item)) f.item=itemFrom(text);
@@ -2257,7 +2261,7 @@ function offlineQuestion(k, prevRoute, stageChanged){
   const f=S.f, F=FACTS[k];
   let intro="";
   if(!prevRoute && S.det){
-    const n=catById(f.category).name; intro = `This sounds like ${/^[A-Z]{2}/.test(n)?n:n.charAt(0).toLowerCase()+n.slice(1)}. `;
+    const n=catById(f.category).name; intro = S.catGuess ? "" : `This sounds like ${/^[A-Z]{2}/.test(n)?n:n.charAt(0).toLowerCase()+n.slice(1)}. `;
     if(S.det.contract && hasSupplier(f)) intro += `We have the ${S.det.contract.title} with ${S.det.contract.supplier}, which makes this quicker. `;
     if(S.det.route==="catalogue") intro += `Good news: ${S.det.catalogue.map(i=>i.name).join(" and ")} ${S.det.catalogue.length>1?"are":"is"} in our catalogue. `;
     const req=requiredFor(S.det.route,f), got=req.filter(k=>known(f[k]));
@@ -2831,12 +2835,17 @@ const money=v=>v==null?"Unknown":new Intl.NumberFormat("en-GB",{style:"currency"
 const fmtDate=d=>{const x=new Date(d);return isNaN(x)?d:x.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});};
 const show=(k,v)=>v==="Confirmed"&&BUNDLES[k]?(BUNDLES[k].map(([,x])=>givenText(S.f[x])).filter(Boolean).join("; ")||"Confirmed"):isTBD(v)?"To be determined":k==="entity"&&entityById(v)?entityById(v).name:k==="l4"&&l4ByCode(v)?`${l4ByCode(v).name} (${v})`:v===true?"Yes":v===false?"No":v==="unsure"?"Not sure":k==="value"?money(Number(v))+(S.f.value_is_estimate?" (est.)":""):["quantity","headcount"].includes(k)?fmtN(v):cap1(String(v));
 
+// examples on the welcome screen: mostly new demand, each showing a different path, then one per other route
 const TRIES=[
-  ["Catalogue","We need 15 laptops for new joiners in Frankfurt."],
-  ["Contract call-off","More support from Lakeshore Advisory for our operations team."],
-  ["External workers","Two Java developers as contractors for 9 months."],
-  ["New demand, under €50k","An agency for a client dinner for 40 people, around 30k."],
-  ["New demand, over €50k","A new HR system to replace our payroll tool."]
+  ["New demand","Software, RFP","A new HR system to replace our payroll tool."],
+  ["New demand","Outsourcing","KYC periodic reviews for our corporate clients by an external provider for 2 years, around 600k."],
+  ["New demand","Offshore","An offshore team in Poland to run accounts payable invoice processing for 3 years, about 900k."],
+  ["New demand","Over €1 million","Replace our core treasury management system, budget 2.5 million over 5 years."],
+  ["New demand","Market data","An ESG ratings data feed for our research team, around 120k a year."],
+  ["New demand","Under €50k","An agency for a client dinner for 40 people, around 30k."],
+  ["Other routes","Catalogue","We need 15 laptops for new joiners in Frankfurt."],
+  ["Other routes","Call-off","More support from Lakeshore Advisory for our operations team."],
+  ["Other routes","External workers","Two Java developers as contractors for 9 months."]
 ];
 /* ---------- replies type out like someone writing: fast, and line by line for long ones ----------
    One reply at a time; anything after it in the same turn (cards, notes, answer chips) waits until it is done.
@@ -2883,8 +2892,8 @@ function render(){
   if(!S.msgs.length){
     box.innerHTML=`<div class="welcome"><h1>What do you need to buy?</h1>
       <p>Tell me in your own words. I'll ask only what's needed, one thing at a time, and then show you the quickest way to get it.</p>
-      <div class="tries">${TRIES.map(([h,t],i)=>`<button data-try="${i}"><small>${h}</small><span>${esc(t)}</span></button>`).join("")}</div></div>`;
-    box.querySelectorAll("[data-try]").forEach(b=>b.onclick=()=>handleUser(TRIES[b.dataset.try][1]));
+      ${[...new Set(TRIES.map(x=>x[0]))].map(g=>`<h5 class="tryh">${esc(g)}</h5><div class="tries">${TRIES.map(([gg,h,t],i)=>gg!==g?"":`<button data-try="${i}"><small>${esc(h)}</small><span>${esc(t)}</span></button>`).join("")}</div>`).join("")}</div>`;
+    box.querySelectorAll("[data-try]").forEach(b=>b.onclick=()=>handleUser(TRIES[b.dataset.try][2]));
   } else {
     const lastRec=S.msgs.map((m,i)=>m.kind==="rec"?i:-1).filter(i=>i>=0).pop();
     const lastSd=S.msgs.map((m,i)=>m.kind==="sd"?i:-1).filter(i=>i>=0).pop();

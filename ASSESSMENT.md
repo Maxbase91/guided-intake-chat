@@ -131,7 +131,7 @@ Three things blocked real users. The first is now fixed:
 | Suite | Result |
 | --- | --- |
 | API (`tests/api`, node:test) | 18 passed, 1 known bug recorded as `todo` |
-| End-to-end (`tests/e2e`, Playwright, Chromium) | 81 passed: 77 behaviour tests and 4 known-issue tests that fail as expected |
+| End-to-end (`tests/e2e`, Playwright, Chromium) | 84 passed: 80 behaviour tests and 4 known-issue tests that fail as expected |
 | Run time | About a minute. Needs no keys and no network. |
 
 **Covered:**
@@ -152,7 +152,7 @@ Three things blocked real users. The first is now fixed:
 - **Access and layout:** the access-code gate and the phone layout.
 
 **Not covered:**
-- **Real LLM output quality.** That needs real keys. Run the app with `GEMINI_API_KEY=... npm start` and walk through the five examples on the welcome screen.
+- **Real LLM output quality.** That needs real keys. Run the app with `GEMINI_API_KEY=... npm start` and walk through the examples on the welcome screen (six new-demand cases, one per other route).
 - **Browsers other than Chromium.**
 
 ## Findings

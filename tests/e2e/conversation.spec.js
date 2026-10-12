@@ -104,7 +104,7 @@ test("skipping a question records it as to be determined", async ({ page }) => {
 
 test("an example on the welcome screen starts the conversation, and New starts over", async ({ page }) => {
   await openApp(page);
-  await page.locator("[data-try]").first().click();
+  await page.locator("[data-try]", { hasText: "15 laptops" }).click();
   await idle(page);
   await expect(page.locator("#msgs .m.u").first()).toContainText("15 laptops");
   await expect(routeInPanel(page)).toHaveText("Catalogue order");
@@ -226,4 +226,14 @@ test("the side panel folds finished steps and shortens long answers until clicke
   expect(full).toBeGreaterThan(short);
   // the captured text itself is complete either way
   expect((await sideFacts(page))["Problem to solve"]).toMatch(/so we get errors every month$/);
+});
+
+test("the welcome screen leads with new-demand examples, then one per other route", async ({ page }) => {
+  await openApp(page);
+  await expect(page.locator(".welcome .tryh")).toHaveText(["New demand", "Other routes"]);
+  await expect(page.locator(".welcome .tries").first().locator("[data-try]")).toHaveCount(6);
+  await expect(page.locator(".welcome .tries").nth(1).locator("[data-try]")).toHaveCount(3);
+  await page.locator("[data-try]", { hasText: "ESG ratings data feed" }).click();
+  await idle(page);
+  await expect(routeInPanel(page)).toHaveText("New demand: procurement-led sourcing");
 });

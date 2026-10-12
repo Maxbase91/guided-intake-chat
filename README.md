@@ -20,6 +20,8 @@ Purpose questions (sourcing, quotes for services, external workers): "What probl
 
 All reference data (catalogue, contracts, preferred suppliers) is mock data. Use dummy requests only.
 
+The welcome screen offers examples to start from. Six are new demand, each showing a different path: software with an RFP, outsourcing of a business process (KYC), offshore delivery, over €1 million (material spend review), market data (not outsourcing), and under €50k (three quotes). Then there is one each for catalogue, call-off and external workers. Consulting, IT services, cloud, legal, facilities, training and external workers have framework contracts in the mock data, so requests in those categories go to a call-off. A request whose category the rules can only guess never does.
+
 ## How it is built
 
 - `index.html` is the whole front end. No build step.
