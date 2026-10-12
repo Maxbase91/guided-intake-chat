@@ -132,3 +132,52 @@ test("new demand over the threshold: procurement-led RFP with the full service d
   await finishAndSubmit(page, "New demand: procurement-led sourcing");
   expect(errors).toEqual([]);
 });
+
+// Catalogue matching: whole words, the request's own demand type, and a value the catalogue price can explain.
+for (const [text, category] of [
+  ["A SaaS tool to track travel expenses for 400k", "software"],         // "pens" inside "expenses"
+  ["A transaction monitoring system for AML, budget 400k", "software"],  // "monitor" inside "monitoring"
+  ["Sanctions screening service for 3 years, around 300k", "bpo"],       // "screen" inside "screening"
+  ["A dashboard tool to monitor sanctions alerts, 400k", null],          // a whole word, but 400k is no monitor order
+]) {
+  test(`"${text}" is not offered from the catalogue`, async ({ page }) => {
+    await openApp(page);
+    await say(page, text);
+    await expect(page.locator("#msgs")).not.toContainText("is in our catalogue");
+    await expect(page.locator("#side .route")).not.toHaveText("Catalogue order");
+    if (category) expect(await page.evaluate(() => S.f.category)).toBe(category);
+  });
+}
+
+test("a budget the catalogue price explains stays a catalogue order", async ({ page }) => {
+  await openApp(page);
+  await say(page, "50 laptops for the new team, budget 60k");
+  await expect(page.locator("#msgs")).toContainText("Standard laptop 14\" is in our catalogue");
+});
+
+test("keywords match whole words with a plural; a trailing * keeps a stem", async ({ page }) => {
+  await openApp(page);
+  const CASES = {
+    "travel expenses ~ pens": false, "transaction monitoring ~ monitor": false, "sanctions screening ~ screen": false, "a template ~ temp": false,
+    "two monitors ~ monitor": true, "15 laptops ~ laptop": true, "office chairs ~ chair": true, "two temps ~ temp": true,
+    "a consultant ~ consult*": true, "telecommunications ~ telecom*": true, "a freelancer ~ freelance*": true, "the reconsultation ~ consult*": false,
+  };
+  const got = await page.evaluate((keys) => Object.fromEntries(keys.map((key) => { const [t, k] = key.split(" ~ "); return [key, kwHit(` ${t} `, k)]; })), Object.keys(CASES));
+  expect(got).toEqual(CASES);
+});
+
+test("the catalogue is offered only when the value fits the catalogue price", async ({ page }) => {
+  await openApp(page);
+  const CASES = {
+    "no value yet": [{ value: null }, true],
+    "50 laptops for 60k": [{ value: 60000, quantity: "50" }, true],
+    "100 laptops for 400k": [{ value: 400000, quantity: "100" }, false],
+    "no quantity, 30k": [{ value: 30000 }, true],
+    "no quantity, 400k (above the sourcing threshold)": [{ value: 400000 }, false],
+  };
+  const got = await page.evaluate((cases) => {
+    const laptop = CATALOGUE.filter((i) => i.id === "CAT-1001");
+    return Object.fromEntries(Object.entries(cases).map(([name, [f]]) => [name, catalogueFits(f, laptop)]));
+  }, CASES);
+  expect(got).toEqual(Object.fromEntries(Object.entries(CASES).map(([name, [, want]]) => [name, want])));
+});

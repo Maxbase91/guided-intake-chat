@@ -65,12 +65,14 @@ npm run test:e2e                  # browser tests (Playwright, Chromium)
 npx playwright show-report test-results/html
 ```
 
+If the Chromium download hangs, point the tests at an installed Chromium instead: `CHROMIUM_PATH=/path/to/chrome-headless-shell npm run test:e2e`.
+
 The end-to-end tests start three local servers: offline (no key), AI (mock providers) and gated (mock providers plus `ACCESS_CODE=demo-code`). No real key or network is needed. The clock is fixed at 12 October 2026, so date checks are deterministic.
 
 | File | What it covers |
 | --- | --- |
 | `tests/api/llm.test.js` | Status and verify endpoints, access code, request validation, provider order, fallback on rate limits and errors, cooldown, forced provider, live check |
-| `tests/e2e/routes.spec.js` | One full conversation per route (catalogue, call-off, external workers, new demand under and over €50,000), result cards, JSON and Word downloads, submit |
+| `tests/e2e/routes.spec.js` | One full conversation per route (catalogue, call-off, external workers, new demand under and over €50,000), result cards, JSON and Word downloads, submit; catalogue matching (whole words, demand type, value that fits the catalogue price) |
 | `tests/e2e/conversation.spec.js` | Corrections in words and in the side panel, unclear corrections, off-topic answers, dates in the past, skipping, Rules thresholds, route override, improvement round, inline edits |
 | `tests/e2e/ai-mode.spec.js` | AI through the server: provider label, Gemini → Groq fallback, all providers down, internal field names hidden, AI off-topic check, AI toggle, `?ai=` |
 | `tests/e2e/outsourcing.spec.js` | Outsourcing determination under EBA/GL/2019/02: a full KYC conversation with the test steps in the document, a branch outside the EU, and a rule table for paragraphs 26 and 28 and the EBA/GL/2026/09 preview |
@@ -82,6 +84,8 @@ The end-to-end tests start three local servers: offline (no key), AI (mock provi
 ## Change the rules
 
 Thresholds sit in `CONFIG.thresholds` and can also be changed live in the **Rules** panel. Catalogue, contracts and preferred suppliers sit in section 2 of the script.
+
+Category and catalogue keywords match whole words, plurals included ("monitor" matches "monitors" but not "monitoring"). End a keyword with `*` to match it as a stem (`consult*` matches "consultant" and "consulting"). A catalogue item is offered only for its own demand type (`goods` or `software`), and only when the stated value fits its price: at most twice price × quantity, or, with no quantity yet, no more than the business-led sourcing threshold.
 
 ## Answer checks against nonsense and repeats
 

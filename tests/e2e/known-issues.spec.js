@@ -6,20 +6,12 @@ const { openApp, say, choose, idle, lastAssistant, choices, answerUntilDone, sid
 
 const route = (page) => page.locator("#side .route");
 
-test.describe("catalogue matching by substring", () => {
-  for (const [text, wrongItem] of [
-    ["A SaaS tool to track travel expenses for 400k", "Stationery bundle"],     // "pens" inside "expenses"
-    ["A transaction monitoring system for AML, budget 400k", "27\" monitor"],  // "monitor"
-    ["Sanctions screening service for 3 years, around 300k", "27\" monitor"],  // "screen"
-  ]) {
-    test(`"${text}" is not offered from the catalogue`, async ({ page }) => {
-      test.fail(true, "catalogueMatches() matches keywords inside other words and ignores the value");
-      await openApp(page);
-      await say(page, text);
-      await expect(page.locator("#msgs")).not.toContainText(`${wrongItem} is in our catalogue`, { timeout: 2000 });
-      await expect(route(page)).not.toHaveText("Catalogue order", { timeout: 2000 });
-    });
-  }
+test("a software request that mentions a hardware word is not offered the hardware from the catalogue", async ({ page }) => {
+  test.fail(true, "category keyword ties go to the first category listed (IT hardware), so 'laptop' outweighs 'software'");
+  await openApp(page);
+  await say(page, "Software to manage our laptop fleet, 20k");
+  await expect(page.locator("#msgs")).not.toContainText("is in our catalogue", { timeout: 2000 });
+  await expect(route(page)).not.toHaveText("Catalogue order", { timeout: 2000 });
 });
 
 test("acronyms keep their capitals in generated text", async ({ page }) => {

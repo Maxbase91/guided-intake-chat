@@ -291,33 +291,34 @@ const CONFIG = {
 /* =========================================================
    2. REFERENCE DATA (mock — replace with your own)
    ========================================================= */
+// keywords match whole words (plural allowed, see kwHit); a trailing * marks a stem that also matches longer words
 const CATEGORIES = [
   {id:"it-hardware", name:"IT hardware",                   type:"goods",    kw:["laptop","notebook","monitor","headset","keyboard","printer","hardware","docking","screen","smartphone"]},
-  {id:"software",    name:"Software and SaaS",             type:"software", kw:["licence","license","software","saas","subscription","seats","system","platform","tool","orchestrat","workflow","portal","automation","agentic","entry point"]},
-  {id:"it-services", name:"IT services and development",   type:"services", kw:["develop","implementation","integration","migration","testing","build an app","service desk","help desk","helpdesk","managed it"]},
+  {id:"software",    name:"Software and SaaS",             type:"software", kw:["licence*","license*","software","saas","subscription","seats","system","platform","tool*","orchestrat*","workflow","portal","automation","agentic","entry point"]},
+  {id:"it-services", name:"IT services and development",   type:"services", kw:["develop*","implementation","integration","migration","testing","build an app","service desk","help desk","helpdesk","managed it"]},
   {id:"cloud",       name:"Cloud and hosting",             type:"services", kw:["cloud","hosting","aws","azure","data centre"]},
-  {id:"consulting",  name:"Management consulting",         type:"services", kw:["consult","advisory","strategy","redesign","transformation","assessment","operating model"]},
+  {id:"consulting",  name:"Management consulting",         type:"services", kw:["consult*","advisory","strategy","redesign","transformation","assessment","operating model"]},
   {id:"legal",       name:"Legal services",                type:"services", kw:["legal","lawyer","counsel","litigation","law firm"]},
   {id:"marketing",   name:"Marketing and events",          type:"services", kw:["event","marketing","campaign","conference","agency","offsite","dinner","sponsorship","ticket"]},
   {id:"facilities",  name:"Facilities and real estate",    type:"services", kw:["cleaning","facility","facilities","office move","maintenance","catering","security guard"]},
-  {id:"contingent",  name:"External workers",             type:"contingent_labour", kw:["contractor","temp ","temporary staff","freelance","interim","day rate"]},
+  {id:"contingent",  name:"External workers",             type:"contingent_labour", kw:["contractor","temp","temporary staff","freelance*","interim","day rate"]},
   {id:"market-data", name:"Market data",                   type:"software", kw:["market data","data feed","terminal","ratings data"]},
   {id:"training",    name:"Training and learning",         type:"services", kw:["training","course","workshop","coaching","certification"]},
   {id:"office",      name:"Office supplies and furniture", type:"goods",    kw:["paper","stationery","toner","chair","desk","supplies","furniture"]},
   {id:"bpo",         name:"Business process services",    type:"services", kw:["kyc","client onboarding","periodic review","financial crime","sanctions screening","transaction monitoring","payments operations","payment processing","reconciliation","settlement operations","invoice processing","accounts payable","payroll service","payroll processing","back office","call centre","contact centre","kyc operations","process our","processing of","claims handling","document processing"]},
-  {id:"telecom",     name:"Telecom",                       type:"services", kw:["mobile contract","telecom","network","sim card","connectivity"]}
+  {id:"telecom",     name:"Telecom",                       type:"services", kw:["mobile contract","telecom*","network*","sim card","connectivity"]}
 ];
 const DEMAND_TYPES = {goods:"Goods", services:"Services", software:"Software", contingent_labour:"External workers"};
 
 const CATALOGUE = [
-  {id:"CAT-1001", name:"Standard laptop 14\"",        supplier:"Northwind IT",    price:1150, kw:["laptop","notebook"]},
-  {id:"CAT-1002", name:"27\" monitor",                supplier:"Northwind IT",    price:240,  kw:["monitor","screen"]},
-  {id:"CAT-1003", name:"Noise-cancelling headset",    supplier:"Northwind IT",    price:180,  kw:["headset","headphones"]},
-  {id:"CAT-1004", name:"Smartphone, standard",        supplier:"Fabrikam Mobile", price:690,  kw:["smartphone","mobile phone","iphone"]},
-  {id:"CAT-1005", name:"Docking station",             supplier:"Northwind IT",    price:210,  kw:["docking"]},
-  {id:"CAT-2001", name:"Ergonomic office chair",      supplier:"Contoso Office",  price:420,  kw:["chair"]},
-  {id:"CAT-2002", name:"Stationery bundle",           supplier:"Contoso Office",  price:35,   kw:["stationery","pens","toner"]},
-  {id:"CAT-3001", name:"Collaboration suite licence", supplier:"Adatum Software", price:280,  kw:["collaboration licence","microsoft 365","m365"]}
+  {id:"CAT-1001", name:"Standard laptop 14\"",        supplier:"Northwind IT",    type:"goods",    price:1150, kw:["laptop","notebook"]},
+  {id:"CAT-1002", name:"27\" monitor",                supplier:"Northwind IT",    type:"goods",    price:240,  kw:["monitor","screen"]},
+  {id:"CAT-1003", name:"Noise-cancelling headset",    supplier:"Northwind IT",    type:"goods",    price:180,  kw:["headset","headphones"]},
+  {id:"CAT-1004", name:"Smartphone, standard",        supplier:"Fabrikam Mobile", type:"goods",    price:690,  kw:["smartphone","mobile phone","iphone"]},
+  {id:"CAT-1005", name:"Docking station",             supplier:"Northwind IT",    type:"goods",    price:210,  kw:["docking"]},
+  {id:"CAT-2001", name:"Ergonomic office chair",      supplier:"Contoso Office",  type:"goods",    price:420,  kw:["chair"]},
+  {id:"CAT-2002", name:"Stationery bundle",           supplier:"Contoso Office",  type:"goods",    price:35,   kw:["stationery","pens","toner"]},
+  {id:"CAT-3001", name:"Collaboration suite licence", supplier:"Adatum Software", type:"software", price:280,  kw:["collaboration licence","microsoft 365","m365"]}
 ];
 const CONTRACTS = [
   {id:"CTR-4410", supplier:"Contoso Cloud",      category:"cloud",       title:"Cloud hosting framework",           expires:"2028-03-31", remaining:2400000},
@@ -557,7 +558,17 @@ const contractAgreed = f => f.contract_ok===true || (S.det && S.det.contract && 
 const hasSupplier = f => known(f.supplier) && !/^(none|no|no preference|not sure|n\/a)$/i.test(String(f.supplier).trim());
 const yes = v => v===true || /^y/i.test(String(v));
 const userText = () => " "+S.msgs.filter(m=>m.role==="user").map(m=>m.text).join(" ").toLowerCase()+" ";
-const catalogueMatches = () => { const t=userText(); return CATALOGUE.filter(i=>i.kw.some(k=>t.includes(k))); };
+// whole words with an optional plural, so "pens" no longer hits "expenses" or "screen" hits "screening"; "consult*" is a stem
+const kwHit = (t, k) => new RegExp(k.endsWith("*") ? "\\b"+k.slice(0,-1) : "\\b"+k+"(?:e?s)?\\b").test(t);
+// only items of the request's own demand type: no stationery for a SaaS tool
+const catalogueMatches = f => { const t=userText(); return CATALOGUE.filter(i=>i.type===f.demand_type && i.kw.some(k=>kwHit(t,k))); };
+// a stated budget the catalogue price cannot explain means something else is being bought: at most twice price × quantity,
+// and with no quantity yet, no more than the business-led sourcing threshold
+const catalogueFits = (f, items) => {
+  const v=known(f.value)?Number(f.value):NaN, q=parseInt(f.quantity);
+  if(isNaN(v)) return true;
+  return q>0 ? v <= 2*q*items.reduce((s,i)=>s+i.price,0) : v <= CONFIG.thresholds.quickQuoteMax;
+};
 const daysTo = d => (new Date(d) - new Date())/864e5;
 
 function contractFor(f){
@@ -570,9 +581,9 @@ function contractFor(f){
 
 function determine(){
   const f=S.f, T=CONFIG.thresholds, v=known(f.value)?Number(f.value):null;
-  const cat = catalogueMatches(), ctr = contractFor(f);
+  const cat = catalogueMatches(f), ctr = contractFor(f);
   let route, why;
-  if(cat.length && GOODSLIKE(f)){ route="catalogue"; why=`${cat.map(i=>i.name).join(" and ")} ${cat.length>1?"are":"is"} in the catalogue, so you can order directly at the agreed price.`; }
+  if(cat.length && catalogueFits(f, cat)){ route="catalogue"; why=`${cat.map(i=>i.name).join(" and ")} ${cat.length>1?"are":"is"} in the catalogue, so you can order directly at the agreed price.`; }
   else if(ctr){ route="contract"; why = f.demand_type==="contingent_labour"
       ? `External workers come through the ${ctr.title} with ${ctr.supplier}, so this is a call-off with a role profile. No new competition is needed.`
       : `The ${ctr.title} with ${ctr.supplier} already covers this, with ${money(ctr.remaining)} left until ${fmtDate(ctr.expires)}. No new competition is needed.`; }
@@ -1098,7 +1109,7 @@ const CHANGE_HINT=/\b(should be|should read|instead|rather than|is wrong|was wro
 function catFromText(t){
   const l=" "+String(t).toLowerCase()+" "; let best=null, score=0;
   for(const e of L4){ const s=(l.includes(e.name.toLowerCase())?10:0)+e.kw.filter(k=>l.includes(k)).length*3+(e.name.toLowerCase().split(/\W+/).filter(w=>w.length>4&&l.includes(w)).length); if(s>score){score=s;best={cat:e.cat,l4:e.code};} }
-  for(const c of CATEGORIES){ const s=(l.includes(c.name.toLowerCase())?10:0)+c.kw.filter(k=>l.includes(k)).length*3; if(s>score){score=s;best={cat:c.id,l4:null};} }
+  for(const c of CATEGORIES){ const s=(l.includes(c.name.toLowerCase())?10:0)+c.kw.filter(k=>kwHit(l,k)).length*3; if(s>score){score=s;best={cat:c.id,l4:null};} }
   return score>=3?best:null;
 }
 // the new value in "change X to Y", "X is Y not Z", "X should be Y"
@@ -1840,7 +1851,7 @@ function offlineRead(text, asked){
   if((!asked || asked==="need") && known(f.category) && f.demand_type!=="contingent_labour"){ f.summary=f.summary||firstSentence(text); if(!known(f.item)) f.item=itemFrom(text); }
   if(!known(f.category) || asked==="need"){
     let best=null, score=0;
-    for(const c of CATEGORIES){ const s=c.kw.filter(k=>all.includes(k)).length; if(s>score){score=s;best=c;} }
+    for(const c of CATEGORIES){ const s=c.kw.filter(k=>kwHit(all,k)).length; if(s>score){score=s;best=c;} }
     if(/contractor|freelance|temporary staff|interim|day rate|\ba day\b|per day/.test(all) && /developer|engineer|analyst|manager|designer|tester|contractor|freelance|interim/.test(all)) best=catById("contingent");
     if(best && best.id==="cloud" && /\b(hr|payroll|crm|erp|finance|accounting|procurement|ticketing)\b[^.]*\b(system|tool|platform|software|application)\b/.test(all)) best=catById("software");
     if(best){ f.category=best.id; f.demand_type=best.type; }

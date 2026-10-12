@@ -1,6 +1,15 @@
 # Assessment: Guided Intake Chat
 
-Reviewed at commit `c4d3e98`, October 2026, and updated for commit `7baf311` (see the next section). The review covered three things: a read of `index.html`, `api/llm.js`, `vercel.json` and the README; running the app locally; and the automated test suite added with this assessment (`npm test`).
+Reviewed at commit `c4d3e98`, October 2026, and updated for commit `7baf311` and the catalogue fix (see the next two sections). The review covered three things: a read of `index.html`, `api/llm.js`, `vercel.json` and the README; running the app locally; and the automated test suite added with this assessment (`npm test`).
+
+## Update: catalogue matching fixed (finding 1)
+
+- **Whole words:** catalogue and category keywords now match whole words, plurals included (`kwHit`). "pens" no longer matches inside "expenses", "monitor" inside "monitoring", or "screen" inside "screening". A trailing `*` marks the few keywords that are deliberate stems (`consult*`, `develop*`, `telecom*`, …).
+- **Demand type:** catalogue items carry a type. Hardware and office items are offered only for goods, and the licence only for software.
+- **Value:** the catalogue is offered only when the value fits the catalogue price (`catalogueFits`). That means at most twice price × quantity, or, with no quantity yet, no more than the business-led sourcing threshold. "A tool to monitor sanctions alerts, 400k" is no monitor order.
+- **Effect on categories:** a sanctions screening service is now "Business process services" instead of "IT hardware". It no longer gets "a purchase of goods, out of scope" in the outsourcing check.
+- **Tests:** the three known-issue tests are regular tests in `tests/e2e/routes.spec.js`, plus a keyword rule table, a value-fit rule table and two conversations.
+- **Still open (finding 21):** category ties go to the first category in the list. "Software to manage our laptop fleet, 20k" is still classed as IT hardware and offered a laptop. This is recorded in `known-issues.spec.js`.
 
 ## Update: commit 7baf311 (outsourcing rework)
 
@@ -42,9 +51,9 @@ Reviewed at commit `c4d3e98`, October 2026, and updated for commit `7baf311` (se
 
 **Demo-ready, not pilot-ready.** All five buying routes work end to end, offline and with AI. The conversation features the README promises also work: corrections, checks, skipping, the improvement round and the outputs. When the AI fails, the app falls back to standard questions cleanly. Escaping of user and AI text is careful throughout.
 
-Three things block real users:
+Three things blocked real users. The first is now fixed:
 
-1. **The rules engine can send ordinary bank requests down the wrong route.** It matches keywords inside other words and does not check the value against the catalogue price. A €400k SaaS tool becomes a stationery catalogue order.
+1. **Fixed: the rules engine could send ordinary bank requests down the wrong route.** It matched keywords inside other words and did not check the value against the catalogue price. A €400k SaaS tool became a stationery catalogue order.
 2. **The server is an open LLM proxy unless `ACCESS_CODE` is set**, and the code can be guessed quickly.
 3. **Real intake data would go to free LLM tiers**, and the page never warns about it.
 
@@ -53,7 +62,7 @@ Three things block real users:
 | Suite | Result |
 | --- | --- |
 | API (`tests/api`, node:test) | 18 passed, 1 known bug recorded as `todo` |
-| End-to-end (`tests/e2e`, Playwright, Chromium) | 45 passed: 35 behaviour tests and 10 known-issue tests that fail as expected |
+| End-to-end (`tests/e2e`, Playwright, Chromium) | 50 passed: 43 behaviour tests and 7 known-issue tests that fail as expected |
 | Run time | About a minute. Needs no keys and no network. |
 
 **Covered:**
@@ -88,7 +97,7 @@ Each finding says how it was confirmed:
 
 | # | Finding | Where | Confirmed by |
 | --- | --- | --- | --- |
-| 1 | **The catalogue route is picked by substring keyword matches, and the value is ignored.** "A SaaS tool to track travel expenses for 400k" → "Stationery bundle is in our catalogue" ("pens" in "expenses"). "Transaction monitoring system for AML, 400k" and "Sanctions screening service, 300k" → "27\" monitor". The intake then asks two catalogue questions and closes. | `catalogueMatches`, `CATALOGUE`/`CATEGORIES` keywords (`index.html` ~314–319, 565–580) | Test |
+| 1, **fixed** | **The catalogue route is picked by substring keyword matches, and the value is ignored.** "A SaaS tool to track travel expenses for 400k" → "Stationery bundle is in our catalogue" ("pens" in "expenses"). "Transaction monitoring system for AML, 400k" and "Sanctions screening service, 300k" → "27\" monitor". The intake then asks two catalogue questions and closes. | `catalogueMatches`, `CATALOGUE`/`CATEGORIES` keywords (`index.html` ~314–319, 565–580) | Test |
 | 2 | **Intake data goes to free LLM tiers with no notice.** The full conversation is sent to Gemini, Groq or Mistral (the README notes that Mistral's free plan may train on requests). The welcome screen does not say "dummy data only". | `index.html` ~2554, 2636 | Code |
 
 ### High
@@ -112,6 +121,7 @@ Each finding says how it was confirmed:
 | 12 | **Groq JSON-mode fallback is unreachable for "not supported" errors.** The first retry branch keeps JSON mode on and fails, so the model is skipped. | `callGroq` (`api/llm.js` 143–147) | Test (`todo`) |
 | 13 | **Accessibility basics are missing.** The input has no label. The message list has no `aria-live`/`role="log"`. The drawers have no dialog role, focus trap or Escape key. Each render rebuilds the whole chat with `innerHTML`. | `index.html` 260–263, 2643, 2858, 2962 | Code |
 | 14 | **Compliance flags depend on AI extraction.** Any message can overwrite `personal_data`, `tech_service`, `in_house` or `value`. The output says "Not outsourcing" and has a disclaimer. Since 7baf311 the per-country matrix is gone and the one remaining future reference (EBA/GL/2026/09) is verified, but it will need updating once its application date is set. | `mergeFacts`, `RULESETS` | Code |
+| 21 | **Category ties go to the first category in the list.** With one keyword each, IT hardware wins, so "Software to manage our laptop fleet, 20k" is classed as goods and offered a laptop from the catalogue. "A dashboard tool to monitor sanctions alerts" and "a service to screen clients" are also classed as IT hardware. Their 300k–400k budgets now keep them off the catalogue, but the outsourcing check still treats them as goods. | `offlineRead` category scoring, `catFromText` | Test |
 
 ### Low
 
@@ -138,10 +148,11 @@ Each finding says how it was confirmed:
 
 1. **Fix routing and the in-house derivation.**
    - Remove the past-practice phrases from `inHouseFromText` (U1). Only "a bank would not do this itself" should give no.
-   - Match keywords as whole words.
-   - Offer the catalogue only for goods, and only when the value fits the catalogue price.
+   - Done: match keywords as whole words.
+   - Done: offer the catalogue only for the item's own demand type, and only when the value fits the catalogue price.
    - Run AI-returned amounts through `parseMoney`.
-   - Remove `test.fail()` from the matching tests in `known-issues.spec.js` once fixed.
+   - Done: the matching tests moved from `known-issues.spec.js` to `routes.spec.js`.
+   - Break category ties on more than list order (finding 21).
 2. **Lock down the server.**
    - Require `ACCESS_CODE` and send it as a header only, compared with `timingSafeEqual`.
    - Add a per-IP rate limit, for example Vercel WAF or Upstash.
