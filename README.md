@@ -76,6 +76,7 @@ The end-to-end tests start three local servers: offline (no key), AI (mock provi
 | `tests/e2e/conversation.spec.js` | Corrections in words and in the side panel, unclear corrections, off-topic answers, dates in the past, skipping, Rules thresholds, route override, improvement round, inline edits |
 | `tests/e2e/ai-mode.spec.js` | AI through the server: provider label, Gemini → Groq fallback, all providers down, internal field names hidden, AI off-topic check, AI toggle, `?ai=` |
 | `tests/e2e/outsourcing.spec.js` | Outsourcing determination under EBA/GL/2019/02: a full KYC conversation with the test steps in the document, a branch outside the EU, and a rule table for paragraphs 26 and 28 and the EBA/GL/2026/09 preview |
+| `tests/e2e/live-ai-run.spec.js` | Defects found in live AI conversations: check-step corrections, work location and offshoring, Level 4 consistency, single source, date scrubbing, object-shaped AI suggestions |
 | `tests/e2e/access-and-layout.spec.js` | Access-code gate and the phone layout |
 | `tests/e2e/known-issues.spec.js` | Defects found in the assessment (see `ASSESSMENT.md`), marked `test.fail()`: they turn red ("unexpectedly passed") once fixed, then the marker can be removed |
 

@@ -2,6 +2,35 @@
 
 Reviewed at commit `c4d3e98`, October 2026, and updated for commit `7baf311` and the catalogue fix (see the next two sections). The review covered three things: a read of `index.html`, `api/llm.js`, `vercel.json` and the README; running the app locally; and the automated test suite added with this assessment (`npm test`).
 
+## Update: live AI test run (new demand)
+
+Two full new-demand conversations ran on the live site with the real providers: an HR and payroll system (€400k, software) and periodic KYC reviews (€600k, business process service). Gemini, Groq and Mistral all answered during the runs. The free tiers then ran out after about 57 calls. Everything below is fixed and covered by tests that fail on the previous code (`tests/e2e/live-ai-run.spec.js`, plus tests in `conversation.spec.js`, `ai-mode.spec.js` and `routes.spec.js`).
+
+**Wrong facts in the record:**
+- **Invented storage location:** the requester named the data only, and the AI recorded "stored in the bank's systems in the EU", copied from the question's example. The location follow-up now depends on the requester's own words. The AI's "storage location unknown" also no longer counts as a place, and the follow-up also fires when the AI fills in the data itself.
+- **False offshoring:** "2,500 employees in Germany and the UK" became the work location, and offshoring was flagged. Places in audience, data or capability answers, or places describing people or data, no longer set the location. "Not offshore" is read as no. An explicit "no" wins everywhere (`isOffshore`).
+- **Raw date reply:** the start date was stored as "Ok then 1 April 2027" after the timeline check, overwriting the AI's correct "1 April 2027".
+- **Level 4 drifting across screens:** the initial category was SaaS, the check step showed "Application development and maintenance", and the record showed "Software licences (installed)". Level 4 is now chosen within the buying category, the confirmed value is the one in the record, and the AI's re-check only adds a note. The software ICT type follows Level 4.
+- **"People 12" for software:** the HR team size was shown as headcount. That row is now for services and external workers only.
+- **"Checked by you: Not yet"** appeared after the requester had confirmed.
+- **AI amount as text (finding 5):** "€400k" from the AI was read as 400 and could drop a request below the RFP threshold.
+
+**Conversation:**
+- **Unapplied correction:** "Point 9 is wrong, the work is not done outside the country" got "Thanks, I've updated it" with nothing changed. Offshoring corrections and "point N is wrong" now apply. A reply that changes nothing gets "I couldn't tell what to change" instead.
+- **Wrong single-source flag:** "We'd like to include Northwind" triggered "Single-source justification". Inclusion wording no longer does; "only", "directly" or "no tender" do.
+- **Stuck at "Fair":** the quality score counted sections the route never asks (governance, reporting, change and escalation below €1M), so "Fair 64/100" could not be improved in the chat. Missing sections now cost points only when the route asks for them; risks always count.
+- **8-minute spinner:** when every provider was at its limit, writing the documents retried for over 8 minutes. A slow 429 is no longer retried, and documents are built from the answers at once.
+
+**Text:**
+- **Scrubbing:** removing dates left "dating," and "documented and 2026". The scrubber also read "Mar" in "Marketing" as a month and deleted "of Marketing".
+- **Mistral suggestions:** they showed raw keys ("exclusions: risk rating: …", "skills experience qualifications: analysts: minimum: …") and ended mid-sentence with "…".
+- **Obligation verbs:** "The Service Provider shall deliver escalate red flags …" came from an incomplete verb list.
+- **Wording:** "Northwind KYC Services's" and "Is 12 Oct 2026 (as soon as possible) a fixed deadline".
+
+**Not changed (judgement calls for the outsourcing team):**
+- the ICT type "technology advice" for a KYC operations provider using its own case tool (see U5);
+- "Outsourcing (likely)" for a software purchase described as replacing an on-premise tool.
+
 ## Update: per-answer scores removed, two defects from a test conversation fixed
 
 A test conversation in AI mode (two Java contractors, €40k) showed scores that looked random. Here is where each one came from:
@@ -87,7 +116,7 @@ Three things blocked real users. The first is now fixed:
 | Suite | Result |
 | --- | --- |
 | API (`tests/api`, node:test) | 18 passed, 1 known bug recorded as `todo` |
-| End-to-end (`tests/e2e`, Playwright, Chromium) | 56 passed: 50 behaviour tests and 6 known-issue tests that fail as expected |
+| End-to-end (`tests/e2e`, Playwright, Chromium) | 67 passed: 62 behaviour tests and 5 known-issue tests that fail as expected |
 | Run time | About a minute. Needs no keys and no network. |
 
 **Covered:**
@@ -131,7 +160,7 @@ Each finding says how it was confirmed:
 | --- | --- | --- | --- |
 | 3 | **Without `ACCESS_CODE` the server is an open LLM proxy.** The browser sends the whole system prompt, and there is no per-client rate limit, so anyone with the URL can use the keys or exhaust the quota. | `api/llm.js` 311–322 | Code |
 | 4 | **The access code can be guessed quickly.** Only `?verify` waits 700 ms. A wrong code on POST is refused at once. The comparison is not timing-safe. `?code=` puts the code in logs and browser history. | `api/llm.js` 268–274, 311 | Code (POST 401 checked in a test) |
-| 5 | **An amount the AI returns as text is read wrongly.** "€400k" becomes 400, so a €400k request drops to business-led quotes. `parseMoney` already handles this but is not used here. | `normFact` (`index.html` ~1449–1460) | Test |
+| 5, **fixed** | **An amount the AI returns as text is read wrongly.** "€400k" becomes 400, so a €400k request drops to business-led quotes. `parseMoney` already handles this but is not used here. | `normFact` (`index.html` ~1449–1460) | Test |
 | 6 | **On a phone, the Summary panel can't be closed.** It covers 92% of the screen, including the Summary button, and has no close button, backdrop or Escape key. The user has to reload. | CSS `index.html` 200; toggle 3008 | Test |
 | 7 | **Wrong-kind answers are stored without a check in offline mode.** "About 400k" to "Is the budget already approved?" is stored as "No". "No supplier in mind" to "What must it be able to do?" is stored as must-haves (8/10). A location given as deliverables produces "The supplier will deliver." in the description. | `offlineRead` / `readAnswer` | Test and run |
 
@@ -175,7 +204,7 @@ Each finding says how it was confirmed:
    - Remove the past-practice phrases from `inHouseFromText` (U1). Only "a bank would not do this itself" should give no.
    - Done: match keywords as whole words.
    - Done: offer the catalogue only for the item's own demand type, and only when the value fits the catalogue price.
-   - Run AI-returned amounts through `parseMoney`.
+   - Done: run AI-returned amounts through `parseMoney`.
    - Done: the matching tests moved from `known-issues.spec.js` to `routes.spec.js`.
    - Done: break category ties on the head noun of the request, not list order (finding 21).
 2. **Lock down the server.**

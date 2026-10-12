@@ -85,6 +85,15 @@ test("a delivery date in the past gets a quick check and can be corrected", asyn
   expect((await sideFacts(page))["Start / delivery"]).toMatch(/1 December 2026/);
 });
 
+test("a new date given in reply to the timeline check is stored without the words around it", async ({ page }) => {
+  await openApp(page);
+  await say(page, "We need 15 laptops for new joiners in Frankfurt.");
+  await say(page, "ASAP");
+  await expect(lastAssistant(page)).toContainText("Is that a fixed deadline");
+  await say(page, "ok then 1 December 2026");
+  expect((await sideFacts(page))["Start / delivery"]).toBe("1 December 2026");
+});
+
 test("skipping a question records it as to be determined", async ({ page }) => {
   await openApp(page);
   await say(page, DINNER);

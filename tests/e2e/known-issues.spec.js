@@ -65,14 +65,6 @@ test.describe("AI mode", () => {
   test.describe.configure({ mode: "serial" });
   test.beforeEach(async ({ request }) => { await mock(request, { gemini: "ok", groq: "ok", mistral: "ok", coldStart: true, resetCalls: true, nextChat: null }); });
 
-  test("an amount the AI returns as text ('€400k') is read as 400,000", async ({ page, request }) => {
-    test.fail(true, "normFact strips non-digits from AI values, so '€400k' becomes 400 and the request drops below the RFP threshold");
-    await openApp(page, { kind: "ai" });
-    await mock(request, { nextChat: { facts: { value: "€400k", value_is_estimate: false } } });
-    await say(page, "A new HR system to replace our payroll tool.");
-    await expect(route(page)).toHaveText("New demand: procurement-led sourcing", { timeout: 2000 });
-  });
-
   test("an answer that mentions a 'summary' during the improvement round is taken as the answer", async ({ page }) => {
     test.fail(true, "once a description exists, any message with 'summary', 'description' or 'document' is sent to refineSD");
     await openApp(page, { kind: "ai" });

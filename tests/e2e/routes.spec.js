@@ -108,8 +108,8 @@ const CONTRACTOR_TEST_RUN = [[/day rate/i, "40k"], [/When (do you need it|should
 test("external workers: 'bank data' is asked where it is stored, and 'next week' is kept as a date", async ({ page }) => {
   await openApp(page);
   await say(page, "Two Java developers as contractors for 9 months.");
-  await answerUntilDone(page, [...CONTRACTOR_TEST_RUN, [/where will that data be stored/i, "in the EU"], ...ANSWERS]);
-  await expect(page.locator("#msgs")).toContainText("where will that data be stored or processed");
+  await answerUntilDone(page, [...CONTRACTOR_TEST_RUN, [/where will that data/i, "in the EU"], ...ANSWERS]);
+  await expect(page.locator("#msgs")).toContainText("where will that data (bank data) be stored or processed");
   const record = page.locator(".sd .record");
   await expect(record).toContainText(/bank data, stored in the EU/i);
   await expect(record).toContainText("19 Oct 2026 (next week)");
@@ -119,7 +119,7 @@ test("external workers: 'bank data' is asked where it is stored, and 'next week'
 test("external workers: a data answer without a place is listed in the quality check", async ({ page }) => {
   await openApp(page);
   await say(page, "Two Java developers as contractors for 9 months.");
-  await answerUntilDone(page, [...CONTRACTOR_TEST_RUN, [/where will that data be stored/i, "Not sure"], ...ANSWERS]);
+  await answerUntilDone(page, [...CONTRACTOR_TEST_RUN, [/where will that data/i, "Not sure"], ...ANSWERS]);
   await expect(page.locator(".sd .record")).toContainText(/bank data/i);
   await expect(page.locator(".sd .qual")).toContainText("Data involved: where the data is stored is not given.");
 });
@@ -127,11 +127,23 @@ test("external workers: a data answer without a place is listed in the quality c
 test("a data answer says where it is stored; a relative start is kept as the date it stood for", async ({ page }) => {
   await openApp(page);
   const WHERE = { "bank data": false, "client names and IDs": false, "employee names and salaries, stored in the EU": true, "client data in Germany": true,
-    "client data on our own systems": true, "the supplier hosts it": true, "kept on premises": true };
+    "client data on our own systems": true, "the supplier hosts it": true, "kept on premises": true,
+    // what an AI wrote for "employee names, salaries and bank details" in a real run
+    "employee names, salaries and bank details; storage location unknown": false, "client names, not sure where it is stored": false };
   const WHEN = { "next week": "19 Oct 2026 (next week)", "ASAP": "12 Oct 2026 (ASAP)", "by next month": "1 Nov 2026 (by next month)",
     "1 February 2027": "1 February 2027", "start of March, we're hiring now": "start of March, we're hiring now", "19 Oct 2026 (next week)": "19 Oct 2026 (next week)" };
   const got = await page.evaluate(([w, d]) => [Object.fromEntries(w.map((t) => [t, saysWhere(t)])), Object.fromEntries(d.map((t) => [t, datedWhen(t)]))], [Object.keys(WHERE), Object.keys(WHEN)]);
   expect(got).toEqual([WHERE, WHEN]);
+});
+
+test("obligations keep the requester's verb", async ({ page }) => {
+  await openApp(page);
+  const got = await page.evaluate(() => shallify("Run periodic KYC reviews for 3,000 corporate clients; escalate red flags to Financial Crime Compliance within 2 days; a monthly quality report"));
+  expect(got).toEqual([
+    "The Service Provider shall run periodic KYC reviews for 3,000 corporate clients.",
+    "The Service Provider shall escalate red flags to Financial Crime Compliance within 2 days.",
+    "The Service Provider shall deliver a monthly quality report.",
+  ]);
 });
 
 test("new demand under the threshold: business-led sourcing with three quotes", async ({ page }) => {

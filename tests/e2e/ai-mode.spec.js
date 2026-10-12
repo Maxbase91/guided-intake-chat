@@ -92,6 +92,17 @@ test("an off-topic verdict on a question that was not asked is ignored", async (
   await expect(page.locator("#msgs")).not.toContainText("Answer quality");
 });
 
+test("a storage location the AI adds on its own is asked about, and dropped if the requester doesn't know", async ({ page, request }) => {
+  await openApp(page, { kind: "ai" });
+  await say(page, HR);
+  // as in a real run: the requester names the data only, the AI copies the question's example "stored in the EU"
+  await mock(request, { nextChat: { facts: { personal_data: true, data_details: "employee names and salaries; stored in the EU" } } });
+  await say(page, "About 400k");
+  await expect(lastAssistant(page)).toContainText("where will that data (employee names and salaries) be stored");
+  await say(page, "Not sure");
+  expect(await page.evaluate(() => S.f.data_details)).toBe("employee names and salaries");
+});
+
 test("turning the AI off under Rules switches to offline questions without reloading", async ({ page, request }) => {
   await openApp(page, { kind: "ai" });
   await page.click("#cfgBtn");
@@ -111,4 +122,11 @@ test("?ai=mistral forces one provider for testing", async ({ page, request }) =>
   await say(page, HR);
   await expect(page.locator("#aiLabel")).toHaveText("AI on · Mistral");
   expect([...new Set((await calls(request)).map((c) => c.provider))]).toEqual(["mistral"]);
+});
+
+test("an amount the AI returns as text ('€400k') is read as 400,000", async ({ page, request }) => {
+  await openApp(page, { kind: "ai" });
+  await mock(request, { nextChat: { facts: { value: "€400k", value_is_estimate: false } } });
+  await say(page, "A new HR system to replace our payroll tool.");
+  await expect(page.locator("#side .route")).toHaveText("New demand: procurement-led sourcing", { timeout: 2000 });
 });
