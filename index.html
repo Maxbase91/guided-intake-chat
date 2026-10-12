@@ -269,7 +269,7 @@ const CONFIG = {
   accessCode: "",                         // only if ACCESS_CODE is set on Vercel
   forceProvider: new URLSearchParams(location.search).get("ai") || "",   // testing: ?ai=mistral uses only that provider
   currency: "EUR",
-  thresholds: { quickQuoteMax: 50000, materialityMin: 1000000 }
+  thresholds: { quickQuoteMax: 50000, materialityMin: 1000000, qualityMin: 75, answerTip: 5 }
 };
 
 /* =========================================================
@@ -530,7 +530,7 @@ const BLANK_FACTS = {summary:null,category:null,demand_type:null,item:null,quant
   volume:null,support_needs:null,data_details:null,criticality:null,subcontracting:null,pricing_model:null,service_levels:null,ip_ownership:null,performance:null,role:null,headcount:null,skills:null,day_rate:null,system_access:null,renewal_change:null,wants_renewal:null};
 let CONV_SEQ=0;
 const S = fresh();
-function fresh(){ return {cid:++CONV_SEQ, curStage:null, stageIds:[], recapped:{}, req:[], challenged:{}, challengeCount:0, flags:[], pending:null, derived:{}, offChecked:{}, suggest:{}, sugAccepted:{}, checkRound:0, checkWait:false, l4Initial:null, completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
+function fresh(){ return {cid:++CONV_SEQ, curStage:null, stageIds:[], recapped:{}, req:[], challenged:{}, challengeCount:0, flags:[], pending:null, thinChecked:{}, thinCount:0, offerImprove:null, improveRound:0, improveDone:false, belowThresholdOk:false, derived:{}, offChecked:{}, suggest:{}, sugAccepted:{}, checkRound:0, checkWait:false, l4Initial:null, completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
 
 /* =========================================================
    5. RULES ENGINE (deterministic)
@@ -1027,6 +1027,14 @@ async function handleUser(text){
   finally{ if(S.cid===cid){ S.busy=false; render(); } }
 }
 async function handleTurn(text, cid){
+  // answer to the offer to improve a below-threshold description
+  if(S.offerImprove){
+    const tt=text.trim();
+    if(/^(?:yes|yep|yeah|let'?s|improve|ok(?:ay)?|sure|go(?: ahead)?)\b/i.test(tt)) return startImprovement(tt);
+    if(/submit anyway|^no\b|not now|^skip|leave it/i.test(tt)){ S.msgs.push({role:"user",text:tt}); S.offerImprove=null; S.belowThresholdOk=true; S.choices=[];
+      S.msgs.push({role:"assistant",text:"Okay. The rating and the open points stay visible to the buyer. Press \"Looks right, submit\" on the service description when you're ready."}); render(); return; }
+    S.offerImprove=null;
+  }
   if(S.sd && /^(make it|shorten|shorter|add more|rewrite|reword)|\b(summary|description|document)\b/i.test(text) && aiReady()) return refineSD(text);
   const asked=S.lastAsked; if(asked) S.asked[asked]=(S.asked[asked]||0)+1;
   const um={role:"user",text}; S.msgs.push(um); S.choices=[]; S.busy=true; render();
@@ -1034,7 +1042,7 @@ async function handleTurn(text, cid){
   // the user is answering a check we raised on an earlier answer
   const pend=S.pending; S.pending=null;
   const t=text.trim().toLowerCase();
-  const keepIt = pend && pend.kind!=="offtopic" && (/^(yes|yep|yeah|correct|that'?s (right|correct)|right|confirmed?|it is|keep( it)?|as i said|it'?s fixed|fixed|hard deadline|that'?s fine|fine)\b/.test(t) || /is right$/.test(t)) && !/\d/.test(t.replace(/^[^\d]*right/,"")) && words(text)<=6;
+  const keepIt = pend && pend.kind!=="offtopic" && (/^(yes|yep|yeah|correct|that'?s (right|correct)|right|confirmed?|it is|keep( it)?( as it is)?|as i said|it'?s fixed|fixed|hard deadline|that'?s fine|fine)\b/.test(t) || /is right$/.test(t)) && !/\d/.test(t.replace(/^[^\d]*right/,"")) && words(text)<=6;
   if(pend && !keepIt && pend.kind!=="date") S.f[pend.fact]=null;
   let reply=null, choices=[], complete=false, note=null, aiAsking=null, aiCheck=null, aiSuggestion=null, aiScore=null;
   if(aiReady()){
@@ -1062,6 +1070,8 @@ async function handleTurn(text, cid){
   const sugResult = asked && !pend && isSug(asked) ? applySuggestion(asked, text) : false;
   if(asked && !pend && isSug(asked) && !sugResult && known(S.f[asked]) && ACCEPT.test(text.trim())) S.f[asked]=null;
   if(sugResult) S.sugAccepted[asked]=true;
+  if(asked && BUNDLES[asked] && !sugResult && !pend && givenText(S.f[asked]) && S.f[asked]!=="Confirmed" && !BUNDLES[asked].some(([,x])=>givenText(S.f[x]))){
+    const free={kpis_pack:"kpis"}[asked]; if(free){ S.f[free]=String(S.f[asked]); } else setFromSuggestion(asked, String(S.f[asked])); }
   // "skip": the point is recorded as to be determined and listed as an open point
   const skipped = asked && !pend && !["need","confirm_derived"].includes(asked) && /^(skip|skip (?:for now|this|it)|pass)[.!]?$/i.test(text.trim());
   if(skipped){ S.f[asked]="Not given"; if(BUNDLES[asked]) BUNDLES[asked].forEach(([,k])=>{ if(!known(S.f[k])) S.f[k]="Not given"; }); }
@@ -1084,6 +1094,12 @@ async function handleTurn(text, cid){
       const nd = parseWhen(text) && !/fixed|can move|flexible|later/.test(t) ? text.trim() : null;
       if(nd && nd!==pend.prev){ S.f.needed_by=cap1(nd); S.flags.push({fact:pend.fact,issue:pend.issue,status:"corrected"}); }
       else { S.f.needed_by=pend.prev; S.flags.push({fact:pend.fact,issue:pend.issue,status:/move|flexible|later/.test(t)?"flexible":"confirmed"}); }
+    } else if(pend.kind==="thin"){
+      const nv=S.f[pend.fact], kept=keepIt||/^keep|^no\b|that'?s (?:it|all)/i.test(t);
+      if(kept || !known(nv)){ S.f[pend.fact]=pend.prev; S.flags.push({fact:pend.fact,issue:pend.issue,status:"confirmed"}); }
+      else { if(pend.prev && typeof nv==="string" && !nv.includes(String(pend.prev)) && words(nv)<15) S.f[pend.fact]=`${pend.prev}; ${nv}`;
+        if(BUNDLES[pend.fact]){ BUNDLES[pend.fact].forEach(([,x])=>{ if(isTBD(S.f[x])) S.f[x]=null; }); const free={kpis_pack:"kpis"}[pend.fact]; if(free) S.f[free]=String(S.f[pend.fact]); else setFromSuggestion(pend.fact,String(S.f[pend.fact])); }
+        S.flags.push({fact:pend.fact,issue:pend.issue,status:"corrected"}); }
     } else if(pend.kind==="offtopic"){
       const nv=S.f[pend.fact];
       if(!known(nv) || offTopic(pend.fact, nv) || nv===pend.prev){ S.f[pend.fact]="Not given"; S.flags.push({fact:pend.fact,issue:"no usable answer given",status:"unanswered"}); }
@@ -1112,8 +1128,9 @@ async function handleTurn(text, cid){
   if(!issue && aiCheck && S.challengeCount<3 && changed.includes(aiCheck.fact) && !S.challenged[aiCheck.fact] && FACTS[aiCheck.fact])
     issue={fact:aiCheck.fact, issue:String(aiCheck.issue||"needs a second look").slice(0,140), message:String(cleanReply(aiCheck.follow_up||"")||reply||"").trim()||`Could you double-check this? ${FACTS[aiCheck.fact].q(S.f)}`};
   um.score = skipped ? null : asked==="confirm_derived" ? null : answerScore(asked, text, issue, sugResult, aiScore, pend);
+  if(!issue && !pend && !skipped && asked && TIPS[asked] && um.score!=null && um.score<=CONFIG.thresholds.answerTip && !S.thinChecked[asked] && S.thinCount<3 && S.det && NEW_DEMAND(S.det.route) && givenText(S.f[asked])) issue=thinIssue(asked);
   if(issue){
-    if(issue.kind==="offtopic") S.offChecked[issue.fact]=true; else { S.challenged[issue.fact]=true; S.challengeCount++; }
+    if(issue.kind==="offtopic") S.offChecked[issue.fact]=true; else if(issue.kind==="thin"){ S.thinChecked[issue.fact]=true; S.thinCount++; } else { S.challenged[issue.fact]=true; S.challengeCount++; }
     S.pending={fact:issue.fact, prev:S.f[issue.fact], issue:issue.issue, kind:issue.kind||""};
     S.msgs.push({role:"assistant",text:issue.message, check:true});
     S.choices=issue.choices||[]; S.lastAsked=issue.fact;
@@ -1129,13 +1146,14 @@ async function handleTurn(text, cid){
 
   if(!S.missing.length){
     stageTransition("review");
-    const lead = S.completed ? "Updated. Here are the revised service description and route." : `${complete && reply && !aiCheck ? reply.replace(/\s*$/,"") : wrapUp()} I'm writing the service description now. Below it you'll find the route I recommend and the full document. Please check them before you submit.`;
+    const lead = S.completed ? "Updated. Here are the revised service description and route." : S.improveRound ? "Thanks, that makes it stronger. I'm updating the service description now." : `${complete && reply && !aiCheck ? reply.replace(/\s*$/,"") : wrapUp()} I'm writing the service description now. Below it you'll find the route I recommend and the full document. Please check them before you submit.`;
     S.msgs.push({role:"assistant",text:lead});
     S.lastAsked=null; S.completed=true;
     render();
     try{ await buildDoc(cid); }
     catch(e){ if(e instanceof Stale) throw e; console.error(e); S.msgs.push({role:"assistant",kind:"sys",text:"Something went wrong while writing the documents. Please tell me to try again."}); }
     showRecommendation();
+    offerImprovement();
   } else {
     let next=S.missing[0];
     const aiAskedOk = reply && !complete && !aiCheck && aiAsking && S.missing.slice(0,2).includes(aiAsking) && stageOf(aiAsking)===stageOf(S.missing[0]);
@@ -1162,6 +1180,46 @@ async function handleTurn(text, cid){
 }
 
 // moving to another stage: a recap card for the stages just finished, then a short stage marker
+// points that would lift a weak description, mapped to the questions that fill them
+const SEC2KEY={"Scope":f=>GOODSLIKE(f)?(givenText(f.must_haves)?"scope_out":"must_haves"):(givenText(f.scope_in)?"scope_out":"scope_in"),"Active obligations":"scope_in","Deliverables":"scope_in",
+  "Responsibility allocation":"deps_pack","Dependencies":"deps_pack","Assumptions":"deps_pack","Acceptance criteria":"acceptance_pack","Acceptance testing":"acceptance_pack",
+  "Service levels":"kpis_pack","Key performance indicators":"kpis_pack","Tools":"service_model","Governance":"governance","Reporting":"governance","Change management":"governance","Escalation":"governance",
+  "Timelines":"needed_by","Data, system, asset, money and account access":"data_details","Supplier documents and URLs":"supplier_terms","Service qualification":f=>known(f.entity)&&!isTBD(f.entity)?null:"entity"};
+function improvementTargets(){
+  const f=S.f, out=[], add=k=>{ if(k && FACTS[k] && !out.includes(k) && (S.req.includes(k)||(k==="data_details"&&yes(f.personal_data)))) out.push(k); };
+  S.flags.filter(x=>x.status==="unanswered").forEach(x=>add(x.fact));
+  (S.req||[]).filter(k=>isTBD(f[k])).forEach(add);
+  sectionQuality().filter(r=>["Partial","To be determined","Risk"].includes(r.status)).forEach(r=>{ const m=SEC2KEY[r.sec]; add(typeof m==="function"?m(f):m); });
+  return out.slice(0,8);
+}
+function offerImprovement(){
+  if(!S.sd||!S.quality||S.submitted||!NEW_DEMAND(S.det.route)) return;
+  const min=CONFIG.thresholds.qualityMin, q=S.quality;
+  if(q.score>=min){ if(S.improveRound&&!S.improveDone){ S.improveDone=true; S.msgs.push({role:"assistant",text:`It's now rated **${q.rating} (${q.score}/100)**. Please check the updated service description before you submit.`}); } return; }
+  if(S.improveRound){ S.msgs.push({role:"assistant",text:`It's now rated **${q.rating} (${q.score}/100)**. The remaining points are listed in the quality check; the buyer will see them too.`}); return; }
+  const keys=improvementTargets(); if(!keys.length) return;
+  S.offerImprove=keys;
+  S.msgs.push({role:"assistant",text:`This would be rated **${q.rating} (${q.score}/100)**, below the ${min} a strong sourcing request needs. ${keys.length===1?"One point":`${keys.length} points`} would strengthen it:\n${keys.map(k=>"• "+FACTS[k].label).join("\n")}\n\nShall we go through ${keys.length===1?"it":"them"}? ${keys.length>4?"It takes a few minutes.":"It only takes a minute."}`});
+  S.choices=["Yes, let's improve it","Submit anyway"];
+}
+function startImprovement(text){
+  const f=S.f, keys=S.offerImprove||[]; S.offerImprove=null; S.improveRound=1;
+  S.msgs.push({role:"user",text}); S.choices=[];
+  keys.forEach(k=>{ if(BUNDLES[k]) BUNDLES[k].forEach(([,x])=>{ if(isTBD(f[x])||!givenText(f[x])) f[x]=null; }); f[k]=null; S.asked[k]=0; delete S.sugAccepted[k]; delete S.suggest[k]; delete S.thinChecked[k]; });
+  S.completed=false; refresh();
+  const next=S.missing[0]; if(!next){ S.completed=true; render(); return; }
+  askNext(next, "Let's go through them, one at a time.");
+  render();
+}
+// ask a question without the AI (used when resuming after the description was written)
+function askNext(next, lead){
+  stageTransition(STAGES[stageOf(next)].id);
+  const msg = next==="confirm_derived" ? checkMessage() : offlineQuestion(next, S.det.route, true);
+  S.msgs.push({role:"assistant",text:(lead?lead+"\n\n":"")+msg});
+  const fc=FACTS[next].choices, fcs=typeof fc==="function"?fc(S.f):fc, canSkip=!["confirm_derived","value","item","need"].includes(next);
+  S.choices = next==="confirm_derived" ? ["Yes, that's right","Something's wrong"] : isSug(next) ? ["Use this suggestion","Skip for now"] : fcs ? fcs : (canSkip&&!CLOSED.includes(next)?["Skip for now"]:[]);
+  S.lastAsked=next;
+}
 function stageTransition(newStage){
   if(newStage===S.curStage) return;
   const done=S.stageIds.filter(id=>id!=="review" && !S.recapped[id] && stageFacts(id).length && stageDone(id));
@@ -1257,10 +1315,25 @@ function checkMessage(){
   const rev=S.det.controls.filter(c=>c[0]!=="i").map(c=>c[1]); if(rev.length) means.push(`Reviews needed: ${rev.join(", ")}`);
   return `${S.checkRound?"Thanks, I've updated it. ":""}Here's what I've worked out from your answers. Please check it:\n${L.map((x,i)=>`${i+1}. ${x}.`).join("\n")}${means.length?`\n\nWhat this means:\n${means.map(x=>"• "+x).join("\n")}`:""}\n\nIs this right? If not, tell me what's wrong.`;
 }
+// what makes an answer usable for sourcing, shown when an answer scores low
+const TIPS={background:"say what goes wrong today and what it costs or risks, for example: invoices are paid late, we pay about €20,000 a year in late fees and an audit flagged control gaps.",
+  current_solution:"say how it's done today and why our own teams can't do it, for example: done manually in spreadsheets by two people who are fully booked.",
+  scope_in:"list concrete activities and outputs with a frequency, for example: process all invoices within 3 days, answer supplier queries within 1 working day, send a monthly report.",
+  must_haves:"name the 3 to 5 functions it must have and how you'll judge that it works, for example: approval workflows, a supplier portal and single sign-on; it works if requests are approved within 2 days.",
+  acceptance_pack:"make it measurable and say who signs off, for example: 99% accuracy over the first 3 months, signed off by the head of accounts payable.",
+  kpis_pack:"use a number and a period, for example: 95% of invoices processed within 3 working days, measured monthly.",
+  data_details:"name the data types, the access level (read, change or admin) and whether it's production or test data.",
+  qualifications:"name the skills or certifications that really matter, for example: 3 years of accounts payable experience and fluent German.",
+  governance:"say how often you meet, which reports you need and who escalates to whom.",
+  deps_pack:"say what we must provide and by when, for example: read access to the finance system within 5 working days of the start.",
+  deliverables:"list each deliverable with its format and who receives it, for example: a monthly report to the head of accounts payable."};
+const MEASURABLE=["kpis_pack","acceptance_pack"];
+function thinIssue(k){ return {fact:k, kind:"thin", issue:"answer too thin for sourcing", message:`That's a start. To make it usable for sourcing, ${TIPS[k]} Could you add a bit more, or keep it as it is?`, choices:["Keep it as is"]}; }
 // how useful was this answer? shown as a small score under the user's message
 function answerScore(asked, text, issue, sugResult, aiScore, pend){
   if(issue && (issue.fact===asked || issue.kind==="offtopic")) return issue.kind==="offtopic"?1:/vague/.test(issue.issue||"")?4:6;
   if(sugResult) return sugResult==="extended"?10:9;
+  if(MEASURABLE.includes(asked) && !/\d/.test(text)) return 5;   // a measure without a number is not measurable
   if(!asked || asked==="need"){ const got=(S.req||[]).filter(k=>known(S.f[k])&&S.f[k]!=="Not given").length; return Math.max(5,Math.min(10,4+got)); }
   if(pend) return 8;
   if(aiScore) return aiScore;
@@ -2169,8 +2242,9 @@ async function refineSD(text){
 function submit(){
   if(!S.sd) return;
   const id="REQ-"+Math.floor(1e5+Math.random()*9e5), ch=CHANNELS[S.override||S.det.route].name;
-  S.submitted=id; S.brdEdited=null;
-  S.msgs.push({role:"assistant",text:`Submitted. Request **${id}** goes to **${ch}** with the service description, the captured details and the business requirements document attached. You'll get an update at each step.\n(Prototype: nothing was sent anywhere.)`});
+  S.submitted=id; S.brdEdited=null; S.offerImprove=null; S.choices=[];
+  S.belowThreshold = !!(S.quality && NEW_DEMAND(S.det.route) && S.quality.score<CONFIG.thresholds.qualityMin);
+  S.msgs.push({role:"assistant",text:`Submitted. Request **${id}** goes to **${ch}** with the service description, the captured details and the full document attached.${S.belowThreshold?` It is marked as submitted below the quality threshold (${S.quality.rating}, ${S.quality.score}/100), so the buyer will look at the open points first.`:""} You'll get an update at each step.\n(Prototype: nothing was sent anywhere.)`});
   render();
 }
 function payload(){
@@ -2178,7 +2252,7 @@ function payload(){
     conversation:S.msgs.filter(m=>!m.kind).map(m=>({role:m.role,text:m.text})),
     decision:S.det?{route:S.det.route, chosen:S.override||S.det.route, override:!!S.override, justification:($("#just")||{}).value||null, why:S.det.why,
       required_facts:requiredFor(S.det.route,S.f), contract:S.det.contract?.id||null, controls:S.det.controls.map(c=>c[1]), next_steps:S.det.steps, thresholds:CONFIG.thresholds}:null,
-    quality:S.quality||null, answer_checks:S.flags,
+    quality:S.quality||null, quality_threshold:CONFIG.thresholds.qualityMin, submitted_below_threshold:!!S.belowThreshold, answer_checks:S.flags,
     service_description:S.sd?{name:S.sd.title,...S.sd.desc}:null, intake_record:S.sd&&S.det?Object.fromEntries(intakeRecord()):null, business_requirements:S.sd&&S.sd.brd, title:S.sd&&S.sd.title, source:S.sd&&S.sd._ai?CONFIG.provider:"rules"};
 }
 function download(){ const b=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=`intake-${Date.now()}.json`; a.click(); }
@@ -2412,7 +2486,7 @@ function detailHTML(){
   const convo=S.msgs.filter(m=>!m.kind).map(m=>`<p><b>${m.role==="user"?"Requester":"Intake assistant"}:</b> ${esc(m.text)}</p>`).join("");
   return `<div class="brd">
   <div class="kicker">Service description for approval to source</div><h1>${esc(d.title)}</h1>
-  ${kv([["Reference",S.submitted||"Draft, not yet submitted"],["Version and status",S.submitted?"1.0, submitted":"0.1, draft for review"],["Date",date],["Category (Level 4)",fin.code?`${fin.name} (${fin.code})`:"—"],["Buying route",`${ch.name}, typically ${ch.days} working days`],["Estimated value",known(f.value)?money(Number(f.value))+(f.value_is_estimate?" (estimate)":""):"To be determined"]])}
+  ${kv([["Reference",S.submitted||"Draft, not yet submitted"],["Version and status",S.submitted?"1.0, submitted":"0.1, draft for review"],["Date",date],["Category (Level 4)",fin.code?`${fin.name} (${fin.code})`:"—"],["Buying route",`${ch.name}, typically ${ch.days} working days`],["Quality",S.quality?`${S.quality.rating}, ${S.quality.score}/100 (threshold ${CONFIG.thresholds.qualityMin})${S.quality.score<CONFIG.thresholds.qualityMin?(S.submitted?", submitted below the threshold":", below the threshold"):""}`:""],["Estimated value",known(f.value)?money(Number(f.value))+(f.value_is_estimate?" (estimate)":""):"To be determined"]])}
   <h2>Part 1. Executive service description</h2><div class="lead">${descHTML(false)}</div>
   <h2>Part 2. Detailed service description</h2>${body}
   <h2>Part 3. Structured sourcing input attributes</h2>${attrs}
@@ -2499,7 +2573,9 @@ function openSettings(){
       <section><div class="eyebrow">Route rules</div>
         <p class="muted" style="margin:6px 0 0">Owned by the business. Changes apply to the current request straight away.</p>
         <label>Business-led sourcing up to (${CONFIG.currency}); above it procurement runs an RFP</label><input class="inp" type="number" id="t2" value="${T.quickQuoteMax}">
-        <label>Material spend review from (${CONFIG.currency})</label><input class="inp" type="number" id="t3" value="${T.materialityMin}"></section>
+        <label>Material spend review from (${CONFIG.currency})</label><input class="inp" type="number" id="t3" value="${T.materialityMin}">
+        <label>Quality needed before submitting (0–100); below it the chat offers an improvement round</label><input class="inp" type="number" id="t4" value="${T.qualityMin}">
+        <label>Answer score that triggers a tip (1–10)</label><input class="inp" type="number" id="t5" value="${T.answerTip}"></section>
       <section><div class="eyebrow">AI</div>
         ${hosted?`
           <label class="tgl"><input type="checkbox" id="aiToggle" ${aiOn?"checked":""}><span>Use AI for the conversation and the documents</span></label>
@@ -2523,7 +2599,7 @@ function openSettings(){
     pf();
     document.querySelectorAll("#prov button").forEach(b=>b.onclick=()=>{CONFIG.provider=b.dataset.p;document.querySelectorAll("#prov button").forEach(x=>x.classList.toggle("on",x===b));pf();render();});
   }
-  [["#t2","quickQuoteMax"],["#t3","materialityMin"]].forEach(([id,k])=>$(id).oninput=e=>{const v=parseFloat(e.target.value);if(!isNaN(v))CONFIG.thresholds[k]=v;});
+  [["#t2","quickQuoteMax"],["#t3","materialityMin"],["#t4","qualityMin"],["#t5","answerTip"]].forEach(([id,k])=>$(id).oninput=e=>{const v=parseFloat(e.target.value);if(!isNaN(v))CONFIG.thresholds[k]=v;});
   const close=()=>{$("#drawerRoot").innerHTML=""; if(S.det){refresh(); if(!S.missing.length && S.sd) showRecommendation();} render();};
   $("#close").onclick=close; $("#scrim").onclick=close;
 }
