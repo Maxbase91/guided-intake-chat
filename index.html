@@ -1314,7 +1314,7 @@ async function finishIntake(cid, lead){
 }
 const corrLabel = ch => Object.entries(ch).map(([k,v])=>k==="category"?`the category to **${catById(v.cat).name}**`:`the ${FACTS[k].label.toLowerCase()} to **${show(k,v)}**`).join(" and ");
 async function handleUser(text){
-  S.holdScroll=false;
+  S.holdScroll=false; typeFlush();   // a reply still typing out is shown in full first
   text=text.trim(); if(!text||S.busy) return;
   const cid=S.cid;
   try{ await handleTurn(text, cid); }
@@ -2831,7 +2831,43 @@ const TRIES=[
   ["New demand, under €50k","An agency for a client dinner for 40 people, around 30k."],
   ["New demand, over €50k","A new HR system to replace our payroll tool."]
 ];
+/* ---------- replies type out like someone writing: fast, and line by line for long ones ----------
+   One reply at a time; anything after it in the same turn (cards, notes, answer chips) waits until it is done.
+   A click on the reply, typing or sending finishes it at once. With "reduce motion" switched on, text appears at once. */
+const TYPE={seen:new WeakSet(), queue:[], cur:null, shown:0, timer:null};
+const typable = m => m.role==="assistant" && !m.kind && typeof m.text==="string" && m.text.length>0;
+const typingActive = () => !!TYPE.cur;
+function typeTrack(){
+  const reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+  S.msgs.forEach(m=>{ if(TYPE.seen.has(m)) return; TYPE.seen.add(m); if(typable(m) && !reduce) TYPE.queue.push(m); });
+  if(!TYPE.cur && TYPE.queue.length) typeNext();
+}
+function typeNext(){
+  TYPE.cur=TYPE.queue.shift()||null; TYPE.shown=0; if(!TYPE.cur) return;
+  const t=TYPE.cur.text, lines=t.split("\n").length, long=t.length>280||lines>=4;
+  // short replies take up to 1.2 s; long ones come line by line with a short pause, about 2 s in all
+  const ms = long ? Math.min(2200, 300+lines*180) : Math.min(1200, Math.max(250, t.length*10)), per=Math.max(1, Math.ceil(t.length/(ms/16)));
+  const tick=()=>{
+    if(!TYPE.cur) return;
+    const t=TYPE.cur.text; let n=Math.min(t.length, TYPE.shown+per);
+    const nl=t.indexOf("\n", TYPE.shown); if(long && nl>=0 && nl<n) n=nl+1;   // stop at the end of a line, then pause
+    TYPE.shown=n;
+    if(n>=t.length){ typeDone(); return; }
+    typePaint(); TYPE.timer=setTimeout(tick, long && t[n-1]==="\n" ? 90 : 16);
+  };
+  TYPE.timer=setTimeout(tick, 16);
+}
+function typePaint(){
+  const el=document.querySelector("#msgs [data-typing]"); if(!el||!TYPE.cur) return;
+  let part=TYPE.cur.text.slice(0, TYPE.shown); if(((part.match(/\*\*/g)||[]).length)%2) part+="**";   // no stray "**" mid-way
+  el.innerHTML=md(part);
+  const box=$("#msgs"); if(!S.holdScroll) box.scrollTop=box.scrollHeight;
+}
+function typeDone(){ clearTimeout(TYPE.timer); TYPE.cur=null; if(TYPE.queue.length) typeNext(); render(); }
+function typeFlush(){ clearTimeout(TYPE.timer); const was=TYPE.cur||TYPE.queue.length; TYPE.cur=null; TYPE.queue=[]; if(was) render(); }
+
 function render(){
+  typeTrack();
   $("#aiDot").className="dot"+(aiReady()?" on":"");
   const pl=providerLabel();
   $("#aiLabel").textContent=aiReady()?(pl?`AI on · ${pl}`:"AI on"):"Offline rules";
@@ -2845,10 +2881,13 @@ function render(){
   } else {
     const lastRec=S.msgs.map((m,i)=>m.kind==="rec"?i:-1).filter(i=>i>=0).pop();
     const lastSd=S.msgs.map((m,i)=>m.kind==="sd"?i:-1).filter(i=>i>=0).pop();
-    box.innerHTML=S.msgs.map((m,i)=>msgHTML(m,i,lastRec,lastSd)).join("")+(S.busy?`<div class="m a"><div class="av">G</div><div class="bub"><span class="typing"><i></i><i></i><i></i></span></div></div>`:"");
+    // nothing after the reply being typed is shown yet
+    const upto=TYPE.cur?S.msgs.indexOf(TYPE.cur):S.msgs.length-1;
+    box.innerHTML=S.msgs.map((m,i)=>i>upto?"":msgHTML(m,i,lastRec,lastSd)).join("")+(S.busy&&!TYPE.cur?`<div class="m a"><div class="av">G</div><div class="bub"><span class="typing"><i></i><i></i><i></i></span></div></div>`:"");
     bind();
+    if(TYPE.cur){ typePaint(); const el=box.querySelector("[data-typing]"); if(el) el.onclick=typeFlush; }
   }
-  $("#qr").innerHTML=S.busy?"":S.choices.map(q=>`<button>${esc(q)}</button>`).join("");
+  $("#qr").innerHTML=S.busy||TYPE.cur?"":S.choices.map(q=>`<button>${esc(q)}</button>`).join("");
   $("#qr").querySelectorAll("button").forEach(b=>b.onclick=()=>handleUser(b.textContent));
   $("#send").disabled=S.busy;
   renderStepbar();
@@ -2885,6 +2924,7 @@ function msgHTML(m,i,lastRec,lastSd){
   if(m.kind==="recap"){ const lastRecap=S.msgs.map((x,j)=>x.kind==="recap"?j:-1).filter(j=>j>=0).pop(); return `<div class="m a"><div class="av">G</div>${recapHTML(m, i===lastRecap)}</div>`; }
   if(m.kind==="rec") return `<div class="m a"><div class="av">G</div><div class="wide">${i===lastRec?recHTML(m.rec):`<div class="card old">Earlier recommendation: ${esc(CHANNELS[m.rec.route].name)}. Updated below.</div>`}</div></div>`;
   if(m.kind==="sd")  return i===lastSd?`<div class="m a" id="sdcard"><div class="av">G</div><div class="wide">${sdHTML()}</div></div>`:"";
+  if(m===TYPE.cur) return `<div class="m a"><div class="av">G</div><div class="bub${m.check?" qchk":""}" data-typing title="Click to show it all"></div></div>`;
   return `<div class="m a"><div class="av">G</div><div class="bub${m.check?" qchk":""}">${md(m.text)}</div></div>`;
 }
 function recHTML(R){
@@ -3249,9 +3289,9 @@ function openSettings(){
 /* =========================================================
    11. WIRING
    ========================================================= */
-function reset(){ Object.keys(S).forEach(k=>delete S[k]); Object.assign(S,fresh()); render(); $("#inp").focus(); }
+function reset(){ typeFlush(); Object.keys(S).forEach(k=>delete S[k]); Object.assign(S,fresh()); render(); $("#inp").focus(); }
 const inp=$("#inp");
-inp.addEventListener("input",()=>{inp.style.height="auto";inp.style.height=Math.min(inp.scrollHeight,160)+"px";});
+inp.addEventListener("input",()=>{typeFlush();inp.style.height="auto";inp.style.height=Math.min(inp.scrollHeight,160)+"px";});
 inp.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("#comp").requestSubmit();}});
 $("#comp").onsubmit=e=>{e.preventDefault();const t=inp.value;inp.value="";inp.style.height="auto";handleUser(t);};
 $("#doccss").textContent=DOC_CSS;

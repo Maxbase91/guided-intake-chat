@@ -78,6 +78,7 @@ The end-to-end tests start three local servers: offline (no key), AI (mock provi
 | `tests/e2e/outsourcing.spec.js` | Outsourcing determination under EBA/GL/2019/02: a full KYC conversation with the test steps in the document, a branch outside the EU, and a rule table for paragraphs 26 and 28 and the EBA/GL/2026/09 preview |
 | `tests/e2e/live-ai-run.spec.js` | Defects found in live AI conversations: check-step corrections, work location and offshoring, Level 4 consistency, single source, date scrubbing, object-shaped AI suggestions |
 | `tests/e2e/access-and-layout.spec.js` | Access-code gate and the phone layout |
+| `tests/e2e/typing.spec.js` | Replies typing out: speed, chips after the text, click to finish, "reduce motion" (the other tests run with reduce motion through `openApp`) |
 | `tests/e2e/known-issues.spec.js` | Defects found in the assessment (see `ASSESSMENT.md`), marked `test.fail()`: they turn red ("unexpectedly passed") once fixed, then the marker can be removed |
 
 `scripts/mock-providers.js` answers in the shapes the app asks for. To exercise failures, the AI server accepts `POST /__mock` with `{"gemini":"429","groq":"500","coldStart":true}` (mock mode only).
@@ -111,6 +112,8 @@ The user can change something said earlier at any point, in their own words: "ch
 A correction is never stored as the answer to the current question. The app updates the item and re-runs everything that depends on it: type, Level 4 category, route (for example RFP to contract call-off, or across the €50,000 threshold) and which questions are needed. It says what changed and what that means for the route and the questions, then goes back to the open question. Answers already given are kept. If the description already exists, it is rebuilt. An answer and a correction in one message are both taken. When it is unclear ("actually it's more a consulting job"), the chat asks once whether to change it or treat it as the answer.
 
 Captured details can also be changed directly in the side panel (pencil icon): the category from the Level 4 list, the budget, dates and other details. The same rules apply.
+
+Replies type out like someone writing. Short ones finish within about a second; long ones (such as the check-step list) come line by line, about two seconds in all. Cards, notes and answer chips that follow wait until the text is complete. A click on the reply, typing or sending shows it in full at once. With "reduce motion" switched on in the system, replies appear at once.
 
 The side panel keeps only the step being asked open. Finished steps fold to one line (for example "✓ 4 details"), and a click opens them. Long answers sit under their label, cut to two lines; a click shows them in full.
 

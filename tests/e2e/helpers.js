@@ -7,10 +7,12 @@ const urlFor = (kind) => `http://localhost:${PORTS[kind]}/`;
 const TODAY = new Date("2026-10-12T09:00:00Z");
 
 // opens the app; collects page errors so each test can assert there were none
-async function openApp(page, { kind = "offline", viewport, waitReady = true } = {}) {
+// replies appear at once, as for users with "reduce motion" (typing.spec.js passes motion: true to see them type out)
+async function openApp(page, { kind = "offline", viewport, waitReady = true, motion = false } = {}) {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
+  await page.emulateMedia({ reducedMotion: motion ? "no-preference" : "reduce" });
   if (viewport) await page.setViewportSize(viewport);
   await page.clock.install({ time: TODAY });
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
@@ -24,6 +26,7 @@ async function openApp(page, { kind = "offline", viewport, waitReady = true } = 
 
 async function idle(page) {
   await expect(page.locator(".typing")).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.locator("#msgs [data-typing]")).toHaveCount(0, { timeout: 30_000 });   // a reply still typing out
   await expect(page.locator("#send")).toBeEnabled();
 }
 
