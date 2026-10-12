@@ -77,42 +77,6 @@ test.describe("phone layout", () => {
   });
 });
 
-test.describe("outsourcing determination (commit 7baf311)", () => {
-  const KYC = [
-    [/cost in total/i, "About 600k"],
-    [/business problem/i, "A backlog of overdue KYC reviews flagged by the regulator; if delayed we face supervisory action"],
-    [/use today/i, "Temporary staff and spreadsheets"],
-    [/exactly must the provider do/i, "Run periodic KYC reviews for 3,000 corporate clients and document each file"],
-    [/When (do you need it|should it start)/i, "1 February 2027"],
-    [/Where and how/i, "Remotely from the provider's centre in Frankfurt"],
-    [/budget already approved/i, "Yes"],
-    [/kind of data/i, "Client names, ownership structures and ID documents, stored in the EU"],
-    [/bank does itself today/i, "We could realistically do it"],
-  ];
-
-  test("'we have never done this ourselves' does not turn KYC operations into 'not outsourcing'", async ({ page }) => {
-    test.fail(true, "inHouseFromText checks past-practice phrases before bankDomain; EBA/GL/2019/02 para 26 says past practice does not matter");
-    await openApp(page);
-    await say(page, "KYC periodic reviews for our corporate clients for 2 years, around 600k. We have never done this ourselves.");
-    await answerUntilDone(page, KYC);
-    await expect(page.locator(".sd .record")).toContainText("Outsourcing (likely) (EBA/GL/2019/02", { timeout: 2000 });
-  });
-
-  test("'No, but a bank could realistically do it' is read as yes", async ({ page }) => {
-    test.fail(true, "readAnswer('in_house') tests /^no\\b/ before 'could realistically do'");
-    await openApp(page);
-    expect(await page.evaluate(() => readAnswer("in_house", "No, but a bank could realistically do it"))).toBe(true);
-  });
-
-  test("the provisioning legal entity is the one named, not the first match anywhere in the text", async ({ page }) => {
-    test.fail(true, "entityFrom returns the first entity in list order whose pattern appears anywhere ('stored in the EU' wins over 'Singapore branch')");
-    await openApp(page);
-    await say(page, "KYC periodic reviews for our Singapore branch clients for 2 years, around 600k.");
-    await answerUntilDone(page, KYC.map(([re, a]) => [re, a.replace("Frankfurt", "Singapore")]));
-    await expect(page.locator("#msgs")).toContainText("Provisioning legal entity: Singapore branch", { timeout: 2000 });
-  });
-});
-
 test.describe("AI mode", () => {
   test.describe.configure({ mode: "serial" });
   test.beforeEach(async ({ request }) => { await mock(request, { gemini: "ok", groq: "ok", mistral: "ok", coldStart: true, resetCalls: true, nextChat: null }); });

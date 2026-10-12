@@ -670,9 +670,15 @@ function classifyL4(f){
 }
 const l4ByCode = c => L4.find(e=>e.code===c) || null;
 function entityFrom(f){
-  const raw=userRaw()+" "+(f.location||"");
-  for(const e of ENTITIES) if(e.re.test(raw) || (e.abbr && e.abbr.test(raw))) return e.id;
-  return null;
+  const place=String.raw`(?:the\s+)?[\w-]+(?:\s+(?:and|or)\s+(?:the\s+)?[\w-]+)*`;
+  const raw=(userRaw()+" "+(f.location||""))
+    .replace(new RegExp(String.raw`\b(?:stored|hosted|kept|held|backed up|processed)\s+(?:in|within|inside)\s+`+place,"gi")," ")
+    .replace(new RegExp(String.raw`\bprovider'?s?\s+(?:own\s+)?[\w-]+(?:\s+[\w-]+)?\s+in\s+`+place,"gi")," ");
+  const hits=ENTITIES.map(e=>{ const m=[e.re.exec(raw), e.abbr&&e.abbr.exec(raw)].filter(Boolean).sort((a,b)=>a.index-b.index)[0];
+    return m && {id:e.id, i:m.index, named:/^\s*(?:branch|entity|banking entity|office|subsidiary|bank)\b/i.test(raw.slice(m.index+m[0].length)) || /\b(?:branch|entity|office) (?:in|of) (?:the )?$/i.test(raw.slice(Math.max(0,m.index-20),m.index))}; }).filter(Boolean);
+  if(!hits.length) return null;
+  const named=hits.filter(h=>h.named);
+  return (named.length?named:hits).sort((a,b)=>a.i-b.i)[0].id;
 }
 const entityById = id => ENTITIES.find(e=>e.id===id) || null;
 const isOngoing = f => known(f.ongoing) && !isTBD(f.ongoing) ? yes(f.ongoing) : f.demand_type==="contingent_labour" ? (known(f.duration)?monthsOf(f.duration)>=3:true) : (GOODSLIKE(f)&&f.demand_type!=="software") ? false : REL.ongoingSvc(f) && !(known(f.duration) && monthsOf(f.duration)<3);
@@ -694,7 +700,8 @@ function excludedType(f){
 // would we otherwise do this ourselves? true / false / null (unclear)
 function inHouseFromText(f){
   const t=demandText(f);
-  if(/\b(always (?:bought|buy) (?:this|it) in|never done (?:it|this)? ?(?:ourselves|internally|in[- ]house)|we (?:don.?t|do not) (?:do|have) (?:this|it) (?:today|ourselves)|not something (?:we|our teams?) (?:do|would do))\b/.test(t)) return false;
+  // only "a bank would not do this" says no; what we did in the past does not count (EBA/GL/2019/02 paragraph 26: "even if ... not performed ... in the past")
+  if(/\b(?:a bank|banks) (?:wouldn.?t|would not|would never|couldn.?t|could not|don.?t|do not) (?:realistically )?(?:do|perform|run)\b|\bnot (?:work|something) (?:a bank|banks) (?:would|could) (?:realistically )?do\b/.test(t)) return false;
   if(/\b(our (?:own )?(?:team|teams|staff|people|colleagues)\b[^.]{0,40}\b(?:do|does|did|run|runs|handle|handles|process|processes|manage|manages)\b|in[- ]house today|today (?:we|our team)|we (?:currently )?(?:do|run|process|handle|manage) (?:it|this|them)|take over|on our behalf|instead of (?:us|our team)|run (?:our|the) [a-z ]*process|operate (?:our|the)|managed service|outsourc)/.test(t)) return true;
   if(bankDomain(f) || f.category==="bpo") return true;   // work banks typically run themselves
   return null;
@@ -2031,7 +2038,13 @@ const cap1 = x => x ? String(x).charAt(0).toUpperCase()+String(x).slice(1) : x;
 const CLOSED=["in_house","entity","supplier_terms","contract_ok","value","quantity","headcount","tech_service","personal_data","ict_outsourcing","system_access","budget_approved","subcontracting"];
 function readAnswer(k, text){
   const t=text.trim().toLowerCase();
-  if(k==="in_house"){ if(/not sure|unsure|don.?t know/.test(t)) return "unsure"; if(/always buy|buy (?:this|it) in|^no\b|never|wouldn.?t do this|would not do this/.test(t)) return false; if(/^yes|our teams|normally do|ourselves|in[- ]house|we do|could (?:realistically )?do/.test(t)) return true; return null; }
+  if(k==="in_house"){ if(/not sure|unsure|don.?t know/.test(t)) return "unsure";
+    if(/\b(?:wouldn.?t|would not|would never|couldn.?t|could not|can.?t|cannot)\b|\bnot (?:work|something) (?:a bank|banks)\b/.test(t)) return false;
+    if(/\bcould\b|\bbanks? (?:would|can|do|does)\b|realistically/.test(t)) return true;
+    // what we do today only answers half the question (paragraph 26), so past practice alone leaves it open for the review
+    if(/\bnever\b|always (?:buy|bought)|(?:buy|bought) (?:this|it) in|(?:don.?t|do not|didn.?t|did not) (?:do|have|run|handle)\b|not today/.test(t)) return "unsure";
+    if(/^yes|our (?:own )?teams?\b|normally do|in[- ]house|we do (?:it|this)/.test(t)) return true;
+    return /^no\b/.test(t) ? false : null; }
   if(k==="entity"){ const e=ENTITIES.find(x=>t.includes(x.name.toLowerCase())||x.re.test(text)||(x.abbr&&x.abbr.test(text))); return e?e.id:/another|other/.test(t)?null:"Not given"; }
   if(k==="supplier_terms") return /^no\b|none/.test(t)?"No":/not sure|unsure/.test(t)?"Not sure":text.trim();
   if(k==="value"){ const v=parseMoney(text); if(v!=null){S.f.value_is_estimate=false;return v;} if(/know|sure|idea|estimate/.test(t)){S.f.value_is_estimate=true;return defaultEstimate();} return null; }

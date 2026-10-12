@@ -13,6 +13,7 @@ const KYC_ANSWERS = [
   [/budget already approved/i, "Yes"],
   [/kind of data/i, "Client names, ownership structures and ID documents, stored in the EU"],
   [/bank does itself today/i, "We could realistically do it"],
+  [/Which legal entity of the bank/i, "EU banking entity (Germany)"],
 ];
 
 test("an ongoing KYC operations service is flagged as likely outsourcing, with the test steps in the document", async ({ page }) => {
@@ -21,6 +22,8 @@ test("an ongoing KYC operations service is flagged as likely outsourcing, with t
   await answerUntilDone(page, KYC_ANSWERS);
 
   const msgs = page.locator("#msgs");
+  // nothing in the conversation names an entity (data storage and the provider's site don't count), so it is asked
+  await expect(msgs).toContainText("Which legal entity of the bank will receive this service and sign the contract?");
   await expect(msgs).toContainText("Provisioning legal entity: EU banking entity (Germany)");
   await expect(msgs).toContainText("It's work the bank does or could realistically do itself");
   await expect(msgs).toContainText("Outsourcing: Outsourcing (likely) under EBA/GL/2019/02 (group standard)");
@@ -49,8 +52,8 @@ test("an ongoing KYC operations service is flagged as likely outsourcing, with t
 test("a branch outside the EU gets the same group standard", async ({ page }) => {
   await openApp(page);
   await say(page, "KYC periodic reviews for our Singapore branch clients for 2 years, around 600k.");
-  // no "EU" in the answers: the entity is picked from all text (see known-issues.spec.js)
-  await answerUntilDone(page, KYC_ANSWERS.map(([re, a]) => [re, a.replace("Frankfurt", "Singapore").replace("stored in the EU", "stored in Singapore")]));
+  // "stored in the EU" and "the provider's centre in Frankfurt" must not decide the entity
+  await answerUntilDone(page, KYC_ANSWERS);
   await expect(page.locator("#msgs")).toContainText("Provisioning legal entity: Singapore branch");
   await expect(page.locator(".sd .record")).toContainText("Outsourcing (likely) (EBA/GL/2019/02, group standard)");
 });
@@ -85,4 +88,62 @@ test("the outsourcing rule table follows EBA/GL/2019/02 paragraphs 26 and 28", a
     if (para) expect.soft(rows[i].ex, label).toContain(`paragraph ${para}`); else expect.soft(rows[i].ex, label).toBeNull();
     expect.soft(rows[i].future, label).toBe(future);
   }
+});
+
+test("saying we have never done it ourselves does not turn KYC operations into 'not outsourcing'", async ({ page }) => {
+  await openApp(page);
+  await say(page, "KYC periodic reviews for our corporate clients for 2 years, around 600k. We have never done this ourselves.");
+  await answerUntilDone(page, KYC_ANSWERS);
+  await expect(page.locator("#msgs")).toContainText("It's work the bank does or could realistically do itself");
+  await expect(page.locator(".sd .record")).toContainText("Outsourcing (likely) (EBA/GL/2019/02, group standard)");
+});
+
+test("answers to the in-house question follow paragraph 26", async ({ page }) => {
+  await openApp(page);
+  const CASES = {
+    "Yes, we do it today": true, "We could realistically do it": true, "No, a bank wouldn't do this itself": false, "Not sure": "unsure",
+    "No, but a bank could realistically do it": true, "We don't do it today, but a bank could": true, "No": false, "we could not realistically do it": false,
+    // past practice alone answers only half the question: left open for the outsourcing review
+    "Never done it ourselves": "unsure", "No, we've never done it": "unsure", "Our teams don't do this": "unsure",
+  };
+  const got = await page.evaluate((answers) => Object.fromEntries(answers.map((a) => [a, readAnswer("in_house", a)])), Object.keys(CASES));
+  expect(got).toEqual(CASES);
+});
+
+test("past practice in the description does not decide the in-house test; an explicit 'a bank would not' does", async ({ page }) => {
+  await openApp(page);
+  const CASES = [
+    ["KYC periodic reviews for 2 years; we have never done this ourselves", "bpo", "Outsourcing (likely)"],
+    ["Payroll processing for 3 years; we don't do this today", "bpo", "Outsourcing (likely)"],
+    ["Invoice processing for 3 years; we have always bought this in", "bpo", "Outsourcing (likely)"],
+    ["Ongoing PMO support for 2 years; we have never done this ourselves", "consulting", "To be determined"],
+    ["Ongoing PMO support for 2 years; a bank would not do this itself", "consulting", "Not outsourcing (likely)"],
+  ];
+  const got = await page.evaluate((cases) => cases.map(([text, category]) => {
+    S.msgs = [{ role: "user", text }];
+    const f = { ...BLANK_FACTS, summary: text, item: text, category, demand_type: "services", duration: "2 years" };
+    f.in_house = inHouseFromText(f);
+    return outsourcing(f).result;
+  }), CASES);
+  expect(got).toEqual(CASES.map((c) => c[2]));
+});
+
+test("the provisioning legal entity is the one named, not where data is stored or the provider sits", async ({ page }) => {
+  await openApp(page);
+  const CASES = [
+    [["KYC reviews for our Singapore branch clients", "Client names, stored in the EU"], "", "SG"],
+    [["KYC reviews for our Singapore branch"], "Remotely from the provider's centre in Frankfurt", "SG"],
+    [["Payroll for the UK branch", "data stored in the EU and the UK"], "", "UK"],
+    [["Hosting stored in Singapore for our UK branch"], "", "UK"],
+    [["A new HR system for Frankfurt and London"], "", "EU"],
+    [["Cleaning for our London office"], "", "UK"],
+    [["A new HR system"], "On our premises in London", "UK"],
+    [["Market data for the US entity in New York"], "", "US"],
+    [["A new tool for the team"], "", null],
+  ];
+  const got = await page.evaluate((cases) => cases.map(([msgs, location]) => {
+    S.msgs = msgs.map((text) => ({ role: "user", text }));
+    return entityFrom({ ...BLANK_FACTS, location });
+  }), CASES);
+  expect(got).toEqual(CASES.map((c) => c[2]));
 });

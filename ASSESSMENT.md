@@ -4,6 +4,11 @@ Reviewed at commit `c4d3e98`, October 2026, and updated for commit `7baf311` (se
 
 ## Update: commit 7baf311 (outsourcing rework)
 
+**The fixes:**
+- **U1:** only an explicit "a bank would not do this" gives no; past practice is ignored, as paragraph 26 requires.
+- **U2:** "could" wins over a leading "no". Past practice alone ("never done it") is recorded as "not sure", which leaves the outsourcing result to be determined.
+- **U3:** the entity named with "branch", "entity", "office" or "bank" wins, otherwise the first place mentioned. Where data is stored and where the provider sits no longer count. When nothing names an entity, the question is asked.
+
 **What changed:**
 - One group standard, EBA/GL/2019/02, now applies to every provisioning legal entity. The per-jurisdiction matrix (PRA, MAS, HKMA, APRA, OSFI, US guidance) is gone.
 - The test runs in order: paragraph 28 exclusions, then ongoing or recurrent (paragraph 26), then "would or could realistically be performed by the bank" (paragraph 26). Critical or important function (paragraphs 29 to 31) is a separate flag.
@@ -22,13 +27,13 @@ Reviewed at commit `c4d3e98`, October 2026, and updated for commit `7baf311` (se
 - **Future rule set reference:** checked against public sources. The EBA published the final report for EBA/GL/2026/09 on 18 September 2026; the application date is not set; it repeals EBA/GL/2019/02 once applicable; and it covers non-ICT services only.
 - **Fewer stale dates:** the removed per-country "change watch" entries took most of the unverifiable dates with them (old finding 14).
 
-**Defects introduced or exposed** (known-issue tests added):
+**Defects introduced or exposed.** U1–U3 are fixed on this branch and guarded by tests in `tests/e2e/outsourcing.spec.js`:
 
 | # | Finding | Where | Confirmed by |
 | --- | --- | --- | --- |
-| U1 (High) | **Mentioning past practice flips the result.** "We have never done this ourselves", "we don't do this today" or "we have always bought this in" make KYC, payroll or accounts payable "Not outsourcing (likely)". This contradicts paragraph 26 ("even if the institution has not performed this function in the past") and the commit's own intent. The in-house question is then skipped, the check step says "It's not work a bank would do itself", and once confirmed the document records "Checked by the requester: Yes, confirmed". Example: a €600k, 2-year offshore KYC service. | `inHouseFromText` (`index.html` 697 runs before 699) | Test |
-| U2 (Medium) | **"No, but a bank could realistically do it" is read as no** in answer to the new question. | `readAnswer('in_house')` | Test |
-| U3 (Medium, existing before this commit) | **The provisioning legal entity is the first list match anywhere in the text.** "Singapore branch … stored in the EU" becomes the EU entity, and that raises a false offshoring flag. | `entityFrom` (`index.html` 672) | Test |
+| U1 (High), **fixed** | **Mentioning past practice flips the result.** "We have never done this ourselves", "we don't do this today" or "we have always bought this in" make KYC, payroll or accounts payable "Not outsourcing (likely)". This contradicts paragraph 26 ("even if the institution has not performed this function in the past") and the commit's own intent. The in-house question is then skipped, the check step says "It's not work a bank would do itself", and once confirmed the document records "Checked by the requester: Yes, confirmed". Example: a €600k, 2-year offshore KYC service. | `inHouseFromText` (`index.html` 697 runs before 699) | Test |
+| U2 (Medium), **fixed** | **"No, but a bank could realistically do it" is read as no** in answer to the new question. | `readAnswer('in_house')` | Test |
+| U3 (Medium, existing before this commit), **fixed** | **The provisioning legal entity is the first list match anywhere in the text.** "Singapore branch … stored in the EU" becomes the EU entity, and that raises a false offshoring flag. | `entityFrom` (`index.html` 672) | Test |
 | U4 (Medium, judgement) | **Paragraph 28(g) is applied by category, which is too broad:** <ul><li>A 3-year managed contract-review service counts as "legal advice or representation".</li><li>A managed WAN network counts as "telecom lines and utilities".</li><li>A provider-run compliance e-learning platform counts as a service "the bank would not otherwise perform".</li><li>Event services are cited as if paragraph 28(g) listed them.</li><li>Contingent labour appears under the "Excluded under paragraph 28" step although that paragraph does not cover it.</li></ul> Confirm the mapping with the outsourcing team. | `excludedType` | Run (rule probe) |
 | U5 (Medium) | **ICT is judged too broadly in the future rule set.** Any ongoing service with the technology flag is "Out of scope: ICT service under DORA". The technology flag is derived broadly, so KYC operations (a non-ICT business process service) shows as out of scope of EBA/GL/2026/09. | `futureRule` | Run |
 | U6 (Medium, design trade-off) | **Local rules are no longer prompted.** For non-EU entities, local requirements now appear only in the small print ("local requirements may add"). Nothing prompts the local notification duties (for example MAS, PRA or APRA material outsourcing or service-provider notifications). Suggest a "local add-on check" line in the record for non-EU entities. | `detailHTML`, `intakeRecord` | Code |
@@ -48,7 +53,7 @@ Three things block real users:
 | Suite | Result |
 | --- | --- |
 | API (`tests/api`, node:test) | 18 passed, 1 known bug recorded as `todo` |
-| End-to-end (`tests/e2e`, Playwright, Chromium) | 44 passed: 31 behaviour tests and 13 known-issue tests that fail as expected |
+| End-to-end (`tests/e2e`, Playwright, Chromium) | 45 passed: 35 behaviour tests and 10 known-issue tests that fail as expected |
 | Run time | About a minute. Needs no keys and no network. |
 
 **Covered:**
