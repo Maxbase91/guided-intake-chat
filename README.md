@@ -61,6 +61,14 @@ Two thresholds sit in `CONFIG.thresholds` and in the **Rules** panel:
 
 The score: 100, minus 15 per warning (skipped detail, unusable answer, kept despite a check), minus 5 per note, minus half the share of missing details, minus 3 per partial section and 8 per risk section in the detailed description (at most 30). Floor 35. Strong ≥ 90, Good ≥ 75, Fair ≥ 55, otherwise Needs work.
 
+## Corrections mid-way
+
+The user can change something said earlier at any point, in their own words: "change the category to management consulting", "sorry, the budget is 600k not 400k", "it's not software, it's consulting", "the start should be 1 March", "it's for the Singapore branch, please change the entity". Corrections are recognised by rules first (a field must be named together with change wording; free-text fields such as the supplier or title need "change the … to …" or a known supplier name), and the AI reports any others separately from the answer.
+
+A correction is never stored as the answer to the current question. The app updates the item and re-runs everything that depends on it: type, Level 4 category, route (for example RFP to contract call-off, or across the €50,000 threshold) and which questions are needed. It says what changed and what that means for the route and the questions, then goes back to the open question. Answers already given are kept. If the description already exists, it is rebuilt. An answer and a correction in one message are both taken. When it is unclear ("actually it's more a consulting job"), the chat asks once whether to change it or treat it as the answer.
+
+Captured details can also be changed directly in the side panel (pencil icon): the category from the Level 4 list, the budget, dates and other details. The same rules apply.
+
 ## Executive service description (new demand)
 
 New demand gets the format of an executive service description: a headline (name, tagline and 50–100 words), an executive description of 150–250 words and a service summary table (service name, target audience, supported functions, business problem solved, key capabilities, key benefits, unique selling points, KPIs / success measures, regulatory / governance benefits). Business-led demand gets the same parts, shorter. Catalogue orders and call-offs keep a short description.

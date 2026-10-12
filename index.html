@@ -210,6 +210,13 @@ body.doc-open{overflow:hidden}
 .fact.next .ic{border-color:var(--amber);box-shadow:0 0 0 3px var(--amber-soft)}
 .fact .k{color:var(--ink-3);flex:none;width:112px}
 .fact .v{flex:1;text-align:right;font-weight:500;word-break:break-word}
+.ed{border:0;background:none;color:var(--ink-3);cursor:pointer;padding:0 2px;font-size:13px;line-height:1;opacity:.55}
+.ed:hover,.ed:focus-visible{opacity:1;color:var(--navy-3)}
+.fact.editing{flex-wrap:wrap}
+.fedit{display:flex;gap:6px;width:100%;margin-top:6px}
+.fedit input,.fedit select{flex:1;min-width:0;padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:13px}
+.fedit button{border:0;border-radius:8px;padding:6px 10px;font:inherit;font-size:12.5px;cursor:pointer;background:var(--navy);color:#fff}
+.fedit button.x{background:var(--line-2);color:var(--ink-2)}
 .fact:not(.ok) .v{color:var(--ink-3);font-weight:400}
 .muted{color:var(--ink-3);font-size:12.5px}
 
@@ -542,7 +549,7 @@ const BLANK_FACTS = {summary:null,category:null,demand_type:null,item:null,quant
   volume:null,support_needs:null,data_details:null,criticality:null,subcontracting:null,pricing_model:null,service_levels:null,ip_ownership:null,performance:null,role:null,headcount:null,skills:null,day_rate:null,system_access:null,renewal_change:null,wants_renewal:null};
 let CONV_SEQ=0;
 const S = fresh();
-function fresh(){ return {cid:++CONV_SEQ, curStage:null, stageIds:[], recapped:{}, req:[], challenged:{}, challengeCount:0, flags:[], pending:null, thinChecked:{}, thinCount:0, offerImprove:null, improveRound:0, improveDone:false, sdShown:-1, holdScroll:false, belowThresholdOk:false, derived:{}, offChecked:{}, suggest:{}, sugAccepted:{}, checkRound:0, checkWait:false, l4Initial:null, completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
+function fresh(){ return {cid:++CONV_SEQ, curStage:null, stageIds:[], recapped:{}, req:[], challenged:{}, challengeCount:0, flags:[], pending:null, thinChecked:{}, thinCount:0, offerImprove:null, pendingCorr:null, editing:null, improveRound:0, improveDone:false, sdShown:-1, holdScroll:false, belowThresholdOk:false, derived:{}, offChecked:{}, suggest:{}, sugAccepted:{}, checkRound:0, checkWait:false, l4Initial:null, completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
 
 /* =========================================================
    5. RULES ENGINE (deterministic)
@@ -957,6 +964,7 @@ Your job each turn:
    (for example a budget far too low for the work described, a start date that has passed, "no personal data" for an HR or payroll system).
    Reasonable answers are ok, even if short. Never challenge an item listed in already_checked.
    When ok is false, "reply" must be only a short, friendly follow-up that names the issue and asks to confirm or correct it. Do not ask the next item in that case.
+7. Corrections: if the user changes something they said or confirmed earlier (for example a different category, budget, number of users, start date, duration, supplier, legal entity, location or title), put only the corrected items in "corrections" (same keys as facts; category as a category id) and NOT in "facts". Set "answers_question" false when the message does not also answer your last question; then do not record anything for that question.
 6. If pending_check is set, the user is answering your earlier check on that item: update the fact if they corrected it, keep it if they confirmed it.
 Keep the conversation light: ask only what is in still_needed, and never ask about cost centres, payment models, subcontractors, certifications, service levels, ownership of work or evaluation weights unless the user raises them.
 
@@ -995,7 +1003,7 @@ External workers or contractors are demand_type contingent_labour.
 
 ${contextLines()}
 
-Return JSON only: {"facts":{...only keys you are setting...},"reply":"","asking":"the key from still_needed your question is about","choices":[],"complete":false,"suggestion":"","assessment":{"fact":"","ok":true,"issue":"","follow_up":"","score":10}}
+Return JSON only: {"facts":{...only keys you are setting...},"reply":"","asking":"the key from still_needed your question is about","choices":[],"complete":false,"suggestion":"","corrections":{},"answers_question":true,"assessment":{"fact":"","ok":true,"issue":"","follow_up":"","score":10}}
 "asking" must be the key of the first unknown item in still_needed. Do not ask about anything else.`;
 }
 function contextLines(){
@@ -1040,6 +1048,152 @@ function cleanReply(t){
 }
 class Stale extends Error{}
 const guard = cid => { if(S.cid!==cid) throw new Stale(); };   // the user started a new conversation meanwhile
+/* ---------- corrections mid-way: "change the category to …", "sorry, the budget is 600k" ---------- */
+// fields a user can correct in their own words, and how they are named
+const CORR_FIELDS=[
+  {k:"category", re:/\b(categor(?:y|ies)|classification|level 4|type of (?:purchase|spend|demand|request))\b/i},
+  {k:"value",    re:/\b(budget|value|total cost|cost|price|amount)\b/i},
+  {k:"quantity", re:/\b(number of (?:users|people|licen[cs]es|seats)|users|licen[cs]es|seats|quantity)\b/i},
+  {k:"needed_by",re:/\b(start date|start|deadline|go[- ]live|needed by|delivery date)\b/i},
+  {k:"duration", re:/\b(duration|contract length|term|period)\b/i},
+  {k:"supplier", re:/\b(supplier|vendor)\b/i},
+  {k:"entity",   re:/\b(legal entity|entity|branch)\b/i},
+  {k:"location", re:/\b(location|delivery address|delivered to)\b/i},
+  {k:"title",    re:/\b(working title|title)\b/i}
+];
+const CHANGE_VERB=/\b(change|correct|update|amend|switch|replace|set)\b/i;
+const CHANGE_HINT=/\b(should be|should read|instead|rather than|is wrong|was wrong|i meant|i mean|sorry|actually|my mistake|typo|not\s+[^,.;]{1,30}\s*(?:but|,))/i;
+// category (and Level 4 entry) named in a piece of text
+function catFromText(t){
+  const l=" "+String(t).toLowerCase()+" "; let best=null, score=0;
+  for(const e of L4){ const s=(l.includes(e.name.toLowerCase())?10:0)+e.kw.filter(k=>l.includes(k)).length*3+(e.name.toLowerCase().split(/\W+/).filter(w=>w.length>4&&l.includes(w)).length); if(s>score){score=s;best={cat:e.cat,l4:e.code};} }
+  for(const c of CATEGORIES){ const s=(l.includes(c.name.toLowerCase())?10:0)+c.kw.filter(k=>l.includes(k)).length*3; if(s>score){score=s;best={cat:c.id,l4:null};} }
+  return score>=3?best:null;
+}
+// the new value in "change X to Y", "X is Y not Z", "X should be Y"
+function corrTarget(s, fieldIdx){
+  let tail=s.slice(fieldIdx);
+  const m=tail.match(/\b(?:from\s+.+?\s+to|to|should be|should read|is|be|=|:|now)\s+(.+)$/i);
+  let c=m?m[1]:tail.replace(/^\S+\s*/,"");
+  c=c.replace(/\s*(?:,|;)?\s*\b(?:not|instead of|rather than|and not)\b.*$/i,"").replace(/\s*(?:,|;|\.)?\s*\b(?:sorry|thanks|thank you|please)\b.*$/i,"").replace(/[.!]+$/,"").trim();
+  return c;
+}
+function corrValue(k, c){
+  if(!c) return null;
+  if(k==="category") return catFromText(c);
+  if(k==="value"){ const v=parseMoney(c); return v!=null?v:null; }
+  if(k==="quantity"){ const n=c.replace(/(\d),(\d{3})/g,"$1$2").match(/\d+/); return n?+n[0]:null; }
+  if(k==="entity"){ const e=ENTITIES.find(x=>x.re.test(c)||(x.abbr&&x.abbr.test(c))||c.toLowerCase().includes(x.name.toLowerCase())); return e?e.id:null; }
+  if(k==="duration"){ const d=c.match(/\d+\s*(?:-|to)?\s*\d*\s*(?:months?|weeks?|years?)/i); return d?d[0]:null; }
+  if(k==="needed_by") return parseWhen(c)||/asap|q[1-4]|\b20\d\d\b/i.test(c)?cap1(c):null;
+  return words(c)>=1&&words(c)<=12?cap1(c):null;
+}
+// read a message for corrections; returns {changes, rest, ambiguous}
+function detectCorrection(text, asked){
+  const out={changes:{}, rest:"", ambiguous:null};
+  if(!S.det || asked==="confirm_derived" || S.pending) return out;
+  const parts=text.split(/(?<=[.!?;])\s+|\s+(?:and also|also)\s+/i), keep=[];
+  for(const s of parts){
+    let hit=false;
+    // "it's not software, it's consulting"
+    const nb=s.match(/\b(?:it'?s|it is|this is)\s+not\s+(?:an?\s+)?([^,;.]+?)[,;.]?\s*(?:but\s+|it'?s\s+|it is\s+)(?:an?\s+)?(.+)$/i);
+    if(nb){ const was=catFromText(nb[1]), now=catFromText(nb[2]); if(now && now.cat!==S.f.category && (!was || was.cat===S.f.category)){ out.changes.category=now; hit=true; } }
+    if(!hit) for(const F of CORR_FIELDS){
+      const m=s.match(F.re); if(!m || F.k===asked) continue;
+      const prefersSupplier = F.k==="supplier" && /\b(rather|prefer|would like|we'?d like|want to)\b/i.test(s) && ALL_SUPPLIERS.some(x=>s.toLowerCase().includes(x.toLowerCase()));
+      if(!(CHANGE_VERB.test(s)||CHANGE_HINT.test(s)||prefersSupplier)) continue;
+      if(F.k==="quantity" && !/\b(?:number of|change|correct|update|should be|actually|sorry|i meant)\b/i.test(s)) continue;
+      // free-text fields need an explicit "change the supplier to …" (or a supplier we know)
+      if(["supplier","title","location"].includes(F.k)){
+        const strict=new RegExp(`\\b(?:change|correct|update|amend|switch|set|make)\\s+(?:the\\s+|our\\s+|my\\s+)?(?:working\\s+)?${m[0]}\\s+(?:name\\s+)?(?:to|from\\s+.+?\\s+to)\\s+(.+)$`,"i").exec(s);
+        const named=F.k==="supplier" && ALL_SUPPLIERS.find(x=>s.toLowerCase().includes(x.toLowerCase()));
+        if(!strict && !named) continue;
+        const v=named||corrValue(F.k, strict[1].replace(/\s*(?:,|;)?\s*\b(?:not|instead of|rather than|sorry|thanks|please)\b.*$/i,"").replace(/[.!]+$/,""));
+        if(v!=null){ out.changes[F.k]=v; hit=true; break; }
+        continue;
+      }
+      let v=corrValue(F.k, corrTarget(s, m.index));
+      // the new value can also come before the field: "it's for the Singapore branch, please change the entity"
+      if(v==null && ["entity","category","duration","needed_by"].includes(F.k)) v=corrValue(F.k, s.replace(/\b(?:not|instead of|rather than)\s+[^,.;]+/gi,"").replace(F.re,""));
+      if(v!=null){ out.changes[F.k]=v; hit=true; break; }
+    }
+    // weak signal: "actually it's consulting" without naming the field → ask
+    if(!hit && /\b(actually|sorry|i meant|i mean)\b/i.test(s)){
+      const w=s.match(/\b(?:it'?s|it is|this is)\s+(?:really\s+|more\s+)?(?:an?\s+)?(.+)$/i), now=w&&catFromText(w[1]);
+      if(now && now.cat!==S.f.category && asked!=="need"){ out.ambiguous={category:now}; continue; }
+    }
+    if(!hit) keep.push(s);
+  }
+  out.rest=keep.join(" ").trim();
+  if(!/[a-z0-9]{2,}/i.test(out.rest.replace(/\b(sorry|thanks|thank you|ok(?:ay)?|please|actually|also|and)\b/gi,""))) out.rest="";
+  if(Object.keys(out.changes).length) out.ambiguous=null;
+  return out;
+}
+// corrections from the AI, in the shape applyChanges expects
+function normCorr(c){
+  if(!c || typeof c!=="object" || Array.isArray(c)) return null;
+  const out={};
+  for(const [k,v] of Object.entries(c)){
+    if(v===null||v===undefined||v==="") continue;
+    if(k==="category"){ const id=String(v).trim(); const hit=CATEGORIES.find(x=>x.id===id)?{cat:id,l4:null}:catFromText(id); if(hit) out.category=hit; continue; }
+    if(k==="l4"){ const e=l4ByCode(String(v)); if(e) out.category={cat:e.cat,l4:e.code}; continue; }
+    if(["value","quantity","needed_by","duration","supplier","entity","location","title"].includes(k)){ const n=normFact(k,v); if(n!==null&&n!=="") out[k]=n; }
+  }
+  return Object.keys(out).length?out:null;
+}
+// apply corrections; returns what changed, in plain words
+function applyChanges(ch){
+  const f=S.f, done=[];
+  for(const [k,v] of Object.entries(ch)){
+    if(k==="category"){
+      const code=v.l4||(L4.find(e=>e.cat===v.cat)||{}).code;
+      if(v.cat===f.category && (!code||code===f.l4)) continue;
+      const from=catById(f.category).name, c=catById(v.cat);
+      f.category=v.cat; f.demand_type=c.type;
+      if(code){ f.l4=code; delete S.derived.l4; f.l4_reason="Set by you during the intake."; }
+      f.contract_ok=null; f.decline_contract=null; S.override="";
+      // suggestions prepared for the old category no longer fit
+      Object.keys(S.suggest).forEach(x=>{ if(!known(f[x])) delete S.suggest[x]; });
+      done.push(`category from ${from} to **${c.name}**${code?` (${l4ByCode(code).name})`:""}`); continue;
+    }
+    const prev=f[k]; if(JSON.stringify(prev)===JSON.stringify(v)) continue;
+    f[k]=v; if(k in S.derived) delete S.derived[k];
+    if(k==="value") f.value_is_estimate=false;
+    done.push(`${FACTS[k]?FACTS[k].label.toLowerCase():k} ${known(prev)&&!isTBD(prev)?`from ${show(k,prev)} `:""}to **${show(k,v)}**`);
+  }
+  return done;
+}
+// say what changed, then go on: back to the open question, or a rebuilt description
+async function afterChanges(done, cid, opts={}){
+  const prevRoute=S.det&&S.det.route, prevMissing=[...(S.missing||[])], asked=S.lastAsked, hadDoc=!!S.sd;
+  refresh();
+  const route=S.det.route, added=S.missing.filter(k=>!prevMissing.includes(k)), dropped=prevMissing.filter(k=>!S.missing.includes(k)&&!known(S.f[k]));
+  let msg=`Changed: ${done.join("; ")}.`;
+  if(prevRoute && route!==prevRoute) msg+=` That changes the route from ${CHANNELS[prevRoute].name} to **${CHANNELS[route].name}**.`;
+  const nq=n=>n===1?"one question":`${n} questions`;
+  const qa = dropped.length&&added.length ? [`${nq(dropped.length)} ${dropped.length===1?"is":"are"} no longer needed and ${added.length===1?"one is":`${added.length} are`} added`]
+    : dropped.length ? [`${nq(dropped.length)} ${dropped.length===1?"is":"are"} no longer needed`] : added.length ? [`I need ${added.length===1?"one more answer":`${added.length} more answers`} for this`] : [];
+  if(qa.length && !opts.quiet) msg+=` ${cap1(qa.join(" and "))}.`;
+  if(!S.missing.length){
+    await finishIntake(cid, `${msg} ${hadDoc?"I'm updating the service description.":"That's everything I need. I'm writing the service description now."}`);
+    return;
+  }
+  if(S.completed) S.completed=false;
+  const next=S.missing[0];
+  askNext(next, msg+(next===asked?"\n\nBack to where we were:":""));
+}
+// the end of the intake: write the description, recommend the route, offer improvements
+async function finishIntake(cid, lead){
+  stageTransition("review");
+  S.msgs.push({role:"assistant",text:lead});
+  S.lastAsked=null; S.completed=true; S.choices=[];
+  render();
+  try{ await buildDoc(cid); }
+  catch(e){ if(e instanceof Stale) throw e; console.error(e); S.msgs.push({role:"assistant",kind:"sys",text:"Something went wrong while writing the documents. Please tell me to try again."}); }
+  showRecommendation();
+  offerImprovement();
+}
+const corrLabel = ch => Object.entries(ch).map(([k,v])=>k==="category"?`the category to **${catById(v.cat).name}**`:`the ${FACTS[k].label.toLowerCase()} to **${show(k,v)}**`).join(" and ");
 async function handleUser(text){
   S.holdScroll=false;
   text=text.trim(); if(!text||S.busy) return;
@@ -1048,7 +1202,7 @@ async function handleUser(text){
   catch(e){ if(e instanceof Stale) return; console.error(e); if(S.cid===cid) S.msgs.push({role:"assistant",kind:"sys",text:"Something went wrong on my side. Please send that again."}); }
   finally{ if(S.cid===cid){ S.busy=false; render(); } }
 }
-async function handleTurn(text, cid){
+async function handleTurn(text, cid, opts={}){
   // answer to the offer to improve a below-threshold description
   if(S.offerImprove){
     const tt=text.trim();
@@ -1057,9 +1211,42 @@ async function handleTurn(text, cid){
       S.msgs.push({role:"assistant",text:"Okay. The rating and the open points stay visible to the buyer. Press \"Looks right, submit\" on the service description when you're ready."}); render(); return; }
     S.offerImprove=null;
   }
+  // answer to "do you want me to change …?"
+  if(S.pendingCorr){
+    const pc=S.pendingCorr; S.pendingCorr=null; const tt=text.trim();
+    if(/^(?:yes|yep|yeah|change it|please do|correct|do it)\b/i.test(tt)){
+      S.msgs.push({role:"user",text:tt}); S.choices=[];
+      const done=applyChanges(pc.changes);
+      if(done.length) await afterChanges(done, cid); else askNext(S.lastAsked||S.missing[0], "That's already what I have.\n\nBack to where we were:");
+      render(); return;
+    }
+    if(/^(?:no|nope|it'?s my answer|my answer)\b/i.test(tt)){ S.msgs.push({role:"user",text:tt}); return handleTurn(pc.text, cid, {noCorr:true, silent:true}); }
+  }
+  // a correction of something said earlier, rather than (or as well as) an answer
+  if(!opts.noCorr){
+    const corr=detectCorrection(text, S.lastAsked);
+    if(corr.ambiguous){
+      S.msgs.push({role:"user",text}); S.pendingCorr={changes:corr.ambiguous, text};
+      const q=S.lastAsked&&FACTS[S.lastAsked]?` (${FACTS[S.lastAsked].label.toLowerCase()})`:"";
+      S.msgs.push({role:"assistant",text:`Do you want me to change ${corrLabel(corr.ambiguous)}? Or is this your answer to my last question${q}?`});
+      S.choices=["Yes, change it","No, it's my answer"]; render(); return;
+    }
+    if(Object.keys(corr.changes).length){
+      if(!corr.rest){
+        S.msgs.push({role:"user",text}); S.choices=[];
+        const done=applyChanges(corr.changes);
+        if(done.length) await afterChanges(done, cid); else askNext(S.lastAsked||S.missing[0], "That's already what I have.\n\nBack to where we were:");
+        render(); return;
+      }
+      // answer and correction in one message: apply the change, read the rest as the answer
+      opts.display=text; opts.corrDone=applyChanges(corr.changes); text=corr.rest;
+    }
+  }
   if(S.sd && /^(make it|shorten|shorter|add more|rewrite|reword)|\b(summary|description|document)\b/i.test(text) && aiReady()) return refineSD(text);
   const asked=S.lastAsked; if(asked) S.asked[asked]=(S.asked[asked]||0)+1;
-  const um={role:"user",text}; S.msgs.push(um); S.choices=[]; S.busy=true; render();
+  const um={role:"user",text:opts.display||text}; if(!opts.silent) S.msgs.push(um); S.choices=[]; S.busy=true;
+  if(opts.corrDone&&opts.corrDone.length) S.msgs.push({role:"assistant",kind:"sys",text:`Changed: ${opts.corrDone.join("; ")}.`});
+  render();
   const before={...S.f};
   // the user is answering a check we raised on an earlier answer
   const pend=S.pending; S.pending=null;
@@ -1072,6 +1259,12 @@ async function handleTurn(text, cid){
       const transcript=S.msgs.filter(m=>!m.kind).slice(0,-1).slice(-8).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
       const out = await callLLM(chatSystem(), [{role:"user",content:`${transcript?`Conversation so far:\n${transcript}\n\n`:""}Latest user message:\n${text}${stateBlock(pend)}\n\nAnswer with the JSON object only.`}]);
       guard(cid);
+      const aiCorr=normCorr(out.corrections);
+      if(aiCorr && !opts.corrDone){
+        const done=applyChanges(aiCorr);
+        if(done.length && out.answers_question===false){ if(asked) S.asked[asked]=Math.max(0,(S.asked[asked]||1)-1); S.pending=pend; await afterChanges(done, cid); S.busy=false; render(); return; }
+        if(done.length) S.msgs.push({role:"assistant",kind:"sys",text:`Changed: ${done.join("; ")}.`});
+      }
       if(!(pend && keepIt)) mergeFacts(out.facts||{}); else { const nf={...(out.facts||{})}; delete nf[pend.fact]; mergeFacts(nf); }
       if(asked && !known(S.f[asked]) && CLOSED.includes(asked)){ const v=readAnswer(asked,text); if(known(v) && v!=="unsure"||/sure|know/i.test(text)) S.f[asked]=v; }
       if(!(pend && keepIt)) offlineRead(text, asked);
@@ -1167,15 +1360,8 @@ async function handleTurn(text, cid){
     S.msgs.push({role:"assistant",kind:"sys",text:`This is now ${CHANNELS[S.det.route].name.replace(/^New demand: /,"new demand with ")}, so I've added a few questions on ${added.map(id=>stageById(id).name.toLowerCase()).join(" and ")}.`});
 
   if(!S.missing.length){
-    stageTransition("review");
     const lead = S.completed ? "Updated. Here are the revised service description and route." : S.improveRound ? "Thanks, that makes it stronger. I'm updating the service description now." : `${complete && reply && !aiCheck ? reply.replace(/\s*$/,"") : wrapUp()} I'm writing the service description now. Below it you'll find the route I recommend and the full document. Please check them before you submit.`;
-    S.msgs.push({role:"assistant",text:lead});
-    S.lastAsked=null; S.completed=true;
-    render();
-    try{ await buildDoc(cid); }
-    catch(e){ if(e instanceof Stale) throw e; console.error(e); S.msgs.push({role:"assistant",kind:"sys",text:"Something went wrong while writing the documents. Please tell me to try again."}); }
-    showRecommendation();
-    offerImprovement();
+    await finishIntake(cid, lead);
   } else {
     let next=S.missing[0];
     const aiAskedOk = reply && !complete && !aiCheck && aiAsking && S.missing.slice(0,2).includes(aiAsking) && stageOf(aiAsking)===stageOf(S.missing[0]);
@@ -2563,16 +2749,56 @@ function renderSide(){
   const groups=S.stageIds.filter(id=>id!=="review").map(id=>{
     const ks=stageFacts(id); const all=ks.every(k=>known(f[k]));
     return `<div class="grp"><span>${esc(stageById(id).name)}</span>${all?"<em>✓ done</em>":""}</div>`+
-      ks.map(k=>{const ok=known(f[k]), nx=!ok&&S.missing[0]===k; return `<div class="fact ${ok?"ok":""} ${nx?"next":""}"><span class="ic">${ok?"✓":""}</span><span class="k">${FACTS[k].label}</span><span class="v">${ok?esc(show(k,f[k])):nx?"asking now":"—"}</span></div>`;}).join("");
+      ks.map(k=>{const ok=known(f[k]), nx=!ok&&S.missing[0]===k, can=ok&&canEdit(k);
+        if(S.editing===k) return `<div class="fact ok editing"><span class="ic">✓</span><span class="k">${FACTS[k].label}</span>${editorHTML(k)}</div>`;
+        return `<div class="fact ${ok?"ok":""} ${nx?"next":""}"><span class="ic">${ok?"✓":""}</span><span class="k">${FACTS[k].label}</span><span class="v">${ok?esc(show(k,f[k])):nx?"asking now":"—"}</span>${can?`<button class="ed" data-edit="${k}" title="Change" aria-label="Change ${esc(FACTS[k].label)}">✎</button>`:""}</div>`;}).join("");
   }).join("");
   $("#side").innerHTML=`<div class="panel">
       <div class="eyebrow">Route ${S.missing.length?"so far":""}</div>
       <div class="route">${CHANNELS[S.override||D.route].name}</div>
-      <div class="prov">${S.missing.length?"May change as you answer":"Ready"} · ${esc(catById(f.category).name)}</div>
+      <div class="prov">${S.missing.length?"May change as you answer":"Ready"} · ${esc(catById(f.category).name)} <button class="ed" data-edit="category" title="Change the category" aria-label="Change the category">✎</button></div>
+      ${S.editing==="category"?`<div class="fact editing">${editorHTML("category")}</div>`:""}
       <div class="prog"><i style="width:${pct}%"></i></div>
       <div class="muted">${done} of ${req.length} details for this route</div>
       ${groups}
     </div>${sideNote()}`;
+  bindEdits();
+}
+// editing a captured detail in the side panel
+const canEdit = k => !BUNDLES[k] && !["confirm_derived","need","profile"].includes(k) && FACTS[k];
+function editorHTML(k){
+  const f=S.f, opt=(v,t,sel)=>`<option value="${esc(String(v))}"${sel?" selected":""}>${esc(t)}</option>`;
+  let ctl;
+  if(k==="category") ctl=`<select id="edv">${L4.map(e=>opt(e.code,`${e.name} (${catById(e.cat).name})`,e.code===f.l4)).join("")}</select>`;
+  else if(k==="entity") ctl=`<select id="edv">${ENTITIES.map(e=>opt(e.id,e.name,e.id===f.entity)).join("")}</select>`;
+  else if(BOOL_KEYS.includes(k)) ctl=`<select id="edv">${opt("yes","Yes",f[k]===true)}${opt("no","No",f[k]===false)}${opt("unsure","Not sure",f[k]==="unsure")}</select>`;
+  else { const cur = k==="value"&&typeof f[k]==="number" ? String(f[k]) : isTBD(f[k])?"":String(show(k,f[k])); ctl=`<input id="edv" value="${esc(cur)}">`; }
+  return `<div class="fedit">${ctl}<button data-esave="${k}">Save</button><button class="x" data-ecancel>Cancel</button></div>`;
+}
+function bindEdits(){
+  const side=$("#side");
+  side.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{ if(S.busy) return; S.editing=b.dataset.edit; renderSide(); const x=$("#edv"); if(x){ x.focus(); if(x.select) x.select(); } });
+  side.querySelectorAll("[data-ecancel]").forEach(b=>b.onclick=()=>{ S.editing=null; renderSide(); });
+  const x=$("#edv"); if(x) x.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); side.querySelector("[data-esave]").click(); } if(e.key==="Escape"){ S.editing=null; renderSide(); } };
+  side.querySelectorAll("[data-esave]").forEach(b=>b.onclick=()=>saveEdit(b.dataset.esave, $("#edv").value));
+}
+async function saveEdit(k, raw){
+  if(S.busy) return;
+  const t=String(raw||"").trim(); let v;
+  if(k==="category"){ const e=l4ByCode(t); v=e?{cat:e.cat,l4:e.code}:null; }
+  else if(k==="value") v=parseMoney(t);
+  else if(NUM_KEYS.includes(k)){ const n=t.replace(/(\d),(\d{3})/g,"$1$2").match(/\d+/); v=n?+n[0]:/not sure|unsure/i.test(t)?"unsure":null; }
+  else if(BOOL_KEYS.includes(k)) v= t==="yes"?true:t==="no"?false:"unsure";
+  else if(k==="entity") v=t||null;
+  else v=t?cap1(t):null;
+  if(v===null||v===undefined||v===""){ const i=$("#edv"); if(i) i.style.borderColor="var(--bad)"; return; }
+  S.editing=null; S.pending=null; S.pendingCorr=null; S.offerImprove=null;
+  const done=applyChanges({[k]:v});
+  if(!done.length){ renderSide(); return; }
+  const cid=S.cid; S.busy=true; render();
+  try{ await afterChanges(done, cid); }
+  catch(e){ if(!(e instanceof Stale)) console.error(e); }
+  finally{ if(S.cid===cid){ S.busy=false; render(); } }
 }
 const sideNote=()=>`<div class="panel muted">The route and the details it needs come from fixed rules (editable under Rules). The AI only runs the conversation and writes the description.</div>`;
 
