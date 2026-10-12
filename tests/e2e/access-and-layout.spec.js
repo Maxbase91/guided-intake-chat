@@ -58,3 +58,27 @@ test.describe("phone layout", () => {
     expect(errors).toEqual([]);
   });
 });
+
+// with up to 9 steps the bar folds the others to circles: it never scrolls sideways, and only the current step is named
+for (const [label, viewport] of [["a laptop", { width: 1280, height: 800 }], ["a phone", { width: 375, height: 812 }]]) {
+  test(`the step bar fits on ${label} without scrolling`, async ({ page }) => {
+    await openApp(page, { viewport });
+    await say(page, "A new HR system to replace our payroll tool.");
+    const bar = page.locator("#stepbar");
+    await expect(bar).toHaveClass(/compact/);
+    expect(await bar.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+    await expect(bar.locator(".st.cur .nm")).toBeVisible();
+    expect(await bar.locator(".nm:not(.sr)").count()).toBe(1);
+    // the other names are still there for screen readers and on hover
+    await expect(bar).toContainText("Review");
+    await expect(bar.locator(".st").last()).toHaveAttribute("title", /Review/);
+  });
+}
+
+test("the side panel has no general note about rules and the AI", async ({ page }) => {
+  await openApp(page);
+  await expect(page.locator("#side")).not.toContainText("fixed rules");
+  await say(page, "We need 15 laptops for new joiners in Frankfurt.");
+  await expect(page.locator("#side")).not.toContainText("fixed rules");
+  await expect(page.locator("#side .route")).toHaveText("Catalogue order");
+});

@@ -135,6 +135,13 @@ button,input,select,textarea{font:inherit;color:inherit}
 .stepbar .st.cur{background:#fff;color:var(--navy);font-weight:600;box-shadow:var(--shadow)} .stepbar .st.cur i{background:var(--navy);border-color:var(--navy);color:#fff}
 .stepbar .st small{font-weight:400;color:var(--ink-3);font-size:11.5px}
 .stepbar .sep{flex:none;width:14px;height:1.5px;background:var(--line);align-self:center}
+.stepbar.compact{overflow:hidden}
+.stepbar.compact .sep{flex:1 1 auto;width:auto;min-width:6px}
+.stepbar.compact .st:not(.cur){padding:6px 0}
+.stepbar.compact .st.cur{flex:0 1 auto;min-width:0}
+.stepbar.compact .st.cur .nm{overflow:hidden;text-overflow:ellipsis;min-width:0}
+@media(max-width:600px){.stepbar.compact{gap:2px;padding:10px 10px}.stepbar.compact .st i{width:20px;height:20px;font-size:10.5px}.stepbar.compact .sep{min-width:3px}.stepbar.compact .st.cur{padding:5px 8px;gap:5px}.stepbar.compact .st.cur small{display:none}}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .stagemark{display:flex;align-items:center;gap:10px;margin:18px 0 14px;color:var(--ink-3);font-size:12px}
 .stagemark:before,.stagemark:after{content:"";flex:1;height:1px;background:var(--line)}
 .stagemark b{color:var(--navy);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
@@ -2902,13 +2909,15 @@ function render(){
 function renderStepbar(){
   const el=$("#stepbar");
   if(!S.det || !S.stageIds.length){ el.innerHTML=""; return; }
-  const cur=S.completed?"review":currentStage();
+  // up to four steps show their names; with more, the others fold to numbered circles (name on hover, still read out) so the bar never scrolls
+  const cur=S.completed?"review":currentStage(), compact=S.stageIds.length>4;
+  el.className="stepbar"+(compact?" compact":"");
   el.innerHTML=S.stageIds.map((id,i)=>{
     const st=stageById(id), done=id==="review"?!!S.submitted:(stageDone(id)&&id!==cur), isCur=id===cur;
     const left=isCur&&id!=="review"?stageFacts(id).filter(k=>!known(S.f[k])).length:0;
-    return `${i?'<span class="sep"></span>':""}<span class="st ${done?"done":""} ${isCur?"cur":""}"><i>${done?"✓":i+1}</i>${esc(st.name)}${left?` <small>${left} left</small>`:""}</span>`;
+    return `${i?'<span class="sep"></span>':""}<span class="st ${done?"done":""} ${isCur?"cur":""}" title="${esc(`Step ${i+1}: ${st.name}`)}"><i>${done?"✓":i+1}</i><span class="nm${compact&&!isCur?" sr":""}">${esc(st.name)}</span>${left?` <small>${left} left</small>`:""}</span>`;
   }).join("");
-  const c=el.querySelector(".cur"); if(c) el.scrollLeft=Math.max(0,c.offsetLeft-40);
+  const c=el.querySelector(".cur"); if(c && !compact) el.scrollLeft=Math.max(0,c.offsetLeft-40);
 }
 function recapHTML(m, expanded){
   const names=m.stages.map(id=>stageById(id).name);
@@ -3175,7 +3184,7 @@ function bind(){
 
 function renderSide(){
   const f=S.f, D=S.det;
-  if(!D){ $("#side").innerHTML=`<div class="panel"><div class="eyebrow">Your request</div><p class="muted" style="margin:8px 0 0">Start by describing what you need. The route and what's needed for it appear here.</p></div>${sideNote()}`; return; }
+  if(!D){ $("#side").innerHTML=`<div class="panel"><div class="eyebrow">Your request</div><p class="muted" style="margin:8px 0 0">Start by describing what you need. The route and what's needed for it appear here.</p></div>`; return; }
   const req=S.req||[], done=req.filter(k=>known(f[k])).length, pct=req.length?Math.round(done/req.length*100):100;
   // only the step being asked is open; the others fold to one line and open with a click.
   // Long answers sit under their label, cut to two lines, and show in full when clicked.
@@ -3198,7 +3207,7 @@ function renderSide(){
       <div class="prog"><i style="width:${pct}%"></i></div>
       <div class="muted">${done} of ${req.length} details for this route</div>
       ${groups}
-    </div>${sideNote()}`;
+    </div>`;
   bindEdits();
 }
 // editing a captured detail in the side panel
@@ -3239,7 +3248,6 @@ async function saveEdit(k, raw){
   catch(e){ if(!(e instanceof Stale)) console.error(e); }
   finally{ if(S.cid===cid){ S.busy=false; render(); } }
 }
-const sideNote=()=>`<div class="panel muted">The route and the details it needs come from fixed rules (editable under Rules). The AI only runs the conversation and writes the description.</div>`;
 
 /* =========================================================
    10. SETTINGS
@@ -3254,10 +3262,10 @@ function openSettings(){
     <div class="body">
       <section><div class="eyebrow">Route rules</div>
         <p class="muted" style="margin:6px 0 0">Owned by the business. Changes apply to the current request straight away.</p>
-        <label>Business-led sourcing up to (${CONFIG.currency}); above it procurement runs an RFP</label><input class="inp" type="number" id="t2" value="${T.quickQuoteMax}">
+        <label>Business-led sourcing up to (${CONFIG.currency}); above it procurement runs an RFP. Also the most a catalogue order can be when no quantity is given</label><input class="inp" type="number" id="t2" value="${T.quickQuoteMax}">
         <label>Material spend review from (${CONFIG.currency})</label><input class="inp" type="number" id="t3" value="${T.materialityMin}">
         <label>Quality needed before submitting (0–100); below it the chat offers an improvement round</label><input class="inp" type="number" id="t4" value="${T.qualityMin}">
-        <label>Answer score that triggers a tip (1–10)</label><input class="inp" type="number" id="t5" value="${T.answerTip}"></section>
+        <label>Tips for thin answers (new demand): give one tip when an answer rates this or lower out of 10. The rating is not shown; 0 switches tips off</label><input class="inp" type="number" id="t5" value="${T.answerTip}"></section>
       <section><div class="eyebrow">AI</div>
         ${hosted?`
           <label class="tgl"><input type="checkbox" id="aiToggle" ${aiOn?"checked":""}><span>Use AI for the conversation and the documents</span></label>

@@ -2,7 +2,7 @@
 
 A conversational procurement intake prototype. The user describes a need in plain language. Fixed rules pick one of three buying routes: catalogue, contract call-off (including external workers through the staffing contract) or new demand. New demand is business-led sourcing with three quotes up to €50,000 and procurement-led sourcing with an RFP above it and define exactly which details each route needs. The AI runs the conversation: one question at a time, with a concrete example, reading the answers. It never decides the route.
 
-The chat runs in stages shown in a step bar at the top (Your need → Timing and place → Supplier and approval → Risk and data → Success criteria → Review). Only stages with open questions for the chosen route appear. When a stage is finished, a short recap card shows what was captured, and the side panel groups the details by stage.
+The chat runs in stages shown in a step bar at the top (Your need → Timing and place → Supplier and approval → Risk and data → Success criteria → Review). Only stages with open questions for the chosen route appear. With more than four stages, the bar shows the others as numbered circles (their names on hover), so it never scrolls sideways. When a stage is finished, a short recap card shows what was captured, and the side panel groups the details by stage.
 
 Only what is really needed is asked. Sourcing, risk and contract details are asked only when relevant to the route and the answers so far. Cost centre, payment model, subcontracting, certifications, service levels, ownership of work and evaluation weights are not asked (they are picked up if the user mentions them).
 
