@@ -530,7 +530,7 @@ const BLANK_FACTS = {summary:null,category:null,demand_type:null,item:null,quant
   volume:null,support_needs:null,data_details:null,criticality:null,subcontracting:null,pricing_model:null,service_levels:null,ip_ownership:null,performance:null,role:null,headcount:null,skills:null,day_rate:null,system_access:null,renewal_change:null,wants_renewal:null};
 let CONV_SEQ=0;
 const S = fresh();
-function fresh(){ return {cid:++CONV_SEQ, curStage:null, stageIds:[], recapped:{}, req:[], challenged:{}, challengeCount:0, flags:[], pending:null, thinChecked:{}, thinCount:0, offerImprove:null, improveRound:0, improveDone:false, belowThresholdOk:false, derived:{}, offChecked:{}, suggest:{}, sugAccepted:{}, checkRound:0, checkWait:false, l4Initial:null, completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
+function fresh(){ return {cid:++CONV_SEQ, curStage:null, stageIds:[], recapped:{}, req:[], challenged:{}, challengeCount:0, flags:[], pending:null, thinChecked:{}, thinCount:0, offerImprove:null, improveRound:0, improveDone:false, sdShown:-1, holdScroll:false, belowThresholdOk:false, derived:{}, offChecked:{}, suggest:{}, sugAccepted:{}, checkRound:0, checkWait:false, l4Initial:null, completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
 
 /* =========================================================
    5. RULES ENGINE (deterministic)
@@ -1020,6 +1020,7 @@ function cleanReply(t){
 class Stale extends Error{}
 const guard = cid => { if(S.cid!==cid) throw new Stale(); };   // the user started a new conversation meanwhile
 async function handleUser(text){
+  S.holdScroll=false;
   text=text.trim(); if(!text||S.busy) return;
   const cid=S.cid;
   try{ await handleTurn(text, cid); }
@@ -2239,7 +2240,7 @@ async function refineSD(text){
   if(S.cid!==cid) return;
   S.busy=false; render();
 }
-function submit(){
+function submit(){ S.holdScroll=false;
   if(!S.sd) return;
   const id="REQ-"+Math.floor(1e5+Math.random()*9e5), ch=CHANNELS[S.override||S.det.route].name;
   S.submitted=id; S.brdEdited=null; S.offerImprove=null; S.choices=[];
@@ -2265,7 +2266,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&
 const md=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
 const money=v=>v==null?"Unknown":new Intl.NumberFormat("en-GB",{style:"currency",currency:CONFIG.currency,maximumFractionDigits:0}).format(v);
 const fmtDate=d=>{const x=new Date(d);return isNaN(x)?d:x.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});};
-const show=(k,v)=>isTBD(v)?"To be determined":k==="entity"&&entityById(v)?entityById(v).name:k==="l4"&&l4ByCode(v)?`${l4ByCode(v).name} (${v})`:v===true?"Yes":v===false?"No":v==="unsure"?"Not sure":k==="value"?money(Number(v))+(S.f.value_is_estimate?" (est.)":""):["quantity","headcount"].includes(k)?fmtN(v):cap1(String(v));
+const show=(k,v)=>v==="Confirmed"&&BUNDLES[k]?(BUNDLES[k].map(([,x])=>givenText(S.f[x])).filter(Boolean).join("; ")||"Confirmed"):isTBD(v)?"To be determined":k==="entity"&&entityById(v)?entityById(v).name:k==="l4"&&l4ByCode(v)?`${l4ByCode(v).name} (${v})`:v===true?"Yes":v===false?"No":v==="unsure"?"Not sure":k==="value"?money(Number(v))+(S.f.value_is_estimate?" (est.)":""):["quantity","headcount"].includes(k)?fmtN(v):cap1(String(v));
 
 const TRIES=[
   ["Catalogue","We need 15 laptops for new joiners in Frankfurt."],
@@ -2296,7 +2297,12 @@ function render(){
   $("#send").disabled=S.busy;
   renderStepbar();
   renderSide();
-  requestAnimationFrame(()=>box.scrollTop=box.scrollHeight);
+  // a newly shown service description stays in view from its top; the next user message resumes normal scrolling
+  const sdIdx=S.msgs.map((m,i)=>m.kind==="sd"?i:-1).filter(i=>i>=0).pop();
+  if(sdIdx!=null && sdIdx>S.sdShown){ S.sdShown=sdIdx; S.holdScroll=true; }
+  requestAnimationFrame(()=>{ const card=S.holdScroll&&box.querySelector("#sdcard");
+    if(card) box.scrollTop=card.getBoundingClientRect().top-box.getBoundingClientRect().top+box.scrollTop-8;
+    else box.scrollTop=box.scrollHeight; });
 }
 function renderStepbar(){
   const el=$("#stepbar");
@@ -2322,7 +2328,7 @@ function msgHTML(m,i,lastRec,lastSd){
   if(m.kind==="stage"){ const st=stageById(m.stage); return `<div class="stagemark"><span><b>Step ${m.idx} of ${m.total} · ${esc(st.name)}</b><br>${esc(st.intro)}</span></div>`; }
   if(m.kind==="recap"){ const lastRecap=S.msgs.map((x,j)=>x.kind==="recap"?j:-1).filter(j=>j>=0).pop(); return `<div class="m a"><div class="av">G</div>${recapHTML(m, i===lastRecap)}</div>`; }
   if(m.kind==="rec") return `<div class="m a"><div class="av">G</div><div class="wide">${i===lastRec?recHTML(m.rec):`<div class="card old">Earlier recommendation: ${esc(CHANNELS[m.rec.route].name)}. Updated below.</div>`}</div></div>`;
-  if(m.kind==="sd")  return i===lastSd?`<div class="m a"><div class="av">G</div><div class="wide">${sdHTML()}</div></div>`:"";
+  if(m.kind==="sd")  return i===lastSd?`<div class="m a" id="sdcard"><div class="av">G</div><div class="wide">${sdHTML()}</div></div>`:"";
   return `<div class="m a"><div class="av">G</div><div class="bub${m.check?" qchk":""}">${md(m.text)}</div></div>`;
 }
 function recHTML(R){
