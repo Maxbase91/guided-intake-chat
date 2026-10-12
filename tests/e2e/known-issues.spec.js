@@ -6,14 +6,6 @@ const { openApp, say, choose, idle, lastAssistant, choices, answerUntilDone, sid
 
 const route = (page) => page.locator("#side .route");
 
-test("a software request that mentions a hardware word is not offered the hardware from the catalogue", async ({ page }) => {
-  test.fail(true, "category keyword ties go to the first category listed (IT hardware), so 'laptop' outweighs 'software'");
-  await openApp(page);
-  await say(page, "Software to manage our laptop fleet, 20k");
-  await expect(page.locator("#msgs")).not.toContainText("is in our catalogue", { timeout: 2000 });
-  await expect(route(page)).not.toHaveText("Catalogue order", { timeout: 2000 });
-});
-
 test("acronyms keep their capitals in generated text", async ({ page }) => {
   test.fail(true, "sentence builders lower-case the first letter of category names and answers ('it hardware', 'hR operations')");
   await openApp(page);

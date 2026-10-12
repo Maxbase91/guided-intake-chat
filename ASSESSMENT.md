@@ -2,6 +2,13 @@
 
 Reviewed at commit `c4d3e98`, October 2026, and updated for commit `7baf311` and the catalogue fix (see the next two sections). The review covered three things: a read of `index.html`, `api/llm.js`, `vercel.json` and the README; running the app locally; and the automated test suite added with this assessment (`npm test`).
 
+## Update: category ties fixed (finding 21)
+
+- **Ties:** two categories with the same number of keywords no longer go to whichever is listed first (IT hardware). The category named last in the head of the first message wins: the words before "for", "to", "with", "that" or a comma (`bestCategory`). "Software to manage our laptop fleet" is software, "a transaction monitoring system" is software and "laptops for the software team" is IT hardware.
+- **Verbs:** a goods keyword right after "to" no longer counts ("a tool to monitor alerts", "a service to screen clients").
+- **Keyword:** the business process keyword "sanctions screening" is now "sanctions", so "a service to screen clients against sanctions lists" is a business process service. Before, it fell through to the consulting fallback and was offered the consulting framework.
+- **Tests:** the known-issue test is a regular test now, plus a 9-case category rule table in `routes.spec.js`.
+
 ## Update: catalogue matching fixed (finding 1)
 
 - **Whole words:** catalogue and category keywords now match whole words, plurals included (`kwHit`). "pens" no longer matches inside "expenses", "monitor" inside "monitoring", or "screen" inside "screening". A trailing `*` marks the few keywords that are deliberate stems (`consult*`, `develop*`, `telecom*`, …).
@@ -9,7 +16,7 @@ Reviewed at commit `c4d3e98`, October 2026, and updated for commit `7baf311` and
 - **Value:** the catalogue is offered only when the value fits the catalogue price (`catalogueFits`). That means at most twice price × quantity, or, with no quantity yet, no more than the business-led sourcing threshold. "A tool to monitor sanctions alerts, 400k" is no monitor order.
 - **Effect on categories:** a sanctions screening service is now "Business process services" instead of "IT hardware". It no longer gets "a purchase of goods, out of scope" in the outsourcing check.
 - **Tests:** the three known-issue tests are regular tests in `tests/e2e/routes.spec.js`, plus a keyword rule table, a value-fit rule table and two conversations.
-- **Still open (finding 21):** category ties go to the first category in the list. "Software to manage our laptop fleet, 20k" is still classed as IT hardware and offered a laptop. This is recorded in `known-issues.spec.js`.
+- **Found while fixing (finding 21, since fixed):** category ties went to the first category in the list, so "Software to manage our laptop fleet, 20k" was classed as IT hardware and offered a laptop.
 
 ## Update: commit 7baf311 (outsourcing rework)
 
@@ -62,7 +69,7 @@ Three things blocked real users. The first is now fixed:
 | Suite | Result |
 | --- | --- |
 | API (`tests/api`, node:test) | 18 passed, 1 known bug recorded as `todo` |
-| End-to-end (`tests/e2e`, Playwright, Chromium) | 50 passed: 43 behaviour tests and 7 known-issue tests that fail as expected |
+| End-to-end (`tests/e2e`, Playwright, Chromium) | 51 passed: 45 behaviour tests and 6 known-issue tests that fail as expected |
 | Run time | About a minute. Needs no keys and no network. |
 
 **Covered:**
@@ -121,7 +128,7 @@ Each finding says how it was confirmed:
 | 12 | **Groq JSON-mode fallback is unreachable for "not supported" errors.** The first retry branch keeps JSON mode on and fails, so the model is skipped. | `callGroq` (`api/llm.js` 143–147) | Test (`todo`) |
 | 13 | **Accessibility basics are missing.** The input has no label. The message list has no `aria-live`/`role="log"`. The drawers have no dialog role, focus trap or Escape key. Each render rebuilds the whole chat with `innerHTML`. | `index.html` 260–263, 2643, 2858, 2962 | Code |
 | 14 | **Compliance flags depend on AI extraction.** Any message can overwrite `personal_data`, `tech_service`, `in_house` or `value`. The output says "Not outsourcing" and has a disclaimer. Since 7baf311 the per-country matrix is gone and the one remaining future reference (EBA/GL/2026/09) is verified, but it will need updating once its application date is set. | `mergeFacts`, `RULESETS` | Code |
-| 21 | **Category ties go to the first category in the list.** With one keyword each, IT hardware wins, so "Software to manage our laptop fleet, 20k" is classed as goods and offered a laptop from the catalogue. "A dashboard tool to monitor sanctions alerts" and "a service to screen clients" are also classed as IT hardware. Their 300k–400k budgets now keep them off the catalogue, but the outsourcing check still treats them as goods. | `offlineRead` category scoring, `catFromText` | Test |
+| 21, **fixed** | **Category ties go to the first category in the list.** With one keyword each, IT hardware wins, so "Software to manage our laptop fleet, 20k" is classed as goods and offered a laptop from the catalogue. "A dashboard tool to monitor sanctions alerts" and "a service to screen clients" are also classed as IT hardware. Their 300k–400k budgets now keep them off the catalogue, but the outsourcing check still treats them as goods. | `offlineRead` category scoring, `catFromText` | Test |
 
 ### Low
 
@@ -152,7 +159,7 @@ Each finding says how it was confirmed:
    - Done: offer the catalogue only for the item's own demand type, and only when the value fits the catalogue price.
    - Run AI-returned amounts through `parseMoney`.
    - Done: the matching tests moved from `known-issues.spec.js` to `routes.spec.js`.
-   - Break category ties on more than list order (finding 21).
+   - Done: break category ties on the head noun of the request, not list order (finding 21).
 2. **Lock down the server.**
    - Require `ACCESS_CODE` and send it as a header only, compared with `timingSafeEqual`.
    - Add a per-IP rate limit, for example Vercel WAF or Upstash.

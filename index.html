@@ -305,7 +305,7 @@ const CATEGORIES = [
   {id:"market-data", name:"Market data",                   type:"software", kw:["market data","data feed","terminal","ratings data"]},
   {id:"training",    name:"Training and learning",         type:"services", kw:["training","course","workshop","coaching","certification"]},
   {id:"office",      name:"Office supplies and furniture", type:"goods",    kw:["paper","stationery","toner","chair","desk","supplies","furniture"]},
-  {id:"bpo",         name:"Business process services",    type:"services", kw:["kyc","client onboarding","periodic review","financial crime","sanctions screening","transaction monitoring","payments operations","payment processing","reconciliation","settlement operations","invoice processing","accounts payable","payroll service","payroll processing","back office","call centre","contact centre","kyc operations","process our","processing of","claims handling","document processing"]},
+  {id:"bpo",         name:"Business process services",    type:"services", kw:["kyc","client onboarding","periodic review","financial crime","sanctions","transaction monitoring","payments operations","payment processing","reconciliation","settlement operations","invoice processing","accounts payable","payroll service","payroll processing","back office","call centre","contact centre","kyc operations","process our","processing of","claims handling","document processing"]},
   {id:"telecom",     name:"Telecom",                       type:"services", kw:["mobile contract","telecom*","network*","sim card","connectivity"]}
 ];
 const DEMAND_TYPES = {goods:"Goods", services:"Services", software:"Software", contingent_labour:"External workers"};
@@ -559,7 +559,24 @@ const hasSupplier = f => known(f.supplier) && !/^(none|no|no preference|not sure
 const yes = v => v===true || /^y/i.test(String(v));
 const userText = () => " "+S.msgs.filter(m=>m.role==="user").map(m=>m.text).join(" ").toLowerCase()+" ";
 // whole words with an optional plural, so "pens" no longer hits "expenses" or "screen" hits "screening"; "consult*" is a stem
-const kwHit = (t, k) => new RegExp(k.endsWith("*") ? "\\b"+k.slice(0,-1) : "\\b"+k+"(?:e?s)?\\b").test(t);
+const kwRe = (k, flags) => new RegExp(k.endsWith("*") ? "\\b"+k.slice(0,-1) : "\\b"+k+"(?:e?s)?\\b", flags);
+const kwHit = (t, k) => kwRe(k).test(t);
+// the category with the most keywords in the text. A goods noun right after "to" is a verb ("a tool to monitor alerts"), so it does not count.
+// A tie goes to the category named last in the head of the first message, the words before "for", "to", "with", "that" or a comma:
+// the head noun ends that phrase ("software to manage our laptops" is software, "a transaction monitoring system" is a system).
+function bestCategory(t, first=t){
+  const sep=first.search(/\s(?:for|to|with|that|which|as)\s|[,.;:!?]/), head=sep<0?first.length:sep;
+  let best=null, score=0, key=-1;
+  for(const c of CATEGORIES){
+    let s=0, k2=-1;
+    for(const k of c.kw){
+      const ends=[...t.matchAll(kwRe(k,"g"))].filter(m=>!(c.type==="goods" && /\bto $/.test(t.slice(0,m.index)))).map(m=>m.index+m[0].length);
+      if(ends.length){ s++; k2=Math.max(k2, ...ends.filter(e=>e<=head)); }
+    }
+    if(s>score || (s && s===score && k2>key)){ best=c; score=s; key=k2; }
+  }
+  return best;
+}
 // only items of the request's own demand type: no stationery for a SaaS tool
 const catalogueMatches = f => { const t=userText(); return CATALOGUE.filter(i=>i.type===f.demand_type && i.kw.some(k=>kwHit(t,k))); };
 // a stated budget the catalogue price cannot explain means something else is being bought: at most twice price × quantity,
@@ -1850,8 +1867,8 @@ function offlineRead(text, asked){
   const f=S.f, t=text.toLowerCase(), all=userText();
   if((!asked || asked==="need") && known(f.category) && f.demand_type!=="contingent_labour"){ f.summary=f.summary||firstSentence(text); if(!known(f.item)) f.item=itemFrom(text); }
   if(!known(f.category) || asked==="need"){
-    let best=null, score=0;
-    for(const c of CATEGORIES){ const s=c.kw.filter(k=>kwHit(all,k)).length; if(s>score){score=s;best=c;} }
+    const first=S.msgs.find(m=>m.role==="user");
+    let best=bestCategory(all, " "+(first?first.text:"").toLowerCase());
     if(/contractor|freelance|temporary staff|interim|day rate|\ba day\b|per day/.test(all) && /developer|engineer|analyst|manager|designer|tester|contractor|freelance|interim/.test(all)) best=catById("contingent");
     if(best && best.id==="cloud" && /\b(hr|payroll|crm|erp|finance|accounting|procurement|ticketing)\b[^.]*\b(system|tool|platform|software|application)\b/.test(all)) best=catById("software");
     if(best){ f.category=best.id; f.demand_type=best.type; }

@@ -138,16 +138,34 @@ for (const [text, category] of [
   ["A SaaS tool to track travel expenses for 400k", "software"],         // "pens" inside "expenses"
   ["A transaction monitoring system for AML, budget 400k", "software"],  // "monitor" inside "monitoring"
   ["Sanctions screening service for 3 years, around 300k", "bpo"],       // "screen" inside "screening"
-  ["A dashboard tool to monitor sanctions alerts, 400k", null],          // a whole word, but 400k is no monitor order
+  ["A dashboard tool to monitor sanctions alerts, 400k", "software"],    // "monitor" as a verb
+  ["Software to manage our laptop fleet, 20k", "software"],              // a tie between "software" and "laptop"
 ]) {
   test(`"${text}" is not offered from the catalogue`, async ({ page }) => {
     await openApp(page);
     await say(page, text);
     await expect(page.locator("#msgs")).not.toContainText("is in our catalogue");
     await expect(page.locator("#side .route")).not.toHaveText("Catalogue order");
-    if (category) expect(await page.evaluate(() => S.f.category)).toBe(category);
+    expect(await page.evaluate(() => S.f.category)).toBe(category);
   });
 }
+
+test("category ties go to the head noun of the request, and a goods noun after 'to' is a verb", async ({ page }) => {
+  await openApp(page);
+  const CASES = {
+    "Software to manage our laptop fleet": "software",
+    "A dashboard tool to monitor sanctions alerts": "software",
+    "A service to screen clients against sanctions lists": "bpo",
+    "A transaction monitoring system for AML": "software",
+    "Sanctions screening software for 200 users": "software",
+    "Sanctions screening service for 3 years": "bpo",
+    "Laptops for the software team": "it-hardware",
+    "A consultant to assess our KYC process": "consulting",
+    "We need a new chair for the meeting room": "office",
+  };
+  const got = await page.evaluate((texts) => Object.fromEntries(texts.map((t) => [t, (bestCategory(` ${t.toLowerCase()} `) || {}).id])), Object.keys(CASES));
+  expect(got).toEqual(CASES);
+});
 
 test("a budget the catalogue price explains stays a catalogue order", async ({ page }) => {
   await openApp(page);

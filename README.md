@@ -85,7 +85,7 @@ The end-to-end tests start three local servers: offline (no key), AI (mock provi
 
 Thresholds sit in `CONFIG.thresholds` and can also be changed live in the **Rules** panel. Catalogue, contracts and preferred suppliers sit in section 2 of the script.
 
-Category and catalogue keywords match whole words, plurals included ("monitor" matches "monitors" but not "monitoring"). End a keyword with `*` to match it as a stem (`consult*` matches "consultant" and "consulting"). A catalogue item is offered only for its own demand type (`goods` or `software`), and only when the stated value fits its price: at most twice price × quantity, or, with no quantity yet, no more than the business-led sourcing threshold.
+Category and catalogue keywords match whole words, plurals included ("monitor" matches "monitors" but not "monitoring"). End a keyword with `*` to match it as a stem (`consult*` matches "consultant" and "consulting"). The category with the most keywords wins. On a tie, the category named last before the first "for", "to", "with" or comma wins, because that's the thing being bought ("software to manage our laptops" is software). A goods keyword right after "to" is read as a verb and doesn't count. A catalogue item is offered only for its own demand type (`goods` or `software`), and only when the stated value fits its price: at most twice price × quantity, or, with no quantity yet, no more than the business-led sourcing threshold.
 
 ## Answer checks against nonsense and repeats
 
