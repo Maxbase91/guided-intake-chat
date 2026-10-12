@@ -42,7 +42,41 @@ The page checks `/api/llm` on load. If the server has a key, the pill shows **AI
 
 ## Run locally
 
-Open `index.html` in a browser and paste a key into `CONFIG.keys` at the top of the script, or into the **Rules** panel (key fields only appear when no server is found). Do not commit a key.
+Requires Node 18.17 or later.
+
+```bash
+npm install
+npm start                      # http://localhost:3000, offline rules (no key)
+GEMINI_API_KEY=... npm start   # same, with AI through api/llm.js (any of the Vercel variables work)
+npm run start:mock             # AI mode with fake Gemini/Groq/Mistral answers: no key, no network
+```
+
+`scripts/dev-server.js` serves `index.html` and runs `api/llm.js` the way Vercel does. Use `PORT=4000 npm start` for another port.
+
+You can also open `index.html` straight from disk and paste a key into `CONFIG.keys` at the top of the script, or into the **Rules** panel (key fields only appear when no server is found). Do not commit a key.
+
+## Tests
+
+```bash
+npx playwright install chromium   # once
+npm test                          # API tests, then end-to-end tests (about a minute)
+npm run test:api                  # api/llm.js only (node:test, provider calls stubbed)
+npm run test:e2e                  # browser tests (Playwright, Chromium)
+npx playwright show-report test-results/html
+```
+
+The end-to-end tests start three local servers: offline (no key), AI (mock providers) and gated (mock providers plus `ACCESS_CODE=demo-code`). No real key or network is needed. The clock is fixed at 12 October 2026, so date checks are deterministic.
+
+| File | What it covers |
+| --- | --- |
+| `tests/api/llm.test.js` | Status and verify endpoints, access code, request validation, provider order, fallback on rate limits and errors, cooldown, forced provider, live check |
+| `tests/e2e/routes.spec.js` | One full conversation per route (catalogue, call-off, external workers, new demand under and over €50,000), result cards, JSON and Word downloads, submit |
+| `tests/e2e/conversation.spec.js` | Corrections in words and in the side panel, unclear corrections, off-topic answers, dates in the past, skipping, Rules thresholds, route override, improvement round, inline edits |
+| `tests/e2e/ai-mode.spec.js` | AI through the server: provider label, Gemini → Groq fallback, all providers down, internal field names hidden, AI off-topic check, AI toggle, `?ai=` |
+| `tests/e2e/access-and-layout.spec.js` | Access-code gate and the phone layout |
+| `tests/e2e/known-issues.spec.js` | Defects found in the assessment (see `ASSESSMENT.md`), marked `test.fail()`: they turn red ("unexpectedly passed") once fixed, then the marker can be removed |
+
+`scripts/mock-providers.js` answers in the shapes the app asks for. To exercise failures, the AI server accepts `POST /__mock` with `{"gemini":"429","groq":"500","coldStart":true}` (mock mode only).
 
 ## Change the rules
 
