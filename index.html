@@ -1126,7 +1126,7 @@ function splitCombined(asked, text){
 function fillUnknown(o){ for(const [k,v] of Object.entries(o)) if(known(v) && !known(S.f[k])) S.f[k]=v; }
 const firstSentence = t => { const x=t.split(/(?<=[.!?])\s+/)[0].trim(); return x.length>200?x.slice(0,197)+"…":x; };
 function itemFrom(text){
-  let x=text.split(/[.;\n]/)[0].replace(/^\s*(?:hi|hello)[,!]?\s*/i,"").replace(/^(?:please\s+)?(?:we|i)(?:'d| would)?\s+(?:would like|are looking for|am looking for|need|want|like)\s+(?:t?o (?:buy|get|order|have|procure)\s+)?/i,"").replace(/^please\s+/i,"").replace(/^(?:need|looking for)\s+/i,"");
+  let x=text.split(/[.;:\n]/)[0].replace(/^\s*(?:hi|hello)[,!]?\s*/i,"").replace(/^(?:please\s+)?(?:we|i)(?:'d| would)?\s+(?:would like|are looking for|am looking for|need|want|like)\s+(?:t?o (?:buy|get|order|have|procure)\s+)?/i,"").replace(/^please\s+/i,"").replace(/^(?:need|looking for)\s+/i,"");
   x=x.split(/,|\s+(?:to replace|because|since|by|in|from|starting|with a budget|at around|around|about)\s+/i)[0];
   if(!/\b(?:ticket|licen[cs]e|subscription|membership|seat|place)s?\s+for\b/i.test(x)) x=x.split(/\s+for\s+/i)[0];
   x=x.replace(/^\d[\d,]*\s+(?:x\s+)?/,"").trim();
