@@ -6,13 +6,6 @@ const { openApp, say, choose, idle, lastAssistant, choices, answerUntilDone, sid
 
 const route = (page) => page.locator("#side .route");
 
-test("acronyms keep their capitals in generated text", async ({ page }) => {
-  test.fail(true, "sentence builders lower-case the first letter of category names and answers ('it hardware', 'hR operations')");
-  await openApp(page);
-  await say(page, "We need 15 laptops for new joiners in Frankfurt.");
-  await expect(page.locator("#msgs")).not.toContainText("fits it hardware", { timeout: 2000 });
-});
-
 test("an answer of the wrong kind is not recorded as the budget approval", async ({ page }) => {
   test.fail(true, "offline reading turns any answer to the approval question into yes/no/partly");
   await openApp(page);

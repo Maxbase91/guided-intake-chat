@@ -130,3 +130,15 @@ test("an amount the AI returns as text ('€400k') is read as 400,000", async ({
   await say(page, "A new HR system to replace our payroll tool.");
   await expect(page.locator("#side .route")).toHaveText("New demand: procurement-led sourcing", { timeout: 2000 });
 });
+
+test("a place in the answer about where data is stored does not become the work location", async ({ page, request }) => {
+  await openApp(page, { kind: "ai" });
+  await say(page, HR);
+  await mock(request, { nextChat: { facts: { personal_data: true, data_details: "employee names and salaries" } } });
+  await say(page, "About 400k");
+  await expect(lastAssistant(page)).toContainText("where will that data");
+  // as in a live run: the AI also took "in the EU" as the location of the work
+  await mock(request, { nextChat: { facts: { location: "EU" } } });
+  await say(page, "in the EU");
+  expect(await page.evaluate(() => [S.f.data_details, S.f.location])).toEqual(["employee names and salaries, stored in the EU", null]);
+});

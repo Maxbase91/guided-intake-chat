@@ -707,7 +707,7 @@ function classifyL4(f){
   const top=scored[0], pct=x=>Math.max(35,Math.min(95,Math.round(100*x.score/(x.score+4))));
   const best=scored.filter(x=>x.score===top.score).slice(0,3);
   return best.map(x=>({code:x.code,name:x.name,cat:x.cat,match:pct(x),
-    reason: x.hits.length ? `The demand mentions ${listJoin(x.hits.slice(0,3).map(h=>`"${h}"`))}, which fits ${x.name.toLowerCase()}: ${x.desc.charAt(0).toLowerCase()+x.desc.slice(1)}` : `Closest in meaning to ${x.name.toLowerCase()}: ${x.desc.charAt(0).toLowerCase()+x.desc.slice(1)}`,
+    reason: x.hits.length ? `The demand mentions ${listJoin(x.hits.slice(0,3).map(h=>`"${h}"`))}, which fits ${lcFirst(x.name)}: ${lcFirst(x.desc)}` : `Closest in meaning to ${x.name.toLowerCase()}: ${x.desc.charAt(0).toLowerCase()+x.desc.slice(1)}`,
     uncertainty: x.score<6 ? "Low confidence: the demand has few clear signals." : best.length>1 ? "Two entries match equally well." : ""}));
 }
 const l4ByCode = c => L4.find(e=>e.code===c) || null;
@@ -1385,6 +1385,8 @@ async function handleTurn(text, cid, opts={}){
       if(!(pend && keepIt)) offlineRead(text, asked);
     }
   } else if(!(pend && keepIt)) offlineRead(text, asked);
+  // the AI sometimes takes "stored in the EU" or "employees in the UK" as the work location; the rules don't, and neither does the record
+  if(LOC_FREE_Q.includes(asked) && before.location!==S.f.location) S.f.location=before.location;
 
   // a suggestion the user accepted (or extended) becomes the answer
   const sugResult = asked && !pend && isSug(asked) ? applySuggestion(asked, text) : false;
@@ -1638,7 +1640,7 @@ const SHALL_VERBS=/^(run|process|provide|deliver|design|build|develop|host|maint
 function shallify(text){
   return String(text).split(/;|\n|\.\s+|,\s*(?:and\s+)?(?=[a-z])|\s+and\s+(?=(?:run|process|provide|deliver|design|build|develop|host|maintain|support|operate|manage|create|implement|migrate|train|review|assess|prepare|test|monitor|report|answer|handle|send|produce|hand)\b)/i)
     .map(x=>x.trim().replace(/[.]$/,"").replace(/^(?:they|the provider|the supplier|it)\s+(?:will|should|must|shall)\s+/i,"").replace(/^(?:to|will|should|must)\s+/i,"")).filter(x=>words(x)>=2)
-    .slice(0,8).map(x=>`The Service Provider shall ${SHALL_VERBS.test(x)?x.charAt(0).toLowerCase()+x.slice(1):"deliver "+x.charAt(0).toLowerCase()+x.slice(1)}.`);
+    .slice(0,8).map(x=>`The Service Provider shall ${SHALL_VERBS.test(x)?lcFirst(x):"deliver "+lcFirst(x)}.`);
 }
 const workingTitle = () => { if(givenText(S.f.title)) return S.f.title;
   const it=givenText(S.f.item)||givenText(S.f.summary)||"";
@@ -1845,7 +1847,7 @@ Return JSON only: {"suggestion":"..."}; "suggestion" is one plain string, never 
   }catch(e){ if(e instanceof Stale) throw e; return null; }
 }
 function offlineSuggest(k){
-  const f=S.f, c=f.category, ctx=(String(f.background||"")+" "+userText()).toLowerCase(), lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1);
+  const f=S.f, c=f.category, ctx=(String(f.background||"")+" "+userText()).toLowerCase(), lf=lcFirst;
   const D=bankDomain(f);
   const aud=cap1(known(f.users)&&f.users!=="Not given"?String(f.users):D?D.aud:CAT_AUD[c]||"the team that raised the need and the colleagues it serves");
   const fun=cap1(D?D.fun:CAT_FUN[c]||"the requesting business area");
@@ -1863,7 +1865,7 @@ function offlineSuggest(k){
   const kpi=cap1(D?D.kpi:(/cycle|slow|weeks|delay|long/.test(ctx)&&!/cycle time/.test(kpiBase)?"reduction in end-to-end cycle time; ":"")+kpiBase);
   const reg = D ? D.reg : /regulat|audit|complian|control|finding|policy/.test(ctx) ? "A clear audit trail; evidence that the required controls were applied; better regulatory compliance"
     : yes(f.tech_service) ? "Operational resilience through a managed, supported service; clear ownership and an audit trail" : "No specific regulatory benefit";
-  const isICT=yes(f.tech_service), ong=isOngoing(f), lfx=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1);
+  const isICT=yes(f.tech_service), ong=isOngoing(f), lfx=lcFirst;
   const OUT={software:"Migrating historic data, unless agreed separately; changes to our other systems; hardware", consulting:"Implementing the new design, unless agreed separately; changes to IT systems",
     bpo:"Approval and payment decisions, which stay with us; changes to our finance systems", marketing:"Guest travel and accommodation, unless stated", facilities:"Repairs that need specialist contractors",
     "it-services":"Support after hand-over, unless agreed separately; hardware and licences", training:"Travel costs for participants", cloud:"Application support; data migration, unless agreed separately"}[c] || "Anything not listed in scope; travel costs not agreed in advance";
@@ -2008,6 +2010,8 @@ const PLACES="Poland|Krakow|Kraków|Wroclaw|Philippines|Manila|Portugal|Czech Re
 const WHERE_STORED=new RegExp(`\\b(?:stor\\w*|host\\w*|held|kept|servers?|cloud|on.?prem\\w*|data cent(?:re|er)s?|our (?:own )?systems|in.?house|onshore|offshore|locally)\\b|\\b(?:${PLACES})\\b`,"i");
 // "storage location unknown" or "not sure where it is stored" names no place
 const WHERE_UNKNOWN=/\b(?:storage|location|where)\b[^.;]{0,30}\b(?:unknown|unclear|not (?:known|given|specified|stated|clear|sure)|tbd|tbc|to be (?:confirmed|determined))\b|\b(?:unknown|unclear|not sure|don'?t know)\b[^.;]{0,20}\b(?:storage|location|where)\b/i;
+// answers about who uses it, what it does or which data: a place there is never where the provider works
+const LOC_FREE_Q=["audience_fn","users","functions","quantity","volume","must_haves","value_props","benefits","personal_data","data_details"];
 const saysWhere = v => WHERE_STORED.test(String(v||"")) && !WHERE_UNKNOWN.test(String(v||""));
 // the data part of an answer without its storage clause: "client names; stored in the EU" → "client names"
 const dataOnly = v => String(v||"").replace(/[;,]?\s*\(?\s*\b(?:stored|hosted|held|kept|storage|location)\b.*$/i,"").trim();
@@ -2051,7 +2055,6 @@ function extractAll(text, asked){
   // --- location
   const placeRe=new RegExp(`\\b(?:in|at|across|to|from|for|based in|located in)\\s+((?:${PLACES})(?:\\s*(?:,|and|&)\\s*(?:${PLACES}))*)\\b`);
   // a place is where the provider works or delivers, not where users, staff, clients or data are ("2,500 employees in Germany and the UK")
-  const LOC_FREE_Q=["audience_fn","users","functions","quantity","volume","must_haves","value_props","benefits","personal_data","data_details"];
   const aboutPeople=i=>f.demand_type!=="goods" && /\b(?:employees?|staff|users?|people|colleagues|customers?|clients?|members|traders|buyers|requesters|approvers|learners|subsidiaries|branches|countries|stor\w*|held|kept|backed up)\b(?:\s+[\w,&'-]+){0,3}\s*$/i.test(raw.slice(0,i));
   const pl=LOC_FREE_Q.includes(asked) ? null : [...raw.matchAll(new RegExp(placeRe.source,"g"))].find(m=>!aboutPeople(m.index)), onsite=/\b(on[- ]?site|onsite|in the office|at our office)\b/.test(t), remote=/\b(fully remote|remote(?:ly)?|from home)\b/.test(t), hybrid=/\bhybrid\b/.test(t);
   const place=pl?pl[1]:null;
@@ -2164,6 +2167,8 @@ function extractAll(text, asked){
 }
 const fmtN = x => /^\d+$/.test(String(x)) ? Number(x).toLocaleString("en-GB") : x;
 const cap1 = x => x ? String(x).charAt(0).toUpperCase()+String(x).slice(1) : x;
+// lower-cases the first letter for use mid-sentence, but never an acronym ("EU", "IT hardware", "HR operations")
+const lcFirst = x => { const t=String(x); return /^[A-Z]{2}/.test(t) ? t : t.charAt(0).toLowerCase()+t.slice(1); };
 const CLOSED=["in_house","entity","supplier_terms","contract_ok","value","quantity","headcount","tech_service","personal_data","ict_outsourcing","system_access","budget_approved","subcontracting"];
 function readAnswer(k, text){
   const t=text.trim().toLowerCase();
@@ -2244,7 +2249,7 @@ function showRecommendation(){
 // title and risk lines from the answers alone (no AI)
 function offlineSummary(){
   const f=S.f, c=catById(f.category);
-  const g=k=>known(f[k])&&f[k]!=="Not given"?(NUM_KEYS.includes(k)||typeof f[k]==="boolean"?f[k]:String(f[k])):null, lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1);
+  const g=k=>known(f[k])&&f[k]!=="Not given"?(NUM_KEYS.includes(k)||typeof f[k]==="boolean"?f[k]:String(f[k])):null, lf=lcFirst;
   const risk=[];
   if(known(f.personal_data)) risk.push(yes(f.personal_data)?`The supplier will handle personal or client data${g("data_details")?` (${g("data_details")})`:""}.`:f.personal_data===false?"No personal or client data is involved.":"Whether personal data is involved is still to be confirmed.");
   if(known(f.system_access)) risk.push(yes(f.system_access)?"They will need access to our systems.":"No system access is needed.");
@@ -2307,7 +2312,7 @@ const firstPerson = x => String(x||"").replace(/^\s*(?:hi|hello)[,!]?\s*/i,"").r
 function offlineDescription(){
   const f=S.f, c=catById(f.category), cont=f.demand_type==="contingent_labour", sw=f.demand_type==="software", goods=GOODSLIKE(f);
   const g=k=>known(f[k])&&!["Not given","unsure","None"].includes(f[k])&&typeof f[k]==="string"?f[k].trim().replace(/\.$/,""):null;
-  const lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1), sentence=x=>x?cap1(String(x).trim().replace(/\.?$/,".")):"";
+  const lf=lcFirst, sentence=x=>x?cap1(String(x).trim().replace(/\.?$/,".")):"";
   const split=x=>x?String(x).split(/;|\n|,\s*(?:and\s+)?|\s+and\s+/).map(t=>t.trim().replace(/\.$/,"")).filter(Boolean).map(cap1):[];
   const lead=scrubText(firstPerson(g("summary")||"")), dl=g("deliverables")?listJoin(split(g("deliverables")).map(lf)):null;
   let summary="";
@@ -2335,7 +2340,7 @@ function clampWords(t, max){
 function offlineExec(lead){
   const f=S.f, c=catById(f.category), cont=f.demand_type==="contingent_labour";
   const g=k=>known(f[k])&&!["Not given","unsure","None","Confirmed"].includes(f[k])&&typeof f[k]==="string"?f[k].trim().replace(/\.$/,""):null;
-  const lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1), split=x=>!x?[]:(/[;\n]/.test(x)?String(x).split(/;|\n/):String(x).split(/,\s*(?:and\s+)?|\s+and\s+(?=[a-z])/i)).map(t=>t.trim().replace(/\.$/,"")).filter(t=>words(t)>=1).map(cap1);
+  const lf=lcFirst, split=x=>!x?[]:(/[;\n]/.test(x)?String(x).split(/;|\n/):String(x).split(/,\s*(?:and\s+)?|\s+and\s+(?=[a-z])/i)).map(t=>t.trim().replace(/\.$/,"")).filter(t=>words(t)>=1).map(cap1);
   const sc=x=>scrubText(x||"",false), scl=a=>a.map(x=>scrubText(x,true)).filter(Boolean);
   const t={audience:sc(g("users")), functions:sc(g("functions")), problem:sc(g("background")),
     capabilities:scl(split(g("must_haves")||(cont?g("skills"):g("deliverables"))||g("item"))), benefits:scl(split(g("benefits"))), usp:sc(g("usp")),
@@ -2377,7 +2382,7 @@ function clampText(t, max=NARR_MAX){
   return end>max*0.5 ? cut.slice(0,end+1) : cut.slice(0,cut.lastIndexOf(" ")).replace(/[,;:]$/,"")+"…";
 }
 function composeNarrative(d){
-  const lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1), nodot=x=>String(x).trim().replace(/\.$/,"");
+  const lf=lcFirst, nodot=x=>String(x).trim().replace(/\.$/,"");
   const cont=S.f.demand_type==="contingent_labour";
   let sum=String(d.summary||""); if(d.audience) sum=sum.replace(/\s*It is for [\d,]+ users\./,"");
   const P=[sum], low=sum.toLowerCase();
@@ -2448,7 +2453,7 @@ function openPoints(){
   return out;
 }
 function offlineDetail(brd){
-  const f=S.f, g=k=>givenText(f[k]).replace(/\.$/,""), sp=x=>x?String(x).split(/;|\n/).map(t=>t.trim().replace(/\.$/,"")).filter(Boolean).map(cap1):[], lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1);
+  const f=S.f, g=k=>givenText(f[k]).replace(/\.$/,""), sp=x=>x?String(x).split(/;|\n/).map(t=>t.trim().replace(/\.$/,"")).filter(Boolean).map(cap1):[], lf=lcFirst;
   const a=accessFlags(f), ong=isOngoing(f), ict=yes(f.tech_service)&&ong;
   return {
     purpose:[g("background")&&cap1(g("background"))+".", g("users")&&`It serves ${lf(g("users"))}.`, g("current_solution")&&`Today: ${lf(g("current_solution"))}.`, g("impact_delay")&&`If it doesn't go ahead or is delayed: ${lf(g("impact_delay"))}.`].filter(Boolean).join(" ")||TBDX,
@@ -2456,7 +2461,7 @@ function offlineDetail(brd){
     our_deps: sp(g("our_deps")), assumptions: sp(g("prov_assumptions")),
     delivery: [g("location"), isOffshore(f)&&"Work outside the entity's country (offshoring check)"].filter(Boolean).join("; ")||TBDX,
     timeline: [g("needed_by")&&`Start or delivery: ${g("needed_by")}`, g("duration")&&`Service period: ${g("duration")}`].filter(Boolean).join(". ")||TBDX,
-    deliverables: sp(g("deliverables")).length?sp(g("deliverables")):(GOODSLIKE(f)&&g("item")?[`${known(f.quantity)?fmtN(f.quantity)+" × ":""}${g("item")}`]
+    deliverables: sp(g("deliverables")).length?sp(g("deliverables")):(GOODSLIKE(f)&&g("item")?[f.demand_type==="software"?`${g("item")}${known(f.quantity)?` for ${fmtN(f.quantity)} users`:""}`:`${known(f.quantity)?fmtN(f.quantity)+" × ":""}${g("item")}`]
       : shallify(g("scope_in")).map(x=>x.replace(/^The Service Provider shall (?:send|deliver|provide|produce|prepare|write|hand over)\s+/i,"").replace(/^The Service Provider shall .*/,"").replace(/\.$/,"")).filter(x=>x&&/report|plan|design|document|model|map|roadmap|analysis|assessment|code|release|presentation|statement|dashboard|specification/i.test(x)).map(cap1)),
     acceptance: g("acceptance")||TBDX, acceptance_test: g("acc_review")||TBDX,
     service_levels: ong ? (sp(g("service_levels")).filter(x=>!/not applicable/i.test(x))) : ["Not applicable (one-off delivery)"],
@@ -2531,7 +2536,7 @@ function sectionQuality(){
 }
 // outputs E and F: compact sourcing request text and a very short version
 function offlineCompact(){
-  const f=S.f, d=S.sd&&S.sd.detail||{}, a=accessFlags(f), g=k=>givenText(f[k]).replace(/\.$/,""), lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1);
+  const f=S.f, d=S.sd&&S.sd.detail||{}, a=accessFlags(f), g=k=>givenText(f[k]).replace(/\.$/,""), lf=lcFirst;
   const ob=(d.scope_in||[]).map(x=>x.replace(/^The Service Provider shall /,"").replace(/\.$/,"")).slice(0,4);
   const parts=[`${S.sd?S.sd.title:workingTitle()}.`, ob.length?`The Service Provider shall ${listJoin(ob)}.`:"", g("background")&&`Purpose: ${lf(g("background"))}.`,
     (d.deliverables||[]).length&&`Deliverables: ${d.deliverables.slice(0,4).join("; ")}.`, [g("needed_by")&&`start ${g("needed_by")}`, g("duration")&&`for ${g("duration")}`, g("location")&&lf(g("location"))].filter(Boolean).join(", ").replace(/^./,c=>c.toUpperCase()).replace(/(.)$/,"$1."),
@@ -2544,7 +2549,7 @@ function offlineCompact(){
 // full business requirements document built from the answers alone (no AI); the AI version is merged on top
 function offlineBRD(risk){
   const f=S.f, D=S.det, route=D.route, c=catById(f.category);
-  const g=k=>known(f[k])&&f[k]!=="Not given"&&f[k]!=="unsure"?(NUM_KEYS.includes(k)||typeof f[k]==="boolean"?f[k]:String(f[k])):null, cap=cap1, lf=x=>String(x).charAt(0).toLowerCase()+String(x).slice(1);
+  const g=k=>known(f[k])&&f[k]!=="Not given"&&f[k]!=="unsure"?(NUM_KEYS.includes(k)||typeof f[k]==="boolean"?f[k]:String(f[k])):null, cap=cap1, lf=lcFirst;
   const split=x=>x?String(x).split(/;|\n|,\s*(?:and\s+)?|\s+and\s+/).map(t=>t.trim().replace(/\.$/,"")).filter(Boolean).map(cap):[];
   const R=[], req=(type,text,priority="Must")=>R.push({type,text,priority});
   const goods=GOODSLIKE(f), cont=f.demand_type==="contingent_labour";

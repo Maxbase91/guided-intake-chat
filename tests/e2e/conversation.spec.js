@@ -195,3 +195,10 @@ test("edits made directly in the service description are kept in the output", as
   const { data } = await downloadJSON(page, async () => { await page.click("[data-act=more]"); await page.click(".more [data-act=json]"); });
   expect(data.title).toBe("New-joiner laptops for Frankfurt");
 });
+
+test("acronyms keep their capitals in generated text", async ({ page }) => {
+  await openApp(page);
+  await say(page, "We need 15 laptops for new joiners in Frankfurt.");
+  await expect(page.locator("#msgs")).toContainText("which fits IT hardware");
+  await expect(page.locator("#msgs")).not.toContainText("fits it hardware");
+});

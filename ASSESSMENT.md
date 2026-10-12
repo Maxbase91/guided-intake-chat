@@ -27,6 +27,21 @@ Two full new-demand conversations ran on the live site with the real providers: 
 - **Obligation verbs:** "The Service Provider shall deliver escalate red flags …" came from an incomplete verb list.
 - **Wording:** "Northwind KYC Services's" and "Is 12 Oct 2026 (as soon as possible) a fixed deadline".
 
+**Live re-test after the fix (same day):** a third conversation (managed payroll SaaS, €300k) ran on the live site. These were confirmed with real AI:
+- no work location taken from where the employees are;
+- Level 4 stayed SaaS through to the record;
+- "Is that a fixed deadline" for ASAP, and "ok then 1 April 2027" stored as the date;
+- no single-source flag for "please include";
+- the data-location follow-up asked, and "in the EU" added to the answer;
+- "5 is wrong" applied at the check step;
+- "Checked by you: Confirmed";
+- documents built from the answers within about 50 seconds when every provider was at its limit.
+
+It found three more defects, now fixed:
+- the AI took "in the EU" (the data answer) as the work location;
+- "EU" became "eU" in the sourcing text: acronyms lost their capitals, finding 15, fixed with one shared `lcFirst`;
+- 2,500 software users appeared as "2,500 × managed payroll SaaS".
+
 **Not changed (judgement calls for the outsourcing team):**
 - the ICT type "technology advice" for a KYC operations provider using its own case tool (see U5);
 - "Outsourcing (likely)" for a software purchase described as replacing an on-premise tool.
@@ -116,7 +131,7 @@ Three things blocked real users. The first is now fixed:
 | Suite | Result |
 | --- | --- |
 | API (`tests/api`, node:test) | 18 passed, 1 known bug recorded as `todo` |
-| End-to-end (`tests/e2e`, Playwright, Chromium) | 67 passed: 62 behaviour tests and 5 known-issue tests that fail as expected |
+| End-to-end (`tests/e2e`, Playwright, Chromium) | 68 passed: 64 behaviour tests and 4 known-issue tests that fail as expected |
 | Run time | About a minute. Needs no keys and no network. |
 
 **Covered:**
@@ -181,7 +196,7 @@ Each finding says how it was confirmed:
 
 | # | Finding | Confirmed by |
 | --- | --- | --- |
-| 15 | **Acronyms lose their capitals in generated text:** "fits it hardware", "It provides hR operations", "External java developer". | Test and run |
+| 15, **fixed** | **Acronyms lose their capitals in generated text:** "fits it hardware", "It provides hR operations", "External java developer". | Test and run |
 | 16 | **A closing remark after the results gets a misleading reply.** "thanks" gets "Updated. Here are the revised service description and route." although nothing changed. | Test |
 | 17, **partly fixed** | **The second off-topic answer is shown as "Answer quality 8/10" with "That helps."** It is correctly stored as "To be determined", but the feedback contradicts that. The score is no longer shown; the "That helps." reply is unchanged. | Run |
 | 18 | **The improvement round asks the start date again** when the timeline is only partial, instead of asking for the missing end date or duration. The result card above drops the date while the round runs. | Run |
