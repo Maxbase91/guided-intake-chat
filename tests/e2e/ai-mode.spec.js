@@ -235,3 +235,23 @@ test("a suggestion the AI writes without its line labels is replaced, and its le
   expect(last).toMatch(/Supported functions: /);
   expect(last).not.toMatch(/quick template|– e\.g\./);
 });
+
+test("an accepted AI suggestion for a question without its own is stored as given; a business answer is not 'off-topic'", async ({ page, request }) => {
+  await openApp(page, { kind: "ai" });
+  await say(page, HR);
+  await say(page, "About 400k");
+  // the AI calls a thin but relevant answer off-topic: the app treats it as an answer
+  await mock(request, { nextChat: { assessment: { fact: "background", ok: false, issue: "off-topic", follow_up: "", score: 1 } } });
+  await say(page, "too slow and expensive");
+  expect(await lastAssistant(page).innerText()).not.toContain("doesn't seem to answer");
+  for (let i = 0; i < 4 && (await page.evaluate(() => S.lastAsked)) !== "current_solution"; i++) {
+    const chips = await choices(page).allInnerTexts();
+    if (chips.includes("Use this suggestion")) await choose(page, "Use this suggestion"); else await say(page, "Payroll runs late every month and we miss the reporting deadline");
+  }
+  expect(await page.evaluate(() => S.lastAsked)).toBe("current_solution");
+  await say(page, "what would you suggest?");
+  await expect(lastAssistant(page)).toContainText("Here's a suggestion");
+  const sg = await page.evaluate(() => S.adhoc && S.adhoc.sg);
+  await say(page, "sounds good");
+  expect(await page.evaluate(() => S.f.current_solution)).toBe(sg);
+});

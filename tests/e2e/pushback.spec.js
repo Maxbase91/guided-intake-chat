@@ -165,3 +165,25 @@ test("at the check step, 'why is this outsourcing?' is answered with the reasons
   expect(last).toContain("Here's what I've worked out from your answers");
   expect(await page.evaluate(() => S.f.confirm_derived)).toBeNull();
 });
+
+test("while a check is open, a question back still works and the check stays open; the framework question has its own reason", async ({ page }) => {
+  await openApp(page);
+  await say(page, DINNER);
+  await say(page, "slow");
+  await expect(lastAssistant(page)).toContainText("Could you say a little more?");
+  await say(page, "what would you suggest?");
+  await expect(lastAssistant(page)).toContainText("Here's a suggestion");
+  expect(await page.evaluate(() => S.f.background)).not.toMatch(/suggest/);
+  await choose(page, "Use this suggestion");
+  expect(await page.evaluate(() => S.f.background)).toMatch(/client event keeps key relationships warm/);
+  // "why would I use them?" on the framework question
+  await page.click("#newBtn");
+  await say(page, CONSULTING);
+  await say(page, "why would I use them? are they even any good at procurement?");
+  const last = await lastAssistant(page).innerText();
+  expect(last).toContain("The framework was put out to competition before");
+  expect(last).not.toContain("skip it for now");
+  expect(await choices(page).allInnerTexts()).toEqual(["Yes, use it", "No, look wider"]);
+  await choose(page, "No, look wider");
+  expect(await page.evaluate(() => S.det.why)).toMatch(/^This is new demand \(you chose to look wider than the existing framework\)\./);
+});

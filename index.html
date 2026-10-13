@@ -667,12 +667,14 @@ function determine(){
   const f=S.f, T=CONFIG.thresholds, v=known(f.value)?Number(f.value):null;
   const cat = catalogueMatches(f), ctr = contractFor(f);
   let route, why;
+  const declined=(f.decline_contract||f.contract_ok===false) && CONTRACTS.some(c=>c.category===f.category && new Date(c.expires)>new Date());   // "No, look wider"
+  const lead=`This is new demand${declined?" (you chose to look wider than the existing framework)":" with no contract in place"}.`;
   if(cat.length && catalogueFits(f, cat)){ route="catalogue"; why=`${cat.map(i=>i.name).join(" and ")} ${cat.length>1?"are":"is"} in the catalogue, so you can order directly at the agreed price.`; }
   else if(ctr){ route="contract"; why = f.demand_type==="contingent_labour"
       ? `External workers come through the ${ctr.title} with ${ctr.supplier}, so this is a call-off with a role profile. No new competition is needed.`
       : `The ${ctr.title} with ${ctr.supplier} already covers this, with ${money(ctr.remaining)} left until ${fmtDate(ctr.expires)}. No new competition is needed.`; }
-  else if(v!=null && v<=T.quickQuoteMax){ route="quote"; why=`This is new demand with no contract in place. At ${money(v)}${f.value_is_estimate?" (estimated)":""} it is under the ${money(T.quickQuoteMax)} threshold, so the business leads the sourcing: you collect at least three quotes, with procurement's guidance.`; }
-  else { route="sourcing"; why = v==null ? "This is new demand with no contract in place. The value is not known yet, so I assume procurement-led sourcing until it is." : `This is new demand with no contract in place. At ${money(v)}${f.value_is_estimate?" (estimated)":""} it is above the ${money(T.quickQuoteMax)} threshold, so procurement leads the sourcing with an RFP.`; }
+  else if(v!=null && v<=T.quickQuoteMax){ route="quote"; why=`${lead} At ${money(v)}${f.value_is_estimate?" (estimated)":""} it is under the ${money(T.quickQuoteMax)} threshold, so the business leads the sourcing: you collect at least three quotes, with procurement's guidance.`; }
+  else { route="sourcing"; why = v==null ? `${lead} The value is not known yet, so I assume procurement-led sourcing until it is.` : `${lead} At ${money(v)}${f.value_is_estimate?" (estimated)":""} it is above the ${money(T.quickQuoteMax)} threshold, so procurement leads the sourcing with an RFP.`; }
   return {route, why, contract:ctr, catalogue:cat, controls:controlsFor(route,ctr), steps:nextSteps(route,cat,ctr)};
 }
 
@@ -1440,14 +1442,14 @@ const QUESTION_BACK=/^(?:but\s+|and\s+|so\s+)?(?:what|why|how|who|which|are|is|c
 function metaKind(text, k){
   const t=text.trim();
   if(k==="confirm_derived") return /\bwhy\b[^?]*\?/i.test(t) && !/\b(?:wrong|incorrect|not right|change|\d+\s+is)\b/i.test(t) ? "whycheck" : null;
-  if(!k || S.pending || words(t)>30) return null;
-  if(ROUTE_PUSH.test(t) && S.det) return "route";
+  if(!k || words(t)>30) return null;
+  if(ROUTE_PUSH.test(t) && S.det && !S.pending) return "route";
   if(ASK_WHY.test(t)) return "why";
-  if(ASK_SUGGEST.test(t) || (DELEGATE.test(t) && !isSug(k))) return "suggest";
+  if(ASK_SUGGEST.test(t) || (DELEGATE.test(t) && !isSug(k))) return (CLOSED.includes(k)||FACTS[k].choices) && !isSug(k) && aiReady() && !S.pending ? null : "suggest";   // with AI, a yes/no question's "what do others do?" is answered by the AI
   if(!aiReady() && QUESTION_BACK.test(t) && GROUNDED.concat(["background"]).includes(k)) return "question";   // with AI, the AI answers these
   return null;
 }
-const WHY_ASK={background:"The problem and what a delay would cost are the first things approvers and suppliers read.", current_solution:"Procurement needs to know why the bank can't do this itself before it pays a provider.",
+const WHY_ASK={contract_ok:"The framework was put out to competition before, so the firm, its rates and its terms are already agreed and no new tender is needed. Whether it fits this work is your call: if you'd rather compare firms, choose \"No, look wider\".", background:"The problem and what a delay would cost are the first things approvers and suppliers read.", current_solution:"Procurement needs to know why the bank can't do this itself before it pays a provider.",
   audience_fn:"Suppliers size and price the service by who uses it.", value_props:"Approvers weigh the request by its benefits.", scope_in:"Suppliers price exactly what is listed here; anything missing becomes a change request later.",
   scope_out:"Clear exclusions stop suppliers from pricing work you don't need.", acceptance_pack:"It decides when the work counts as done and can be paid.", qualifications:"Offers are compared on the people the provider puts forward.",
   kpis_pack:"Success measures are how the provider is judged after the contract starts.", governance:"It sets how problems are raised before they become disputes.", needed_by:"The start date decides how much time sourcing has.",
@@ -1478,7 +1480,7 @@ async function metaTurn(kind, text, cid, aiAnswer, display, posted){
   const k=S.lastAsked, F=FACTS[k], f=S.f;
   if(!posted) S.msgs.push({role:"user",text:display||text}); S.choices=[]; S.busy=true; render();
   let lead="";
-  if(kind==="why") lead=`Good question. ${F.why?F.why(f):WHY_ASK[k]||"It goes into the service description and the sourcing request, so suppliers can price it and procurement can compare offers."} If you don't know yet, just say so or skip it for now.`;
+  if(kind==="why") lead=`Good question. ${F.why?F.why(f):WHY_ASK[k]||"It goes into the service description and the sourcing request, so suppliers can price it and procurement can compare offers."}${CLOSED.includes(k)||F.choices?"":" If you don't know yet, just say so or skip it for now."}`;
   else if(kind==="route") lead=`${S.det.why} ${routeOptions()}`;
   else if(kind==="whycheck") lead=whyCheck(text);
   else if(kind==="question") lead=aiAnswer||"Good question. I can't answer that here; the buyer can when they pick this up.";
@@ -1494,6 +1496,11 @@ async function metaTurn(kind, text, cid, aiAnswer, display, posted){
     }
   }
   S.busy=false;
+  if(S.pending){   // a check is still open: say it again, with the question's buttons, and keep waiting for its answer
+    const ex=F.ex(f), fc=F.choices, fcs=typeof fc==="function"?fc(f):fc;
+    S.msgs.push({role:"assistant",text:`${lead}\n\n${F.q(f)}${ex?" "+ex:""}`, check:true});
+    S.choices=fcs?[...fcs]:(S.det&&NEW_DEMAND(S.det.route)&&!CLOSED.includes(k)?["Skip for now"]:[]); render(); return;
+  }
   await askNext(k, lead, cid);
   render();
 }
@@ -1579,7 +1586,7 @@ async function handleTurn(text, cid, opts={}){
     if(sp.notes.length && words(sp.main)>=1){ opts.display=opts.display||text; opts.asideNotes=sp.notes; text=sp.main; }
   }
   // "use the example" answers with the example the question showed; a copy of an earlier question's wording answers that question
-  if(S.lastAsked && !S.pending && !opts.silent && S.lastAsked!=="confirm_derived"){
+  if(S.lastAsked && !S.pending && !opts.silent && !opts.display && S.lastAsked!=="confirm_derived"){
     const echo=echoedAsk(text);
     if(USE_EXAMPLE.test(text.trim()) || (echo && echo.k===S.lastAsked)){
       const ex=isSug(S.lastAsked) ? "Use this suggestion" : exampleFor(S.lastAsked);
@@ -1735,7 +1742,8 @@ async function handleTurn(text, cid, opts={}){
   if(issue && issue.kind!=="offtopic" && issue.kind!=="where" && issue.fact!=="needed_by" && S.challengeCount>=3) issue=null;   // the data location and the timing are always asked
   const aiOff = aiCheck && AI_OFF_RE.test(aiCheck.issue||"");
   // only for the question just asked: an off-topic verdict on another item would say "doesn't answer my question" and ask something else
-  if(!issue && aiOff && aiCheck.fact===asked && asked!=="supplier_reason" && FACTS[asked] && !S.offChecked[asked] && asked!==(pend&&pend.fact)) issue=offTopicIssue(asked);
+  const bizWords=v=>BIZ.test(String(v||"")) || contentWords(v).length<4;   // "too slow and expensive" is thin, not off-topic
+  if(!issue && aiOff && aiCheck.fact===asked && asked!=="supplier_reason" && !bizWords(S.f[asked]||text) && FACTS[asked] && !S.offChecked[asked] && asked!==(pend&&pend.fact)) issue=offTopicIssue(asked);
   if(!issue && aiCheck && S.challengeCount<3 && changed.includes(aiCheck.fact) && !S.challenged[aiCheck.fact] && FACTS[aiCheck.fact])
     issue={fact:aiCheck.fact, issue:String(aiCheck.issue||"needs a second look").slice(0,140), message:String(cleanReply(aiCheck.follow_up||"")||reply||"").trim()||`Could you double-check this? ${FACTS[aiCheck.fact].q(S.f)}`};
   const ansScore = skipped ? null : asked==="confirm_derived" ? null : answerScore(asked, text, issue, sugResult, aiScore, pend);
