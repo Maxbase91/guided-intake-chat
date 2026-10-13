@@ -996,6 +996,15 @@ const NEW_DEMAND = r => r==="quote"||r==="sourcing";
 const words = v => String(v||"").trim().split(/\s+/).filter(Boolean).length;
 const VAGUE=/^(tbd|tbc|n\/?a|not sure|don'?t know|idk|stuff|things|everything|various|whatever|same|as usual|-|\?+|ok|okay|yes|no|see above|as above|same as (?:above|before)|as (?:discussed|mentioned|said)(?: before| above)?|use (?:the |your )?examples?(?: given)?)\.?$/i;
 
+// how many people the request is for, when it names them ("three business consultants")
+function peopleCount(f){
+  if(parseInt(f.headcount)>0) return parseInt(f.headcount);
+  const q=parseInt(f.quantity), who="(?:consultants?|advisers?|advisors?|experts?|specialists?|lawyers?|developers?|engineers?|analysts?|people|persons?|staff|testers?|architects?)";
+  const t=[f.item,f.summary,userText()].filter(x=>typeof x==="string").join(" ");
+  if(q>0 && q<50 && new RegExp(`\\b${who}\\b`,"i").test(t)) return q;
+  const m=t.match(new RegExp(`\\b(\\d{1,2}|two|three|four|five|six|seven|eight|nine|ten|twelve)\\s+(?:[a-z-]+\\s+){0,2}${who}\\b`,"i"));   // "three business consultants"
+  return m ? (+m[1] || NUMW[m[1].toLowerCase()]) : null;
+}
 // does a free-text answer relate to the request at all? (catches a recipe or a joke given as "the problem to solve")
 const TEXT_FACTS=["other_risks","background","users","functions","benefits","usp","reg_benefits","current_solution","impact_delay","must_haves","deliverables","acceptance","skills","role","item","data_details","renewal_change","supplier_reason","criticality","volume"];
 const STOP=new Set("the and for with that this from have has had are was were will would should could can our your their they them you its it's into onto over under about after before then than when what which who whom why how there here also just only very more most some any all each other such been being not but nor yet out off per via upon within without because while where these those does did done doing make made get got let one two three four five six well much many lot lots like want need needs needed please thanks thank yes".split(" "));
@@ -1043,6 +1052,10 @@ function findIssue(changed){
       }
       const bigWork = ["consulting","it-services","legal","cloud"].includes(f.category) || (f.category==="software" && /\b(system|platform|replace|implementation|erp|crm)\b/.test(ctx));
       if(bigWork && val<5000) return {fact:k, issue:`looks low for ${catById(f.category).name.toLowerCase()} work`, message:`Just to check: ${money(val)} is low for ${catById(f.category).name.toLowerCase()} work like this. Is that the total budget, or should it be higher?`, choices:["Yes, that's the total"]};
+      // people × months for advisory work: €80,000 for three consultants over 9 months is about €150 a consultant day
+      const ppl=peopleCount(f), perDay=ppl && known(f.duration) ? val/(ppl*mo*20) : null;
+      if(perDay!=null && perDay<400 && ["consulting","it-services","legal","audit-tax"].includes(f.category))
+        return {fact:k, issue:`low for ${ppl} ${ppl>1?"people":"person"} over ${f.duration}`, message:`Just to check: ${money(val)} for ${ppl} ${ppl>1?"people":"person"} over ${f.duration} is about ${money(Math.round(perDay))} a day each. ${catById(f.category).name} usually costs €1,000 to €2,000 a day per person. Is ${money(val)} the total budget?`, choices:["Yes, that's the total"]};
       if(known(f.duration) && mo>=3 && val<3000 && !GOODSLIKE(f)) return {fact:k, issue:`looks low for ${f.duration} of work`, message:`Just to check: ${money(val)} for ${f.duration} of work looks low. Is that the total budget?`, choices:["Yes, that's the total"]};
       if(val>20000000) return {fact:k, issue:"very large amount", message:`Just to confirm: the total is ${money(val)}?`, choices:["Yes, that's right"]};
     }
@@ -1518,6 +1531,20 @@ function splitAside(text){
   }
   return {main:keep.join(" ").trim(), notes};
 }
+// simple edits to a suggestion, applied by the app so they never depend on the AI: "X is the sponsor, not Y", "replace Y with X", "drop the savings amount"
+function editSuggestion(sg, text){
+  const t=text.trim(); let out=sg, done=false;
+  const swap=(from,to)=>{ from=from.replace(/^(?:the|a|an)\s+/i,"").trim(); to=to.replace(/^(?:the|a|an)\s+/i,"").trim(); if(!from||!to) return;
+    const re=new RegExp(from.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"gi"); if(re.test(out)){ out=out.replace(re,to); done=true; } };
+  let m=t.match(/^(.+?)\s+(?:is|are|should be|will be)\s+(?:the\s+)?[\w -]{2,40}?,?\s+(?:not|instead of)\s+(.+?)(?:[.;!]|,\s*(?:rest|the rest|otherwise|everything else)|$)/i);
+  if(m) swap(m[2], m[1]);
+  m=t.match(/\b(?:replace|change)\s+(.+?)\s+(?:with|to|by)\s+(.+?)(?:[.;!]|,\s*(?:rest|the rest|otherwise)|$)/i); if(m) swap(m[1], m[2]);
+  m=t.match(/\b(?:drop|remove|delete|leave out|take out|without)\s+(?:the\s+)?(.+?)(?:[.;!]|,|\s+(?:and|but)\s+|$)/i);
+  if(m){ const key=contentWords(m[1]).map(stem); if(key.length){
+    out=out.split("\n").map(line=>{ const mm=line.match(/^([^:]{3,45}:)\s*(.*)$/), head=mm?mm[1]+" ":"", pts=(mm?mm[2]:line).split(/;\s*/);
+      const keep=pts.filter(x=>!key.some(w=>contentWords(x).map(stem).includes(w))); if(keep.length<pts.length && keep.length){ done=true; return head+keep.join("; "); } return line; }).join("\n"); } }
+  return done && /\b(?:rest|otherwise|everything else|all else)\b.{0,20}\b(?:fine|ok|okay|good|right)\b|\b(?:fine|ok|okay|good)\s+otherwise\b|^(?:yes|ok|fine)\b|^(?:drop|remove|delete|leave out|take out|replace|change)\b/i.test(t) ? out : null;
+}
 // "use the example (given)", "the example is fine": the requester takes the example the question showed
 const USE_EXAMPLE=/^(?:(?:please|ok(?:ay)?|yes|just|then)[,]?\s+)?(?:use|take|go with|keep|accept|pick)\s+(?:the\s+|your\s+|that\s+|this\s+|an?\s+)?examples?(?:\s+(?:given|you gave|above|provided|shown|you (?:mentioned|suggested)))?[.!]?$|^(?:the\s+|your\s+|that\s+)?examples?(?:\s+(?:given|above))?\s+(?:is|are|sounds?|looks?)\s+(?:fine|good|right|ok(?:ay)?|perfect)[.!]?$|^(?:same as|like|as in)\s+(?:the|your)\s+example[.!]?$/i;
 // the example in a question, as the requester saw it: "such as processing feeds, providing alerts or reporting", "for example: \"…\""
@@ -1580,6 +1607,8 @@ async function handleTurn(text, cid, opts={}){
   if(S.adhoc){ const a=S.adhoc; S.adhoc=null;
     if(a.k===S.lastAsked && (ACCEPT.test(text.trim())||USE_EXAMPLE.test(text.trim())||DELEGATE.test(text.trim()))){ opts.display=opts.display||text; text=a.sg; } }
   if(S.lastAsked && isSug(S.lastAsked) && !S.pending && DELEGATE.test(text.trim())){ opts.display=opts.display||text; text="Use this suggestion"; }
+  if(S.lastAsked && isSug(S.lastAsked) && !S.pending && !opts.display && S.suggest[S.lastAsked]){ const ed=editSuggestion(S.suggest[S.lastAsked], text);
+    if(ed){ S.suggest[S.lastAsked]=ed; opts.display=text; text="Use this suggestion"; } }
   if(!opts.display){ const mk=metaKind(text, S.lastAsked); if(mk) return metaTurn(mk, text, cid); }
   // "btw our CFO loves jazz", "also we need 10 laptops": kept out of this answer, and said so
   if(S.lastAsked && S.det && !S.pending && S.lastAsked!=="confirm_derived"){
@@ -1763,7 +1792,7 @@ async function handleTurn(text, cid, opts={}){
   // what the provider does, written back as obligations
   if(asked==="scope_in" && givenText(S.f.scope_in)){ const ob=shallify(S.f.scope_in); if(ob.length) S.msgs.push({role:"assistant",text:`I've written this as obligations:\n${ob.map(x=>"• "+x).join("\n")}\n\nTell me if anything is wrong.`}); }
   // the route changed and needs more stages: say why, briefly
-  const added=S.stageIds.filter(id=>!prevStages.includes(id)&&id!=="review");
+  const added=S.stageIds.filter(id=>!prevStages.includes(id)&&id!=="review"&&S.missing.some(k=>factsOf(stageById(id)).includes(k)));
   if(prevStages.length && added.length && S.msgs.filter(m=>m.role==="user").length>1)
     S.msgs.push({role:"assistant",kind:"sys",text:`This is now ${CHANNELS[S.det.route].name.replace(/^New demand: /,"new demand with ")}, so I've added a few questions on ${listJoin(added.map(id=>stageById(id).name.toLowerCase()))}.`});
 
@@ -1873,6 +1902,7 @@ function normFact(k,v){
   if(k==="budget_approved" && /not sure|unsure|unknown|no idea|don.?t know/i.test(String(v))) return "unsure";
   if(k==="supplier" && typeof v==="string") return cleanSupplier(v)||v;
   if(k==="supplier_terms" && typeof v==="boolean") return v?"Yes":"No";
+  if(k==="scope_out" && typeof v==="string") return v.replace(/^(?:exclusions?|out of scope|not (?:in scope|included)|the service does not include)\s*:\s*/i,"");
   if(k==="data_details" && typeof v==="string") return v.replace(/\s+\b(?:probably|maybe|perhaps|i think|i guess)\b\.?$/i,"").trim()||v;
   return typeof v==="string"?v:String(v);
 }
@@ -1894,10 +1924,18 @@ function screenAIFacts(nf, asked, text){
     if(PLACEHOLDER.test(sv.trim()) && !own.has(k)) continue;                                  // never a gap filled with "unknown" or "none"
     if(AI_FLAGS.includes(k) && asked!=="confirm_derived" && !own.has(k)) continue;           // classification: the rules, or the requester at the check step
     if(GROUNDED.includes(k)){ const w=contentWords(sv), src=own.has(k)?said:own_; if(w.length && w.filter(x=>src.has(stem(x))).length/w.length<0.5) continue; }   // free text comes from what was said
+    // "the board wants it by Q2" is a deadline for the result, not the start
+    if(k==="needed_by" && k!==asked && /\bby\b|deadline|due\b|done in|ready (?:by|in)/i.test(text) && !/\b(?:start|begin|kick.?off|from)\b/i.test(text)) continue;
+    // an answer the AI padded with the question's example ("…and the team is fully booked until next year")
+    if(k===asked && typeof v==="string" && GROUNDED.includes(k)){ const ex=exampleIn((askedMessage(asked)||{}).text)||exampleIn(FACTS[k]?FACTS[k].ex(S.f):""); if(ex && sharesPhrase(sv,ex) && !sharesPhrase(text,ex)) continue; }
+    // "50k is approved so far" is not a new total
+    if(k==="value" && asked!=="value" && known(S.f.value) && (!/\b(?:budget|total|cost|costs|value|price|spend|overall)\b/i.test(text) || /\bapprov/i.test(text))) continue;
     out[k]=v;
   }
   return out;
 }
+// three words in a row from b also in a
+function sharesPhrase(a, b){ const A=" "+contentWords(a).map(stem).join(" ")+" ", w=contentWords(b).map(stem); for(let i=0;i+2<w.length;i++) if(A.includes(` ${w[i]} ${w[i+1]} ${w[i+2]} `)) return true; return false; }
 function mergeFacts(nf){
   for(const k of Object.keys(BLANK_FACTS)){
     let v=nf[k]; if(v===null||v===undefined||v==="") continue;
@@ -1962,9 +2000,13 @@ function applyCorrections(t){
 // what the provider does, as "The Service Provider shall ..." statements
 const SHALL_VERBS=/^(run|process|provide|deliver|design|build|develop|host|maintain|support|operate|manage|create|implement|migrate|train|review|assess|analy[sz]e|prepare|test|monitor|report|clean|cater|organi[sz]e|recruit|advise|answer|handle|send|produce|configure|install|document|hand over|integrate|redesign|map|write|supply|perform|conduct|carry out|set up|update|check|reconcile|pay|collect|book|escalate|notify|inform|screen|investigate|complete|verify|ensure|track|flag|record|coordinate|onboard|translate|audit|schedule|deploy|upgrade|respond|resolve|submit|keep|store|protect|retain|archive|comply|attend|give|share|follow|use|apply|identify|assist|help|cover|staff)\b/i;
 function shallify(text){
+  // "the target model incl. roles, governance and category management" stays one obligation
+  const lists=[]; text=String(text).replace(/\bincl\.\s*/gi,"including ").replace(/\be\.g\.\s*/gi,"for example ")
+    .replace(/\b(including|such as|for example|like)\s+([^;.]+?)(?=,\s*(?:and\s+)?(?:run|process|provide|deliver|design|build|develop|host|maintain|support|operate|manage|create|implement|migrate|train|review|assess|prepare|test|monitor|report|answer|handle|send|produce|hand)\b|[;.]|$)/gi,(_,w,l)=>`${w} §${lists.push(l)-1}§`);
+  const back=x=>x.replace(/§(\d+)§/g,(_,i)=>lists[+i]);
   return String(text).split(/;|\n|\.\s+|,\s*(?:and\s+)?(?=[a-z])|\s+and\s+(?=(?:run|process|provide|deliver|design|build|develop|host|maintain|support|operate|manage|create|implement|migrate|train|review|assess|prepare|test|monitor|report|answer|handle|send|produce|hand)\b)/i)
     .map(x=>x.trim().replace(/[.]$/,"").replace(/^(?:they|the provider|the supplier|it)\s+(?:will|should|must|shall)\s+/i,"").replace(/^(?:to|will|should|must)\s+/i,"")).filter(x=>words(x)>=2)
-    .slice(0,8).map(x=>`The Service Provider shall ${SHALL_VERBS.test(x)?lcFirst(x):"deliver "+lcFirst(x)}.`);
+    .slice(0,8).map(back).map(x=>`The Service Provider shall ${SHALL_VERBS.test(x)?lcFirst(x):"deliver "+lcFirst(x)}.`);
 }
 const workingTitle = () => { if(givenText(S.f.title)) return S.f.title;
   const it=givenText(S.f.item)||givenText(S.f.summary)||"";
@@ -2009,7 +2051,12 @@ const TIPS={background:"say what goes wrong today and what it costs or risks, fo
   deps_pack:"say what we must provide and by when, for example: read access to the finance system within 5 working days of the start.",
   deliverables:"list each deliverable with its format and who receives it, for example: a monthly report to the head of accounts payable."};
 const MEASURABLE=["kpis_pack","acceptance_pack"];
-function thinIssue(k){ return {fact:k, kind:"thin", issue:"answer too thin for sourcing", message:`That's a start. To make it usable for sourcing, ${TIPS[k]} Could you add a bit more, or keep it as it is?`, choices:["Keep it as is"]}; }
+const TIPS_PROJECT={kpis_pack:"say what will be done and by when, for example: the target design signed off by the sponsor by June and the business case approved by Finance.",
+  acceptance_pack:"say what makes a deliverable done and who signs it off, for example: each deliverable reviewed within 5 working days and signed off by the sponsor.",
+  scope_in:"list concrete activities and outputs, for example: assess the current setup in 6 countries, design the target model and deliver a rollout plan.",
+  qualifications:"name the experience that really matters, for example: two procurement transformations at banks in the last five years.",
+  deliverables:"list each deliverable and who receives it, for example: a target operating model document and a rollout plan for the sponsor."};
+function thinIssue(k){ return {fact:k, kind:"thin", issue:"answer too thin for sourcing", message:`That's a start. To make it usable for sourcing, ${(kindOf(S.f)==="project"&&TIPS_PROJECT[k])||TIPS[k]} Could you add a bit more, or keep it as it is?`, choices:["Keep it as is"]}; }
 // how useful was this answer? not shown; a low score offers one tip (CONFIG.thresholds.answerTip)
 function answerScore(asked, text, issue, sugResult, aiScore, pend){
   if(issue && (issue.fact===asked || issue.kind==="offtopic")) return issue.kind==="offtopic"?1:/vague/.test(issue.issue||"")?4:6;
@@ -2334,7 +2381,7 @@ function fitLine(line){
 // a suggestion as the user sees it: one label per line, short, no formatting, no invented dates
 function tidySuggestion(k, v){
   let sg=normSuggestion(v, k).replace(/\*\*|__/g,"").replace(/\[object Object\]/g,"").trim()
-    .replace(/\s*(?:by|of|to|at least|within|under|over|above|below)?\s*\b(?:[XYZN]|x{1,3})\s*(?:%|percent\b|days?\b|weeks?\b|months?\b|hours?\b)/g,"").replace(/\s*\[[^\]]*\]/g,"").replace(/\s*<[^>]*>/g,"");
+    .replace(/\s*(?:by|of|to|at least|within|under|over|above|below)?\s*\b(?:[XYZN]|x{1,3})\s*(?:%|percent\b|days?\b|weeks?\b|months?\b|hours?\b)/g,"").replace(/\s*(?:of|by|to|at least)?\s*(?:€|EUR\s?|\$|£)\s?(?:[XYZN]|x{1,3})(?:\s*(?:million|m|k|bn|thousand)\b)?/g,"").replace(/\s*\[[^\]]*\]/g,"").replace(/\s*<[^>]*>/g,"");
   const lines=bundleOf(k)?bundleOf(k).map(([L])=>L):null;
   if(lines) lines.slice(1).forEach(L=>{ sg=sg.replace(new RegExp(`[;.]?\\s*(${L.replace(/[/]/g,"\\/")})\\s*:`,"i"),"\n$1:"); });
   const MON="(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\b";
@@ -2351,6 +2398,7 @@ function tidySuggestion(k, v){
 }
 function setFromSuggestion(k, v){
   const f=S.f;
+  if(k==="scope_out") v=String(v).replace(/^(?:exclusions?|out of scope|not (?:in scope|included)|the service does not include)\s*:\s*/i,"");
   if(bundleOf(k)){
     String(v).split(/\n+/).forEach(line=>{ const m=line.match(/^\s*[-•*]?\s*([^:]{3,45}):\s*(.+)$/); if(!m) return; const lab=m[1].trim().toLowerCase();
       const hit=bundleOf(k).find(([L])=>lab===L.toLowerCase()||lab.startsWith(L.toLowerCase().split(/[ /]/)[0])); let key=hit?hit[1]:PROFILE_KEYS[lab];
@@ -2733,7 +2781,7 @@ function scrubText(t, keepTime){
   }).filter(Boolean).join(" ").replace(/,?\s+\b(?:needed|required|live|delivered|starting|due|which|and|dating|dated|introduced|since|as)\s*(?=[.,;]|$)/gi,"").replace(/\s+([,.])/g,"$1").replace(/,\s*\./g,".").trim();
   return out;
 }
-const firstPerson = x => String(x||"").replace(/^\s*(?:hi|hello)[,!]?\s*/i,"").replace(/^(?:please\s+)?(?:we|i)(?:'d| would)?\s+(?:would like|are looking for|am looking for|need|want|like)\s+(?:t?o (?:buy|get|order|have|procure)\s+)?/i,"").replace(/^(?:please\s+)?(?:buy|purchase|procure|order|source|get|acquire)\s+(?:us\s+)?/i,"");   // "Buy a platform" is a request for "a platform"
+const firstPerson = x => String(x||"").replace(/^\s*(?:hi|hello)[,!]?\s*/i,"").replace(/^(?:please\s+)?(?:we|i)(?:'d| would)?\s+(?:would like|are looking for|am looking for|need|want|like)\s+(?:t?o (?:buy|get|order|have|procure)\s+)?/i,"").replace(/^(?:please\s+)?(?:buy|purchase|procure|order|source|get|acquire)\s+(?:us\s+)?/i,"").replace(/^(?:needs?|requires?|wants?|looking for)\s+/i,"");   // "Buy a platform" is a request for "a platform"
 function offlineDescription(){
   const f=S.f, c=catById(f.category), cont=f.demand_type==="contingent_labour", sw=f.demand_type==="software", goods=GOODSLIKE(f);
   const g=k=>known(f[k])&&!["Not given","unsure","None"].includes(f[k])&&typeof f[k]==="string"?f[k].trim().replace(/\.$/,""):null;
@@ -2770,7 +2818,7 @@ function offlineExec(lead){
   const sc=x=>scrubText(x||"",false), scl=a=>a.map(x=>scrubText(x,true)).filter(Boolean);
   const t={audience:sc(g("users")), functions:sc(g("functions")), problem:sc(g("background")),
     capabilities:scl(split(g("must_haves")||(cont?g("skills"):g("deliverables"))||g("item"))), benefits:scl(split(g("benefits"))), usp:sc(g("usp")),
-    kpis:scl(split(g("acceptance"))), regulatory:NO_BENEFIT.test(g("reg_benefits")||"")?"":sc(g("reg_benefits"))};
+    kpis:scl(split(g("kpis")||g("acceptance"))), regulatory:NO_BENEFIT.test(g("reg_benefits")||"")?"":sc(g("reg_benefits"))};
   const L=execLimits(), what=lf(String(lead||c.name).replace(/\.$/,"")), nd=x=>String(x).replace(/\.$/,"");
   // a noun phrase ("a process orchestration platform") becomes a sentence; a problem phrased as a goal ("providing a single entry") is not "today"
   const needs=/^(?:an?|the|some|new|one|\d)\b/i.test(what) ? `The organisation needs ${what}.` : cap1(what)+".", goal=/^(?:to\s+[a-z]+|[a-z]+ing)\b/i.test(t.problem||"");

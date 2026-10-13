@@ -216,3 +216,56 @@ test("from the repeated live run: skip during a check, invented figures, supplie
   expect(got.sg).toMatch(/^Unique selling points: One platform for users across countries\nKey benefits: reduction in manual data entry; call volumes cut; fewer errors\nRegulatory/);
   expect(got.long).toBeLessThanOrEqual(50);
 });
+
+test("from the consulting run: budget per consultant day, edits to suggestions, deadlines, padded answers, obligations, wording", async ({ page }) => {
+  await openApp(page);
+  await say(page, "I need three business consultants for a target operating model transformation in procurement for 9 months");
+  await say(page, "80k");
+  await expect(lastAssistant(page)).toContainText("€80,000 for 3 people over 9 months is about €148 a day each");
+  await say(page, "Yes, that's the total");
+  const got = await page.evaluate(() => {
+    const r = {};
+    const sg = "Sponsor and stakeholders: Procurement Director (sponsor), CFO (budget and savings oversight), Head of Risk (control impact)\nTeams involved: Procurement teams, Finance, Risk and Compliance";
+    r.swap = editSuggestion(sg, "the CPO is the sponsor, not the Procurement Director. rest is fine");
+    r.drop = editSuggestion("Success measures: Achieve the savings target by Q2 2027; deliver the target operating model design within 9 months; sponsor sign-off on all deliverables", "drop the savings amount, rest ok");
+    r.noEdit = editSuggestion(sg, "no, those numbers are made up and we just want lower cost");
+    S.f.value = 80000;
+    r.approved = screenAIFacts({ value: 50000, budget_approved: "partly" }, "budget_approved", "partly, 50k is approved so far");
+    r.deadline = screenAIFacts({ needed_by: "Q2" }, "background", "The board wants a new target operating model by Q2 next year; if it slips we lose the savings target");
+    r.padded = screenAIFacts({ current_solution: "Nobody internally has done an operating model redesign and the team is fully booked until next year" }, "current_solution", "nobody internally has done an operating model redesign and the team is busy with daily buying");
+    r.shall = shallify("assess today's setup in 6 countries, design the target operating model incl. roles, governance and category management, build the business case, and a rollout plan");
+    r.placeholder = tidySuggestion("kpis_pack", "Success measures: Achieve the savings target of €X million by Q2 2027; sponsor sign-off on all deliverables");
+    r.tip = thinIssue("kpis_pack").message;
+    r.lead = firstPerson("need three business consultants for a 9-month transformation");
+    r.excl = normFact("scope_out", "Exclusions: Implementation of the new model; IT build");
+    Object.assign(S.f, { kpis: "Model signed off by the CPO by June 2027; business case approved by Finance", acceptance: "Each deliverable accepted in writing" });
+    r.kpis = offlineExec("a target operating model transformation").kpis;
+    return r;
+  });
+  expect(got.swap).toBe("Sponsor and stakeholders: CPO (sponsor), CFO (budget and savings oversight), Head of Risk (control impact)\nTeams involved: Procurement teams, Finance, Risk and Compliance");
+  expect(got.drop).toBe("Success measures: deliver the target operating model design within 9 months; sponsor sign-off on all deliverables");
+  expect(got.noEdit).toBeNull();
+  expect(got.approved).toEqual({ budget_approved: "partly" });
+  expect(got.deadline).toEqual({});
+  expect(got.padded).toEqual({});
+  expect(got.shall).toEqual(["The Service Provider shall assess today's setup in 6 countries.", "The Service Provider shall design the target operating model including roles, governance and category management.",
+    "The Service Provider shall build the business case.", "The Service Provider shall deliver a rollout plan."]);
+  expect(got.placeholder).toBe("Success measures: Achieve the savings target by Q2 2027; sponsor sign-off on all deliverables");
+  expect(got.tip).toContain("signed off by the sponsor");
+  expect(got.lead).toBe("three business consultants for a 9-month transformation");
+  expect(got.excl).toBe("Implementation of the new model; IT build");
+  expect(got.kpis).toEqual(["Model signed off by the CPO by June 2027", "Business case approved by Finance"]);
+});
+
+test("'the CPO is the sponsor, not the Procurement Director. rest is fine' accepts the suggestion with that change", async ({ page }) => {
+  await openApp(page);
+  await say(page, "We need business consultants to redesign our procurement operating model, about 200k for 6-12 months");
+  await choose(page, "No, look wider");
+  for (let i = 0; i < 6 && (await page.evaluate(() => S.lastAsked)) !== "audience_fn"; i++) {
+    const chips = await choices(page).allInnerTexts();
+    if (chips.includes("Use this suggestion")) await choose(page, "Use this suggestion"); else if (chips.length && !chips.includes("Skip for now")) await choose(page, chips[0]); else await say(page, "Buying is slow and costly; if delayed we miss the savings target");
+  }
+  await page.evaluate(() => { S.suggest.audience_fn = "Sponsor and stakeholders: Procurement Director (sponsor), CFO\nTeams involved: Procurement, Finance and Risk"; });
+  await say(page, "the CPO is the sponsor, not the Procurement Director. rest is fine");
+  expect(await page.evaluate(() => [S.f.users, S.f.functions, S.sugAccepted.audience_fn])).toEqual(["CPO (sponsor), CFO", "Procurement, Finance and Risk", true]);
+});

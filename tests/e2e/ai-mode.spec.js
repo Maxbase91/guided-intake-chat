@@ -219,7 +219,7 @@ test("a budget the AI changes in passing is said out loud", async ({ page, reque
   await say(page, HR);
   await say(page, "About 400k");
   await mock(request, { nextChat: { facts: { value: 450000, background: "Our payroll tool is end of life" } } });
-  await say(page, "Our payroll tool is end of life, and we found another 50k");
+  await say(page, "Our payroll tool is end of life, and the budget went up, we found another 50k");
   expect(await page.evaluate(() => S.msgs.map((m) => m.text || "").join("\n"))).toContain("Changed: budget from €400,000 to **€450,000**");
 });
 
