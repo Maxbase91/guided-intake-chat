@@ -284,3 +284,20 @@ test("'it's fine, keep it' on a past start does not take a date the AI made up",
   await say(page, "it's fine, keep it");
   expect(await page.evaluate(() => S.f.needed_by)).toBe("To be determined");
 });
+
+test("button clicks, a plain 'ok' to a suggestion and 'skip' are read by the rules without an AI call; typed answers still use the AI", async ({ page, request }) => {
+  await openApp(page, { kind: "ai" });
+  await say(page, HR);
+  await say(page, "About 400k");
+  await say(page, "Our payroll tool is end of life and payroll runs on spreadsheets; if delayed we miss the reporting deadline");
+  expect(await page.evaluate(() => S.lastAsked)).toBe("audience_fn");
+  const before = (await calls(request)).length;
+  await choose(page, "Use this suggestion");              // next is a question without a suggestion: no AI request at all
+  expect((await calls(request)).length).toBe(before);
+  expect(await page.evaluate(() => [S.sugAccepted.audience_fn, S.lastAsked])).toEqual([true, "current_solution"]);
+  await say(page, "Spreadsheets today; we have no team to build a replacement");   // a typed answer goes to the AI
+  expect((await calls(request)).length).toBeGreaterThan(before);
+  const mid = (await calls(request)).length;
+  await say(page, "skip");
+  expect((await calls(request)).length - mid).toBeLessThanOrEqual(1);   // at most the suggestion for the next question
+});

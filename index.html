@@ -1237,7 +1237,7 @@ New demand facts: scope_in (what the provider must do and deliver; also record d
 support_model, service_hours, tools, gov_meetings, reporting, change_mgmt, escalation, supplier_terms, our_deps, prov_assumptions, other_risks,
 entity (the provisioning legal entity that receives the service and signs the contract: one of ${ENTITIES.map(e=>`${e.id} = ${e.name}`).join("; ")}), in_house (true if this is work the bank does itself or could realistically do itself (EBA/GL/2019/02 paragraph 26), false if a bank would not do it itself),
 ongoing (true for an ongoing service, false for a one-off), important_fn (true only if the user says it supports a critical or important function), title (working title), l4 (Level 4 code, see below).
-Level 4 list: ${L4.map(e=>`${e.code} ${e.name}`).join("; ")}. On the first message set l4 to the best matching code, l4_match (0-100) and l4_reason (one short plain sentence).
+${!S.det||S.lastAsked==="confirm_derived" ? `Level 4 list: ${L4.map(e=>`${e.code} ${e.name}`).join("; ")}. On the first message set l4 to the best matching code, l4_match (0-100) and l4_reason (one short plain sentence).` : "Level 4: already set; change l4 only when the user corrects it at the check step."}
 If the user types "skip", record nothing for that item.
 At the check step (asking = confirm_derived) the user confirms or corrects facts the app worked out; record any correction (entity, ongoing, in_house, tech_service, important_fn, personal_data, offshore, location, title, l4) and reply briefly. Numbered points refer to the list in your last message. Never decide outsourcing yourself.
 Suggested answers: items marked suggest=true in still_needed are answered by suggestion. When you ask one, put a concrete suggestion tailored to this request in "suggestion" (one plain string, never an object or a list)
@@ -1657,6 +1657,9 @@ async function handleTurn(text, cid, opts={}){
   }
   if(S.sd && /^(make it|shorten|shorter|add more|rewrite|reword)|\b(summary|description|document)\b/i.test(text) && aiReady()) return refineSD(text);
   const asked=S.lastAsked; if(asked) S.asked[asked]=(S.asked[asked]||0)+1;
+  // a button, a plain "ok" to a suggestion or "skip" needs no AI: the rules read it exactly, and the AI's tokens are kept for real answers
+  const said0=String(opts.display||text).trim(), rulesOnly = !!asked && asked!=="need" && (S.choices.some(c=>c.toLowerCase()===said0.toLowerCase())
+    || (isSug(asked) && (ACCEPT.test(said0) || DELEGATE.test(said0) || text==="Use this suggestion")) || /^(?:skip|skip for now|skip this|pass)[.!]?$/i.test(said0));
   const um={role:"user",text:opts.display||text}; if(!opts.silent) S.msgs.push(um); S.choices=[]; S.busy=true;
   if(opts.corrDone&&opts.corrDone.length) S.msgs.push({role:"assistant",kind:"sys",text:`Changed: ${opts.corrDone.join("; ")}.`});
   (opts.asideNotes||[]).forEach(n=>S.msgs.push({role:"assistant",kind:"sys",text:n}));
@@ -1670,9 +1673,11 @@ async function handleTurn(text, cid, opts={}){
   const keepIt = keepIt0 || vagueReply;
   if(pend && !keepIt && pend.kind!=="date") S.f[pend.fact]=null;
   let reply=null, choices=[], complete=false, note=null, aiAsking=null, aiCheck=null, aiSuggestion=null, aiScore=null, aiDropped=false;
-  if(aiReady()){
+  if(aiReady() && !rulesOnly){
     try{
-      const transcript=S.msgs.filter(m=>!m.kind).slice(0,-1).slice(-8).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
+      // the last six messages, each cut to 400 characters: the state block carries everything already known
+      const clip=t=>{ t=String(t||""); return t.length>400 ? t.slice(0,400).replace(/\s+\S*$/,"")+" …" : t; };
+      const transcript=S.msgs.filter(m=>!m.kind).slice(0,-1).slice(-6).map(m=>`${m.role==="user"?"User":"Assistant"}: ${clip(m.text)}`).join("\n");
       const out = await callLLM(chatSystem(), [{role:"user",content:chatUser(transcript, text, pend)}]);
       guard(cid);
       const aiCorr=normCorr(out.corrections);
@@ -3279,11 +3284,11 @@ const cleanFacts = () => Object.fromEntries(Object.entries(S.f).filter(([k,v])=>
 
 // the message sent to write the documents: the whole conversation, the facts and what the rules decided (also shown in How it works)
 function docUser(){
-  const cl=classify(S.f), convo=S.msgs.filter(m=>!m.kind).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
+  const cl=classify(S.f), convo=S.msgs.filter(m=>!m.kind).map(m=>m.role==="user"?`User: ${m.text}`:`Assistant: ${String(m.text).length>200?String(m.text).slice(0,200).replace(/\s+\S*$/,"")+" …":m.text}`).join("\n");
   return `Conversation:\n${convo}\n\nFacts: ${JSON.stringify({...cleanFacts(), value_display: known(S.f.value)?money(Number(S.f.value))+(S.f.value_is_estimate?" (estimate)":""):"unknown"})}\nCategory: ${catById(S.f.category).name}\n`+
         `ICT service (DORA): ${cl.ict?cl.ict.text:"not assessed"}\nOutsourcing: ${cl.out?cl.out.text:"not assessed"}\n`+
         (NEW_DEMAND(S.det.route)?`Critical or important function: ${isImportant(S.f)?"may apply (flag only)":"no indication"}\nProvisioning legal entity: ${(entityById(S.f.entity)||{}).name||"to be determined"}\nDerived facts checked by the requester: ${known(S.f.confirm_derived)&&!isTBD(S.f.confirm_derived)?S.f.confirm_derived:"no"}\n`+
-          `Initial Level 4 classification: ${(S.l4Initial||[]).map(x=>`${x.code} ${x.name} (${x.match}%)`).join("; ")}\nLevel 4 list: ${L4.map(e=>`${e.code} ${e.name}: ${e.desc}`).join(" | ")}\n`:"")+
+          `Initial Level 4 classification: ${(S.l4Initial||[]).map(x=>`${x.code} ${x.name} (${x.match}%)`).join("; ")}\nLevel 4 candidates: ${[...new Set([S.f.l4,...(S.l4Initial||[]).map(x=>x.code),...classifyL4(S.f).map(x=>x.code)].filter(Boolean))].slice(0,5).map(c=>l4ByCode(c)).filter(Boolean).map(e=>`${e.code} ${e.name}: ${e.desc}`).join(" | ")}\n`:"")+
         `Recommended route: ${CHANNELS[S.det.route].name}. ${S.det.why}\nChecks triggered: ${S.det.controls.map(c=>c[1]).join(", ")||"none"}\nExisting contract: ${S.det.contract?`${S.det.contract.title} with ${S.det.contract.supplier}`:"none"}\nPreferred suppliers: ${(PREFERRED[S.f.category]||[]).join(", ")||"none"}`;
 }
 // the message sent to change the documents on request
@@ -3889,7 +3894,7 @@ function specModel(withCurrent){
 
   B.push(h(2,"3. When an AI model is called"),
     table(["Call","When","What it gets","What it returns","If it fails"],[
-      ["A. Chat turn","Every message while the AI is on (not for corrections the rules already understood, nor for a request to change the documents)","The chat prompt; the last 8 messages; the latest message; the app's state: known facts, route so far, items already checked, a pending check, the next items still needed with their question and example","JSON: facts, reply, asking, choices, complete, suggestion, corrections, answers_question, assessment (fact, ok, issue, follow-up, score 1–10)","A short note in the chat; the rules read the answer and ask the standard question"],
+      ["A. Chat turn","Every typed answer while the AI is on. Not for a button click, a plain “ok” to a suggestion or “skip” (the rules read those exactly and save tokens), corrections the rules already understood, questions back the rules answer, or a request to change the documents","The chat prompt (the Level 4 list only on the first message and at the check step); the last 6 messages, each cut to 400 characters; the latest message; the app's state: known facts, route so far, items already checked, a pending check, the next items still needed with their question and example","JSON: facts, reply, asking, choices, complete, suggestion, corrections, answers_question, assessment (fact, ok, issue, follow-up, score 1–10)","A short note in the chat; the rules read the answer and ask the standard question"],
       ["B. Suggestion","The next question is a suggestion item and the chat turn gave no usable suggestion; also when the chat resumes (after a correction, the improvement round or Add)","The suggestion prompt; the question; what is known; the rules' own draft","One plain string; for bundles one “Label: text” line per label","The rules' draft is shown"],
       ["C. Documents","Once every needed detail is there (rebuilt only when the facts change)","The documents prompt; the whole conversation; the facts; category; ICT and outsourcing result; route and why; reviews; contract; preferred suppliers. New demand also: critical-function flag, entity, check-step result, the Level 4 list","JSON: description, brd; new demand also detail, compact, l4_final, quality_remarks","One retry (none at a usage limit); the documents are built from the answers"],
       ["D. Document change","“Make it shorter”, “rewrite the summary” … once a description exists","The documents prompt; the current description and requirements; the request","The same JSON; description and requirements are merged","A note; the text can be edited directly"],

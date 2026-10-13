@@ -43,6 +43,12 @@ The panel is built from the code when it opens, so it never goes out of date:
 
 The explanations in plain words sit in `specModel()` (section 11 of the script). When route, check or quality logic changes, update that text too; the functions it describes carry a `described in How it works` comment.
 
+### AI usage and free-tier limits
+
+A full new-demand conversation makes about 15 AI requests and sends about 40,000 input tokens (measured with the mock providers; before this change it was 27 requests and 100,000 tokens). Button clicks, a plain "ok" to a suggestion and "skip" are read by the rules without an AI call; the Level 4 list goes only into the first message and the check step; each turn sends the last six messages cut to 400 characters; the documents request gets the closest Level 4 entries only.
+
+On free plans the binding limits are requests per day (Gemini) and tokens per day per model (Groq), so roughly a dozen live test conversations a day fit before the chat falls back to Mistral or to standard questions. For a long test session, `?ai=mistral` sends everything to Mistral (largest free allowance, less exact with instructions), and the mock providers (`npm run test:e2e`) cover behaviour without any quota.
+
 ## Deploy on Vercel
 
 1. Import this repo in Vercel. Framework preset: **Other**. No build command.
