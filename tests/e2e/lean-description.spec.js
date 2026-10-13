@@ -110,3 +110,15 @@ test("a suggestion keeps only the requester's figures and the standard draft's; 
   const onlyInvented = await page.evaluate(() => groundSuggestion("acceptance_pack", "Acceptance criteria: 99.9% of requests routed correctly within 2 days\nReview and sign-off: Head of Procurement signs off"));
   expect(onlyInvented.split("\n")[0]).toBe(`Acceptance criteria: ${got.draft.split("\n")[0].replace(/^[^:]+:\s*/, "")}`);
 });
+
+test("what the requester already said for a suggestion line comes first when the AI's points lost it", async ({ page }) => {
+  await openApp(page);
+  await say(page, "We need a procurement intake platform for the whole bank, about 2 million over 3 years");
+  const out = await page.evaluate(() => {
+    S.msgs.push({ role: "user", text: "one intake form and single sign-on; it works if 90% of requests go through it within 6 months" });
+    S.f.acceptance = "90% of requests go through it within 6 months";
+    // the live suggestion: every point had a figure nobody gave
+    return groundSuggestion("acceptance_pack", "Acceptance criteria: 90% of procurement requests processed within 3 months with <5% manual overrides; 100% approval routing accuracy\nReview and sign-off: Finance approves budget and compliance integration within 5 working days");
+  });
+  expect(out.split("\n")[0]).toBe("Acceptance criteria: 90% of requests go through it within 6 months");
+});
