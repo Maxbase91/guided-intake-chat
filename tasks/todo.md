@@ -10,4 +10,4 @@
 - [x] OpenRouter provider (api/llm.js, mocks, tests)
 - [x] Benchmark fixture (separate author) + tests/e2e/l4-scale.spec.js
 - [x] Full suite green (151 e2e, 21 API), docs (README, ASSESSMENT, How it works)
-- [ ] Deploy, verify production, live AI benchmark, docs/l4-recognition-report.md (AI section)
+- [x] Deploy, verify production, live AI benchmark, docs/l4-recognition-report.md (AI section)

@@ -61,6 +61,46 @@ not the descriptions or search terms. 32 of them are hard cases with a near neig
   These four are the 7% missing from the shortlist. With AI, the model names the item in a category list's words
   (`l4_terms`, for example "courier delivery"), and the app looks those up in the whole list.
 
-## Recognition with AI (live)
+## Recognition with AI (live, 13 October 2026)
 
-To be measured on the live site (first message only, the AI's Level 4 against the expected one); see below.
+**Setup:**
+- 32 of the 60 requests (every odd one, plus b20 and b34), each as the first message on the live site.
+- Answered by Mistral 23 times, Groq 7 times and Gemini 2 times (Gemini was mostly at its daily limit).
+
+| Measure | Result |
+|---|---|
+| The AI returned a Level 4 | 28 of 32 |
+| The AI's Level 4 was right | 21 of 28 (75%) |
+| Final Level 4 right | 23 of 32 (72%) |
+| Final Level 4 right, after the fix below (re-checked live) | 25 of 32 (78%) |
+| Right entry in the AI's candidates | 28 of 32 (88%) |
+
+**Fixed after the run:** in two cases the AI chose correctly but a category word at the start of the request overruled it:
+- "support and **maintenance** renewal for our database licences" went to facilities;
+- "analyst research **seats**" went to software.
+
+Now a category named at the start overrules the AI only when the AI's entry fits the words far worse. Both are correct
+on the live site, and `tests/e2e/l4-scale.spec.js` guards it.
+
+**What is still missed:**
+- **Not among the candidates (4 requests):**
+  - courier;
+  - sponsorship;
+  - data migration (the AI chose "Core banking implementation", a fair neighbour);
+  - generative AI software.
+
+  The models never used `l4_terms` and preferred to pick the nearest candidate. A semantic search (embeddings,
+  for example with a free Gemini or Mistral embedding model) would close this gap. Its cost is one extra call per
+  request, plus vectors for the list computed once at import.
+- **Close neighbours:** GPU capacity vs general cloud capacity.
+- **No pick, so the rules decided (1 request):** the one-off KYC remediation project went to the rules, which chose
+  "Programme and project management office".
+- **The AI didn't answer in time once, so the rules decided:** laptops with docking stations went to peripherals. It
+  is right when re-run.
+
+**Verdict:**
+- The size of the list is no longer the problem: the prompt stays small and the candidates hold the right entry in
+  about 9 of 10 requests.
+- The AI picks well from them.
+- The remaining errors are paraphrases with no shared words, and close neighbours that a person would also argue about.
+- The check step shows the Level 4 to the requester and lets them correct it, and the summary search finds any entry.
