@@ -69,8 +69,11 @@ test.describe("phone layout", () => {
     await page.reload();
     await say(page, "We need 15 laptops for new joiners in Frankfurt.");
     await answerUntilDone(page, [[/When (do you need it|should it start)/i, "15 December 2026"]]);
-    await page.click("[data-act=brd]");
-    await expect(page.locator("#paper")).toBeVisible();
+    // a catalogue order is a short purchase request; it and How it works fit the screen
+    await expect(page.locator(".sd .sd-h")).toContainText("Purchase request");
+    expect(await overflow()).toBeLessThanOrEqual(0);
+    await page.click("#howBtn");
+    await expect(page.locator("#specPaper")).toBeVisible();
     expect(await overflow()).toBeLessThanOrEqual(0);
     expect(errors).toEqual([]);
   });

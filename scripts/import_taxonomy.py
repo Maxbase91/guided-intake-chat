@@ -1,4 +1,4 @@
-"""Import the Level 4 taxonomy, preferred suppliers and framework contracts into index.html.
+"""Import the Level 4 taxonomy, preferred suppliers, framework contracts and the catalogue into index.html.
 
 Usage:
     python3 scripts/import_taxonomy.py data/taxonomy-test            # validate and write into index.html
@@ -8,6 +8,9 @@ The folder holds CSV files (UTF-8, header row). Several files of each kind are m
     l4*.csv         code,name,l1,l2,l3,theme,desc,kw          kw: search terms separated by ";"
     suppliers*.csv  supplier,preferred_l4                       preferred_l4: L4 codes separated by ";"
     contracts*.csv  id,supplier,title,l4,expires,remaining      l4: codes separated by ";", expires: YYYY-MM-DD
+    catalogue*.csv  id,kind,name,supplier,l4,price,max_order,unit,kw
+                    kind "item": a fixed-price item (price required); kind "shop": a supplier's punch-out shop for a whole
+                    Level 4, with no fixed price and a maximum order value (max_order required)
     theme-map.csv   level,name,theme  (optional)                fills an empty theme from the L3, L2 or L1 name
 
 The real list: export the Excel sheets as CSV with these columns. Every L4 needs a theme: one of the rule themes
@@ -60,6 +63,58 @@ class Contract:
     l4: list[str]
     expires: str
     remaining: int
+
+
+@dataclass
+class CatalogueEntry:
+    id: str
+    kind: str
+    name: str
+    supplier: str
+    l4: str
+    price: float | None
+    max_order: float | None
+    unit: str
+    kw: list[str] = field(default_factory=list)
+
+
+def load_catalogue(folder: Path, codes: set[str]) -> tuple[list[CatalogueEntry], list[str]]:
+    """Catalogue items and punch-out shops, each linked to an existing Level 4."""
+    entries: list[CatalogueEntry] = []
+    errors: list[str] = []
+    ids: set[str] = set()
+
+    def number(where: str, col: str, value: str) -> float | None:
+        if not value:
+            return None
+        try:
+            return float(value)
+        except ValueError:
+            errors.append(f"{where}: {col} '{value}' is not a number")
+            return None
+
+    for src, line, row in read_rows(folder, "catalogue*.csv"):
+        where = f"{src}:{line}"
+        cid, kind, l4 = row.get("id", ""), row.get("kind", "").lower(), row.get("l4", "")
+        if not cid or cid in ids:
+            errors.append(f"{where}: catalogue id '{cid}' is empty or appears twice")
+        ids.add(cid)
+        if kind not in ("item", "shop"):
+            errors.append(f"{where}: kind '{kind}' must be item or shop")
+        for col in ("name", "supplier"):
+            if not row.get(col):
+                errors.append(f"{where}: {col} is empty")
+        if l4 not in codes:
+            errors.append(f"{where}: {cid} is linked to unknown Level 4 '{l4}'")
+        price = number(where, "price", row.get("price", ""))
+        max_order = number(where, "max_order", row.get("max_order", ""))
+        if kind == "item" and not (price and price > 0):
+            errors.append(f"{where}: item {cid} needs a price")
+        if kind == "shop" and not (max_order and max_order > 0):
+            errors.append(f"{where}: shop {cid} needs a max_order")
+        entries.append(CatalogueEntry(cid, kind, row.get("name", ""), row.get("supplier", ""), l4, price, max_order,
+                                      row.get("unit", ""), [k.lower() for k in split_list(row.get("kw", ""))]))
+    return entries, errors
 
 
 def themes_in_page(html: str) -> set[str]:
@@ -196,12 +251,13 @@ def to_json(
     l4: list[L4Entry],
     suppliers: list[Supplier],
     contracts: list[Contract],
+    catalogue: list[CatalogueEntry] | None = None,
 ) -> str:
     # one entry per line keeps the diff of index.html readable; "</" is escaped so the block can't end the script tag
     lines = lambda items: ",\n".join(
         json.dumps(asdict(x), ensure_ascii=False) for x in items
     )
-    text = f'{{"version":{json.dumps(version)},\n"l4":[\n{lines(l4)}\n],\n"suppliers":[\n{lines(suppliers)}\n],\n"contracts":[\n{lines(contracts)}\n]}}'
+    text = f'{{"version":{json.dumps(version)},\n"l4":[\n{lines(l4)}\n],\n"suppliers":[\n{lines(suppliers)}\n],\n"contracts":[\n{lines(contracts)}\n],\n"catalogue":[\n{lines(catalogue or [])}\n]}}'
     return text.replace("</", "<\\/")
 
 
@@ -223,6 +279,8 @@ def main() -> int:
 
     html = args.html.read_text(encoding="utf-8")
     l4, suppliers, contracts, errors = load(args.folder, themes_in_page(html))
+    catalogue, cat_errors = load_catalogue(args.folder, {e.code for e in l4})
+    errors += cat_errors
     if errors:
         print(f"{len(errors)} problem(s), nothing written:", file=sys.stderr)
         for e in errors[:200]:
@@ -232,7 +290,8 @@ def main() -> int:
     for e in l4:
         by_theme[e.theme] = by_theme.get(e.theme, 0) + 1
     print(
-        f"{len(l4)} Level 4 categories, {len(suppliers)} suppliers, {len(contracts)} contracts"
+        f"{len(l4)} Level 4 categories, {len(suppliers)} suppliers, {len(contracts)} contracts, "
+        f"{len(catalogue)} catalogue entries ({sum(1 for c in catalogue if c.kind == 'shop')} shops)"
     )
     print("by theme: " + ", ".join(f"{k} {v}" for k, v in sorted(by_theme.items())))
     if args.check:
@@ -243,7 +302,7 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
-    data = to_json(args.version or args.folder.name, l4, suppliers, contracts)
+    data = to_json(args.version or args.folder.name, l4, suppliers, contracts, catalogue)
     args.html.write_text(
         BLOCK_RE.sub(
             lambda m: m.group(1) + "\n" + data + "\n" + m.group(3), html, count=1

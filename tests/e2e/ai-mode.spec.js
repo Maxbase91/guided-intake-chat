@@ -302,9 +302,11 @@ test("button clicks, a plain 'ok' to a suggestion and 'skip' are read by the rul
 
 test("documents built without the AI can be written by the AI again on request", async ({ page, request }) => {
   await openApp(page, { kind: "ai" });
-  await say(page, "We need 15 laptops for new joiners in Frankfurt.");
-  await mock(request, { gemini: "500", groq: "500", mistral: "500" });
-  await say(page, "15 December 2026");
+  // new demand: a catalogue order or a low-value purchase is a short purchase request, built without the AI
+  await say(page, "A new HR system to replace our payroll tool, about 400k.");
+  await mock(request, { gemini: "500", groq: "500", mistral: "500", openrouter: "500" });
+  // every detail given: the documents are written next
+  await page.evaluate(async () => { for (const k of S.missing) S.f[k] = BOOL_KEYS.includes(k) ? false : "Given in test"; refresh(); await finishIntake(S.cid, "That's everything I need."); render(); });
   await expect(page.locator("#msgs")).toContainText("The AI couldn't write the documents just now");
   expect(await page.evaluate(() => S.sd._ai)).toBe(false);
   await mock(request, { gemini: "ok", groq: "ok", mistral: "ok" });

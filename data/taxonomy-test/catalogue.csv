@@ -1,0 +1,85 @@
+id,kind,name,supplier,l4,price,max_order,unit,kw
+CAT-1001,item,"Standard laptop 14""",Northwind IT,L4-1101,1150,,each,laptop;notebook
+CAT-1006,item,"Performance laptop 16""",Northwind IT,L4-1101,1890,,each,performance laptop;developer laptop;16 inch laptop
+CAT-1007,item,"Desktop PC, standard",Northwind IT,L4-1101,820,,each,desktop pc;desktop computer
+CAT-1002,item,"27"" monitor",Northwind IT,L4-1102,240,,each,monitor;screen
+CAT-1008,item,"34"" curved monitor",Northwind IT,L4-1102,520,,each,curved monitor;ultrawide monitor
+CAT-1003,item,Noise-cancelling headset,Northwind IT,L4-1103,180,,each,headset;headphones
+CAT-1005,item,Docking station,Northwind IT,L4-1103,210,,each,docking
+CAT-1009,item,Wireless keyboard and mouse set,Northwind IT,L4-1103,75,,each,keyboard;mouse;mice
+CAT-1010,item,HD webcam,Northwind IT,L4-1103,95,,each,webcam
+CAT-1011,item,USB-C travel adapter,Halvorsen Devices,L4-1103,45,,each,travel adapter;usb-c adapter;dongle
+CAT-1012,item,Laptop backpack,Halvorsen Devices,L4-1103,60,,each,laptop bag;backpack
+CAT-1004,item,"Smartphone, standard",Fabrikam Mobile,L4-1106,690,,each,smartphone;mobile phone;iphone
+CAT-1013,item,"Smartphone, premium",Fabrikam Mobile,L4-1106,1090,,each,premium smartphone
+CAT-1014,item,"Tablet, standard",Kestrel Mobile Supply,L4-1107,640,,each,tablet;ipad
+CAT-1015,item,Phone case and screen protector,Kestrel Mobile Supply,L4-1108,35,,set,phone case;screen protector
+CAT-1016,item,"Desk printer, colour",Pemberton Imaging,L4-1109,230,,each,desk printer;personal printer
+CAT-1017,item,Meeting room video kit (small room),Lumacrest Displays,L4-1105,2900,,each,meeting room kit;teams room;video bar
+CAT-3001,item,Collaboration suite licence,Adatum Software,L4-1210,280,,per user per year,collaboration licence;microsoft 365;m365
+CAT-3002,item,PDF editor licence,Adatum Software,L4-1210,180,,per user per year,pdf editor;acrobat;pdf licence
+CAT-3003,item,Diagramming tool licence,Adatum Software,L4-1210,160,,per user per year,diagramming;visio;diagram tool
+CAT-3004,item,Project tracking tool licence,Lakemont Licensing,L4-1202,120,,per user per year,project tracking tool;kanban board;task tracking
+CAT-3005,item,Screen recording tool licence,Adatum Software,L4-1210,90,,per user per year,screen recording;screen recorder
+CAT-3006,item,E-signature licence,Vellum Sign,L4-1212,300,,per user per year,e-signature;electronic signature;docusign
+CAT-2001,item,Ergonomic office chair,Contoso Office,L4-2608,420,,each,chair
+CAT-2003,item,Height-adjustable desk,Ergoform Seating,L4-2608,690,,each,standing desk;height-adjustable desk;sit-stand desk
+CAT-2012,item,Visitor chair,Contoso Office,L4-2608,160,,each,visitor chair
+CAT-2013,item,Lockable pedestal,Contoso Office,L4-2608,210,,each,pedestal;drawer unit;filing cabinet
+CAT-2005,item,Monitor arm,Ergoform Seating,L4-2609,89,,each,monitor arm
+CAT-2006,item,Footrest,Ergoform Seating,L4-2609,39,,each,footrest
+CAT-2014,item,Laptop stand,Ergoform Seating,L4-2609,49,,each,laptop stand
+CAT-2004,item,LED desk lamp,Contoso Office,L4-2607,55,,each,desk lamp
+CAT-2015,item,"Whiteboard, mobile",Contoso Office,L4-2607,240,,each,whiteboard;flipchart
+CAT-2002,item,Stationery bundle,Contoso Office,L4-2602,35,,bundle,stationery;pens;toner
+CAT-2016,item,"Notebooks, A5 (10 pack)",Paperhaus Supplies,L4-2602,29,,pack,notebooks a5;notepads
+CAT-2007,item,"Printer paper, A4 (5 reams)",Paperhaus Supplies,L4-2603,28,,box,printer paper;a4 paper;copy paper
+CAT-2008,item,"Toner cartridge, standard",Contoso Office,L4-2603,95,,each,toner cartridge
+CAT-2009,item,"First-aid kit, office",Contoso Office,L4-2606,45,,each,first aid kit;first-aid kit
+CAT-2010,item,Defibrillator (AED),Contoso Office,L4-2606,1290,,each,defibrillator;aed
+CAT-2011,item,Business cards (250),Printmark Business Print,L4-2604,39,,pack,business cards
+CAT-2017,item,Letterhead paper (500),Printmark Business Print,L4-2604,85,,pack,letterhead
+CAT-2018,item,Kettle,Contoso Office,L4-2612,35,,each,kettle
+CAT-2019,item,Desk fan,Contoso Office,L4-2612,45,,each,desk fan;fan
+CAT-2020,item,Coffee pods (100),Contoso Office,L4-2605,38,,box,coffee pods;coffee capsules
+CAT-2021,item,Hand sanitiser (12 bottles),Contoso Office,L4-2613,42,,box,hand sanitiser;sanitizer
+CAT-2022,item,Shipping boxes (25),Paperhaus Supplies,L4-2614,32,,pack,shipping boxes;cardboard boxes;packaging
+CAT-2023,item,"Fleece jacket, branded",Uniforma Workwear,L4-2610,65,,each,fleece;branded jacket
+CAT-2024,item,Safety vest,Uniforma Workwear,L4-2610,12,,each,safety vest;hi-vis
+CAT-2025,item,Branded water bottle,Giftory Europe,L4-2318,14,,each,water bottle
+CAT-2026,item,Branded tote bag,Giftory Europe,L4-2318,9,,each,tote bag
+CAT-2027,item,Branded notebook and pen set,Giftory Europe,L4-2318,19,,set,notebook and pen set;branded pen
+CAT-2028,item,Wine gift box,Giftory Europe,L4-2319,65,,each,wine gift;wine box
+CAT-2029,item,Chocolate gift box,Giftory Europe,L4-2319,35,,each,chocolate box;chocolates
+CAT-2030,item,Sandwich platter (10 people),Greenleaf Catering,L4-2508,120,,platter,sandwich platter;sandwiches
+CAT-2031,item,Coffee and tea break (per person),Greenleaf Catering,L4-2508,8,,per person,coffee break;coffee and tea
+CAT-2032,item,Fruit basket,Greenleaf Catering,L4-2508,45,,each,fruit basket
+CAT-2033,item,Water cooler bottles (10),Bean & Bite Vending,L4-2509,60,,pack,water cooler bottles;water bottles 19l
+CAT-2034,item,"Reception bouquet, weekly",Petal & Stem Florists,L4-2537,75,,per week,reception flowers
+CAT-2035,item,Condolence wreath,Petal & Stem Florists,L4-2537,120,,each,wreath;condolence flowers
+SHOP-2537,shop,Florist shop,Petal & Stem Florists,L4-2537,,1000,,flowers;bouquet;florist
+SHOP-2601,shop,Office supplies shop,Contoso Office,L4-2601,,2500,,office supplies;office supply
+SHOP-2602,shop,Stationery shop,Paperhaus Supplies,L4-2602,,1500,,stationery shop
+SHOP-2604,shop,Business print shop,Printmark Business Print,L4-2604,,2500,,business print;print shop;flyers
+SHOP-2605,shop,Kitchen and pantry shop,Contoso Office,L4-2605,,1500,,pantry;kitchen supplies;tea and coffee
+SHOP-2606,shop,First-aid and safety shop,Contoso Office,L4-2606,,1500,,first aid;safety supplies
+SHOP-2607,shop,Desk accessories shop,Contoso Office,L4-2607,,1500,,desk accessories
+SHOP-2609,shop,Ergonomics shop,Ergoform Seating,L4-2609,,2500,,ergonomic;ergonomics
+SHOP-2610,shop,Workwear shop,Uniforma Workwear,L4-2610,,2500,,workwear;uniforms
+SHOP-2611,shop,Signage shop,Printmark Business Print,L4-2611,,2500,,sign;signage;door sign;name plate
+SHOP-2612,shop,Small electricals shop,Contoso Office,L4-2612,,1500,,small electricals;office electricals
+SHOP-2613,shop,Hygiene consumables shop,Contoso Office,L4-2613,,1500,,paper towels;toilet paper;cleaning consumables
+SHOP-2614,shop,Packaging shop,Paperhaus Supplies,L4-2614,,1000,,packaging supplies;envelopes;bubble wrap
+SHOP-2318,shop,Promotional merchandise shop,Giftory Europe,L4-2318,,2500,,merchandise;giveaways;branded items;promotional items
+SHOP-2319,shop,Client gift shop,Giftory Europe,L4-2319,,2500,,client gift;gift box;christmas gift;christmas presents
+SHOP-2508,shop,Meeting catering shop,Greenleaf Catering,L4-2508,,2500,,meeting catering;catering for a meeting;lunch for a meeting;working lunch;cake;snacks
+SHOP-2509,shop,Water and refreshments shop,Bean & Bite Vending,L4-2509,,1000,,water cooler
+SHOP-1103,shop,IT accessories shop,Halvorsen Devices,L4-1103,,1500,,it accessories;cables;chargers;adapters
+SHOP-1108,shop,Mobile accessories shop,Kestrel Mobile Supply,L4-1108,,1000,,mobile accessories;phone accessories
+SHOP-1621,shop,Books and publications shop,Pressline Newswire,L4-1621,,1500,,books;book;e-books;publications;magazines
+SHOP-2531,shop,Courier booking,Parcelrun Couriers,L4-2531,,1000,,courier;express delivery;same-day delivery;send a parcel
+SHOP-3202,shop,Hotel booking (meetings and team events),Harbourlight Hotels,L4-3202,,5000,,hotel rooms;meeting room in a hotel
+SHOP-2410,shop,Conference tickets,Litware Learning,L4-2410,,3000,,conference ticket;conference tickets;conference pass
+SHOP-2414,shop,E-learning course seats,Litware Learning,L4-2414,,2000,,online course;e-learning course;course seat
+SHOP-1201,shop,Standard software store,Lakemont Licensing,L4-1201,,3000,,standard software;software store;desktop app
+CAT-2036,item,Greeting cards (10),Paperhaus Supplies,L4-2602,18,,pack,greeting card;birthday card;farewell card;thank you card;greeting cards
