@@ -2777,6 +2777,8 @@ function normFact(k,v){
   if(NUM_KEYS.includes(k)){ if(typeof v==="number") return v;
     if(k==="value"){ const m=parseMoney(v); if(m!=null) return m; }   // "€400k" is 400,000, not 400
     const n=parseFloat(String(v).replace(/[^\d.]/g,"")); return isNaN(n)?String(v):n; }
+  // a bare number for the duration ("3" for "over 3 years") takes its unit from what the requester said
+  if(k==="duration" && /^\s*\d+(?:[.,]\d+)?\s*$/.test(String(v))){ const n=String(v).trim(), m=userText().match(new RegExp(`\\b${n}\\s*(years?|months?|weeks?)\\b`,"i")); return m ? `${n} ${m[1].toLowerCase()}` : `${n} months`; }
   if(k==="budget_approved" && typeof v==="boolean") return v?"yes":"no";
   if(k==="budget_approved" && /not sure|unsure|unknown|no idea|don.?t know/i.test(String(v))) return "unsure";
   if(k==="supplier" && typeof v==="string") return cleanSupplier(v)||v;
@@ -3731,7 +3733,7 @@ function supplierRe(){ const names=[...ALL_SUPPLIERS,...(hasSupplier(S.f)?[Strin
 // removes captured details (money, dates, places, suppliers, route, risk answers, "I don't know") from description text
 function scrubText(t, keepTime){
   if(!t) return "";
-  let x=String(t).replace(/\s+/g," ").trim();
+  let x=String(t).replace(/\*\*|__/g,"").replace(/\s+/g," ").trim();
   STRIP_MONEY.forEach(re=>x=x.replace(re,""));
   if(!keepTime) STRIP_TIME.forEach(re=>x=x.replace(re,""));
   const sup=supplierRe(), bad=y=>SCRUB.money.test(y)||SCRUB.route.test(y)||SCRUB.risk.test(y)||SCRUB.unknown.test(y)||(!keepTime&&SCRUB.time.test(y))||(sup&&sup.test(y));
@@ -3768,6 +3770,15 @@ function offlineDescription(){
 const EXEC_ROWS=[["name","Service name"],["audience","Target audience"],["functions","Supported functions"],["problem","Business problem solved"],["capabilities","Key capabilities"],
   ["benefits","Key benefits"],["usp","Unique selling points"],["kpis","KPIs / success measures"],["regulatory","Regulatory / governance benefits"]];
 const EXEC_LISTS=["capabilities","benefits","kpis"];
+// numbers in the AI's description must be the requester's (or in a suggestion they accepted): "from 21 days to ≤7 days" or
+// "two days" they never said goes, with its sentence or point; "90% within 6 months" they said stays
+const NUM_WORDS={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,twenty:20,thirty:30,forty:40,fifty:50,hundred:100};
+const numsIn = t => [...String(t||"").toLowerCase().matchAll(/\d+(?:[.,]\d+)*|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|hundred)\b/g)].map(m=>NUM_WORDS[m[0]] ?? Number(m[0].replace(/,/g,""))).filter(n=>Number.isFinite(n));
+// (amounts don't count: "2 million" does not make "two days" the requester's, and the description never has amounts)
+const saidNums = () => new Set(numsIn((userText()+" "+Object.entries(S.f).filter(([k,v])=>typeof v==="string" && !/^l4/.test(k)).map(([,v])=>v).join(" "))
+  .replace(/(?:€|eur\b|euros?\b)\s*\d[\d.,]*\s*(?:k|m|bn|million|thousand|billion)?|\d[\d.,]*\s*(?:k|m|bn|million|thousand|billion)\b\s*(?:€|eur\b|euros?\b)?|\d[\d.,]*\s*(?:€|eur\b|euros?\b)/gi," ")));
+const grounded = (t, said) => numsIn(t).every(n=>said.has(n));
+const groundedText = (t, said) => String(t||"").split(/\n{2,}/).map(p=>p.split(/(?<=[.!?])\s+/).filter(x=>grounded(x,said)).join(" ")).filter(Boolean).join("\n\n");
 // at most n words, ending at a clause where possible ("…, and Information Security" rather than mid-phrase)
 function clipWords(t, n){
   t=String(t||"").trim(); if(words(t)<=n) return t;
@@ -3813,17 +3824,17 @@ function offlineExec(lead){
 }
 function mergeExec(base, ai){
   const out={...base}; if(!ai || typeof ai!=="object") return out;
-  const L=execLimits();
+  const L=execLimits(), said=saidNums();
   for(const [k] of EXEC_ROWS){ if(k==="name") continue;
     let v=ai[k];
-    if(EXEC_LISTS.includes(k)) v=(Array.isArray(v)?v:typeof v==="string"?v.split(/\n|;\s*/):[]).map(x=>clipWords(dropFigures(scrubText(String(x).replace(/^[-•*]\s*/,""),k==="kpis")),12)).filter(x=>x&&words(x)>=1).slice(0,5);
-    else v=typeof v==="string"?clipWords(dropFigures(scrubText(v,false)),25):"";
+    if(EXEC_LISTS.includes(k)) v=(Array.isArray(v)?v:typeof v==="string"?v.split(/\n|;\s*/):[]).map(x=>scrubText(String(x).replace(/^[-•*]\s*/,""),k==="kpis")).filter(x=>x && grounded(x,said)).map(x=>clipWords(x,12)).filter(x=>words(x)>=2).slice(0,5);
+    else v=typeof v==="string"?clipWords(dropFigures(groundedText(scrubText(v,false),said)),25):"";
     if(k==="regulatory" && NO_BENEFIT.test(v||"")) v="";
     if(v && v.length) out[k]=v;
   }
   const tg=typeof ai.tagline==="string"?scrubText(ai.tagline,false).replace(/\.$/,""):""; if(tg && words(tg)<=12) out.tagline=tg;
-  const hl=typeof ai.headline==="string"?clampWords(scrubText(ai.headline,false),L.head):""; if(words(hl)>=20) out.headline=hl;
-  const ex=typeof ai.exec==="string"?clampWords(String(ai.exec).split(/\n{2,}/).map(p=>scrubText(p,false)).filter(Boolean).join("\n\n"),L.exec):""; if(words(ex)>=Math.min(60,L.execMin)) out.exec=ex;
+  const hl=typeof ai.headline==="string"?clampWords(groundedText(scrubText(ai.headline,false),said),L.head):""; if(words(hl)>=20) out.headline=hl;
+  const ex=typeof ai.exec==="string"?clampWords(groundedText(String(ai.exec).split(/\n{2,}/).map(p=>scrubText(p,false)).filter(Boolean).join("\n\n"),said),L.exec):""; if(words(ex)>=Math.min(40,L.execMin)) out.exec=ex;
   out.summary=out.headline; out.narrative=out.exec;
   return out;
 }
@@ -3883,8 +3894,6 @@ function intakeRecord(){
     ["Outsourcing", nd && f.demand_type!=="goods" ? `${o.result} (${o.rs.short}, group standard)` : null],
     ["ICT service (DORA)",cl.ict?cl.ict.flag+(["Yes","Possible"].includes(cl.ict.flag)?` · ${cl.type}`:""):null],
     ["Critical or important function", nd && f.demand_type!=="goods" ? (isImportant(f)?"May apply, flagged for review":"No indication") : null],
-    // only when it applies: the final materiality call is made in the materiality process
-    ["Material spend review", known(f.value)&&Number(f.value)>=CONFIG.thresholds.materialityMin ? `Yes, the value is ${money(CONFIG.thresholds.materialityMin)} or more` : null],
     ["If it doesn't go ahead",v("impact_delay")]];
   return rows.filter(r=>r[1]);
 }
@@ -4143,7 +4152,7 @@ Plain language, short sentences, no marketing words, no jargon. Do not use inter
 Return JSON only:
 {"description":${S.det&&NEW_DEMAND(S.det.route)?`{"name":"","tagline":"","headline":"","exec":"","audience":"","functions":"","problem":"","capabilities":[""],"benefits":[""],"usp":"","kpis":[""],"regulatory":""}`:`{"name":"","summary":"","audience":"","problem":"","functions":"","capabilities":[""],"benefits":[""],"difference":"","success":"","regulatory":"","narrative":""}`},
  ${S.det&&NEW_DEMAND(S.det.route)?`"l4_final":{"code":"","match":0,"reason":"","uncertainty":""},`:""}
- "quality_remarks":["at most 3 short remarks a buyer would raise about the description: gaps or inconsistencies; empty if none"]}`;
+ "quality_remarks":["at most 2 short remarks about what the requester said: a missing or contradicting detail a buyer would ask about. Never suggest new topics, regulations, training or change management. Empty if none"]}`;
 
 const nonEmpty = v => Array.isArray(v) ? v.filter(x=>x&&(typeof x!=="object"||Object.values(x).some(Boolean))).length>0 : !!(v&&String(v).trim());
 function mergeBRD(base, ai){
@@ -4437,7 +4446,8 @@ function qualityHTML(){
   // a point the route did not ask joins only when it improves the description itself, with one question to answer or a wording fix
   const labelOf=h=>String(h).replace(/<[^>]+>/g,"").split(":")[0].trim().toLowerCase().replace(/[.]$/,"");
   const seen=new Set(), list=[];
-  const add=(lvl,html)=>{ const l=labelOf(html); if(seen.has(l)) return; seen.add(l); list.push({lvl,html}); };
+  const body=h=>String(h).replace(/<[^>]+>/g,"").replace(/^[^:]{1,40}:\s*/,"").toLowerCase().replace(/[.\s]+$/,"");
+  const add=(lvl,html)=>{ const l=labelOf(html), b=body(html); if(seen.has(l) || (b.length>12 && list.some(x=>{ const o=body(x.html); return o.includes(b)||b.includes(o); }))) return; seen.add(l); list.push({lvl,html}); };
   items.forEach(x=>add(x.lvl,x.html));
   (S.sd&&S.sd.detail&&S.sd.detail.open_points||[]).forEach(x=>add("info",esc(x)));
   gaps.optional.filter(g=>(g.key && DESC_FACTS.includes(g.key)) || g.secs.includes("Definitions")).forEach(g=>{
@@ -4613,7 +4623,7 @@ function renderSide(){
   $("#side").innerHTML=`${closeBtn}<div class="panel">
       <div class="eyebrow">Route ${S.missing.length?"so far":""}</div>
       <div class="route">${CHANNELS[S.override||D.route].name}</div>
-      <div class="prov">${S.missing.length?"May change as you answer":"Ready"} · ${esc(catById(f.category).name)} <button class="ed" data-edit="category" title="Change the category" aria-label="Change the category">✎</button></div>
+      <div class="prov">${S.missing.length?"May change as you answer":"Ready"} · ${esc((l4ByCode(f.l4)||{}).name || catById(f.category).name)} <button class="ed" data-edit="category" title="Change the category" aria-label="Change the category">✎</button></div>
       ${S.editing==="category"?`<div class="fact editing">${editorHTML("category")}</div>`:""}
       <div class="prog"><i style="width:${pct}%"></i></div>
       <div class="muted">${done} of ${req.length} details for this route</div>
@@ -4857,7 +4867,7 @@ function specModel(withCurrent){
 
   B.push(h(2,"10. What comes out"),
     ul([`**Service description:** for new demand a headline (${ex.limits.headMin}–${ex.limits.head} words for an RFP, ${exQuote.limits.headMin}–${exQuote.limits.head} for three quotes), an executive description (${ex.limits.execMin}–${ex.limits.exec} words; ${exQuote.limits.execMin}–${exQuote.limits.exec}) and a summary table (${EXEC_ROWS.map(r=>r[1]).join(", ")}). Other routes get a short description. It never contains amounts, dates, places, suppliers, the route or risk answers.`,
-      "**Captured for procurement:** the record table with the route, Level 4, budget, how many (items, users of software, or people; a service has none), timing, supplier, entity, data access, outsourcing, ICT, critical function, and the material spend review when the value reaches its threshold. The final materiality call is made in the materiality process.",
+      "**Captured for procurement:** the record table with the route, Level 4, budget, how many (items, users of software, or people; a service has none), timing, supplier, entity, data access, outsourcing, ICT, critical function. Reviews such as the material spend review (value of €1,000,000 or more) are listed on the route card, not repeated here.",
       "**Purchase request** (catalogue order, low-value purchase): a short summary and the record, built from the answers without an AI call.",
       `**Switched off for now, to save tokens:** the detailed service description (${DETAIL_SECTIONS.length} sections), the business requirements document and the sourcing request text. They are still built from the answers and sent with the request (JSON), but not shown, and the AI does not write them.`,
       `**JSON on submit:** ${ex.payloadKeys}.`]));

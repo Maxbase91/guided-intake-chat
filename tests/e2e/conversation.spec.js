@@ -43,7 +43,9 @@ test("an unclear correction is confirmed before anything changes", async ({ page
   await expect(lastAssistant(page)).toContainText("Do you want me to change");
   await expect(choices(page)).toHaveText(["Yes, change it", "No, it's my answer"]);
   await choose(page, "Yes, change it");
-  await expect(page.locator("#side .prov")).toContainText("Management consulting");
+  // the summary names the Level 4 within the new category
+  expect(await page.evaluate(() => S.f.category)).toBe("consulting");
+  await expect(page.locator("#side .prov")).toContainText(await page.evaluate(() => l4ByCode(S.f.l4).name));
 });
 
 test("a captured detail edited in the side panel updates the route", async ({ page }) => {

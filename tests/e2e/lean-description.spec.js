@@ -39,14 +39,16 @@ test("the documents call asks only for the description, and the AI's long fields
   expect(got.capWords).toBeLessThanOrEqual(12);
 });
 
-test("the record counts what the kind of purchase has, and shows materiality only when the review applies", async ({ page }) => {
+test("the record counts what the kind of purchase has, and lists no materiality or spend review rows", async ({ page }) => {
   await openApp(page);
   await say(page, "A new procurement intake platform for the whole bank, about 2 million");
   const rows = () => page.evaluate(() => Object.fromEntries(intakeRecord()));
   const sw = await page.evaluate(() => { S.f.quantity = 50; S.f.value = 2000000; S.sd = S.sd || null; return Object.fromEntries(intakeRecord()); });
   expect(sw.Users).toBe("About 50");
   expect(sw.Quantity).toBeUndefined();
-  expect(sw["Material spend review"]).toBe("Yes, the value is €1,000,000 or more");
+  // the spend review at €1m or more is listed with the reviews on the route card, not again in the record
+  expect(sw["Material spend review"]).toBeUndefined();
+  expect(await page.evaluate(() => S.det.controls.map((c) => c[1]))).toContain("Material spend review");
   expect(Object.keys(sw)).not.toContain("Future rule set");
   expect(Object.keys(sw)).not.toContain("Checked by you");
   expect(Object.keys(sw)).not.toContain("Materiality");
@@ -56,4 +58,35 @@ test("the record counts what the kind of purchase has, and shows materiality onl
   expect(svc.Users).toBeUndefined();
   expect(svc["Material spend review"]).toBeUndefined();
   expect(Object.keys(await rows())).not.toContain("Quantity");
+});
+
+// the live run with Mistral (October 2026): figures the requester never said, "**" around the name, kpis cut to fragments,
+// "3" as the duration and the estimate listed twice
+test("numbers in the AI's description must be the requester's; the duration keeps its unit; a point counts once", async ({ page }) => {
+  await openApp(page);
+  await say(page, "We need a procurement intake platform for the whole bank, about 2 million over 3 years");
+  const got = await page.evaluate(() => {
+    S.msgs.push({ role: "user", text: "Requests come in by email and Excel and approvals take three weeks; if delayed, the audit finding stays open" },
+      { role: "user", text: "one intake form, approval routing, Ariba and SAP integration, single sign-on; it works if 90% of requests go through it within 6 months" });
+    const ai = {
+      headline: "A single platform to streamline procurement requests, replacing email and spreadsheets. Used by procurement, finance and operations teams, it cuts approval delays from three weeks to two days, reduces manual work and ensures audit-ready tracking. The platform integrates with Ariba and SAP, supports single sign-on and replaces fragmented intake methods with one standardised process.",
+      exec: "Procurement requests arrive via email and Excel, creating delays that leave an open audit finding. The **Procurement Intake Platform** consolidates intake into one digital form, automates approval routing and integrates with Ariba and SAP. This reduces approval times from 21 days to seven or fewer. Success means 90% of requests go through the platform within 6 months, with every request logged and traceable for the auditors and the business owners alike.",
+      benefits: ["Reduces approval cycle time from 21 days to ≤7 days", "Cuts manual work and lost requests", "Ensures audit-ready tracking"],
+      kpis: ["90% of requests through the platform within 6 months", "<5% manual overrides per quarter"],
+    };
+    const m = mergeExec(offlineExec("a procurement intake platform"), ai);
+    const r = { m, duration: normFact("duration", "3") };
+    S.quality = { rating: "Good", score: 85, complete: 100, points: [{ lvl: "info", text: "The budget of €2,000,000 is an estimate." }] };
+    S.sd = S.sd || { desc: {}, detail: { open_points: [] } }; S.sd.detail = { open_points: ["Value: €2,000,000 is an estimate.", "Service level failure consequences: to be agreed in sourcing"] };
+    r.qual = qualityHTML().replace(/<[^>]+>/g, "\n").split("\n").map((x) => x.trim()).filter(Boolean);
+    return r;
+  });
+  expect(got.m.headline).not.toMatch(/two days/);
+  expect(got.m.headline).toContain("integrates with Ariba and SAP");   // the sentence with the invented figure goes; the rest stays
+  expect(got.m.exec).not.toMatch(/21 days|seven or fewer|\*\*/);
+  expect(got.m.exec).toContain("Success means 90% of requests go through the platform");   // (timing is never part of the description)
+  expect(got.m.benefits).toEqual(["Cuts manual work and lost requests", "Ensures audit-ready tracking"]);
+  expect(got.m.kpis).toEqual(["90% of requests through the platform within 6 months"]);
+  expect(got.duration).toBe("3 years");
+  expect(got.qual.filter((x) => /estimate/.test(x))).toHaveLength(1);
 });
