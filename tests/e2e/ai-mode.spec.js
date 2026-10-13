@@ -301,3 +301,15 @@ test("button clicks, a plain 'ok' to a suggestion and 'skip' are read by the rul
   await say(page, "skip");
   expect((await calls(request)).length - mid).toBeLessThanOrEqual(1);   // at most the suggestion for the next question
 });
+
+test("documents built without the AI can be written by the AI again on request", async ({ page, request }) => {
+  await openApp(page, { kind: "ai" });
+  await say(page, "We need 15 laptops for new joiners in Frankfurt.");
+  await mock(request, { gemini: "500", groq: "500", mistral: "500" });
+  await say(page, "15 December 2026");
+  await expect(page.locator("#msgs")).toContainText("The AI couldn't write the documents just now");
+  expect(await page.evaluate(() => S.sd._ai)).toBe(false);
+  await mock(request, { gemini: "ok", groq: "ok", mistral: "ok" });
+  await choose(page, "Write it with AI again");
+  expect(await page.evaluate(() => S.sd._ai)).toBe(true);
+});

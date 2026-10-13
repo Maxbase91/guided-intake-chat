@@ -172,9 +172,8 @@ test("Groq retries without JSON mode when a model rejects response_format", asyn
   assert.ok(calls.some((c) => !c.body.response_format), "second attempt drops response_format");
 });
 
-// Known bug (api/llm.js callGroq): a JSON-mode error that also says "not supported" takes the first retry branch
-// (minimal, still JSON mode), fails again and skips the model, so the no-JSON retry is never reached.
-test("Groq drops JSON mode even when the error says 'not supported'", { todo: "known bug in callGroq retry branches" }, async () => {
+// Was a known bug: a JSON-mode error that also says "not supported" took the first retry branch (still JSON mode) and skipped the model.
+test("Groq drops JSON mode even when the error says 'not supported'", async () => {
   process.env.GROQ_API_KEY = "k";
   stub({ groq: ({ body }) => (body.response_format ? reply(400, { error: { message: "`response_format.type` `json_object` is not supported with this model" } }) : chatOk('{"ok":true}')) });
   const r = await call(load(), { body: chatBody() });

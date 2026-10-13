@@ -142,8 +142,14 @@ async function callGroq(system, history, info, deadline) {
     try {
       try { return await callGroqWith(model, system, history); }
       catch (e) {
-        if (e.status === 400 && /reasoning|property|parameter|unsupported|not supported/i.test(e.message)) return await callGroqWith(model, system, history, { minimal: true });
-        if (e.status === 400 && /json|response_format/i.test(e.message)) return await callGroqWith(model, system, history, { minimal: true, noJson: true });
+        if (e.status !== 400) throw e;
+        const jsonRefused = (x) => x.status === 400 && /json|response_format/i.test(x.message);
+        // a model that refuses JSON mode is asked again without it (checked first: such errors also say "not supported")
+        if (jsonRefused(e)) return await callGroqWith(model, system, history, { minimal: true, noJson: true });
+        if (/reasoning|property|parameter|unsupported|not supported/i.test(e.message)) {
+          try { return await callGroqWith(model, system, history, { minimal: true }); }
+          catch (e2) { if (jsonRefused(e2)) return await callGroqWith(model, system, history, { minimal: true, noJson: true }); throw e2; }
+        }
         throw e;
       }
     } catch (e) {

@@ -1,7 +1,7 @@
 // Outsourcing determination (EBA/GL/2019/02 as the group standard, EBA/GL/2026/09 as the future rule set).
 // One full conversation through the UI, plus a rule table run against the page's own rules engine.
 const { test, expect } = require("@playwright/test");
-const { openApp, say, answerUntilDone } = require("./helpers");
+const { openApp, say, choose, answerUntilDone, lastAssistant, choices } = require("./helpers");
 
 const KYC_ANSWERS = [
   [/cost in total/i, "About 600k"],
@@ -147,4 +147,40 @@ test("the provisioning legal entity is the one named, not where data is stored o
     return entityFrom({ ...BLANK_FACTS, location });
   }), CASES);
   expect(got).toEqual(CASES.map((c) => c[2]));
+});
+
+// SaaS or software we run ourselves: one question decides it (EBA/GL/2019/02 paragraph 26), asked only when the request doesn't say
+test("who hosts and runs the software decides the outsourcing result and the DORA type", async ({ page }) => {
+  await openApp(page);
+  const run = async (first, pick) => {
+    await page.click("#newBtn");
+    await say(page, first);
+    for (let i = 0; i < 40 && (await page.evaluate(() => S.lastAsked)) !== "hosting" && !(await page.locator("[data-act=submit]").count()); i++) {
+      const chips = await choices(page).allInnerTexts(), q = await lastAssistant(page).innerText();
+      if (chips.includes("Use this suggestion")) await choose(page, "Use this suggestion");
+      else if (/cost in total/i.test(q)) await say(page, "About 400k");
+      else if (/business problem/i.test(q)) await say(page, "Payroll runs on spreadsheets; if delayed we miss the reporting deadline");
+      else if (/use today/i.test(q)) await say(page, "Spreadsheets; no team to build a replacement");
+      else if (/must it be able to do/i.test(q)) await say(page, "Payroll for Germany and an audit trail; it works if 99% of payslips are right");
+      else if (/When (do you need it|should it start)/i.test(q)) await say(page, "1 September 2027");
+      else if (/see or access/i.test(q)) await say(page, "Employee names and salaries, stored in the EU");
+      else if (chips.length) await choose(page, chips[0]);
+      else await say(page, "Nothing else");
+    }
+    const asked = await page.evaluate(() => S.lastAsked === "hosting");
+    if (asked && pick) await choose(page, pick);
+    return page.evaluate(() => { const o = outsourcing(S.f); return { hosting: S.f.hosting, result: o.result, reasons: o.reasons.join(" "), ict: ictType(S.f), inHouseAsked: (S.req || []).includes("in_house") && !("in_house" in S.derived) }; });   // derived by the rules = never asked
+  };
+  const saas = await run("A new HR system to replace our payroll tool.", "The provider hosts and runs it");
+  expect(saas).toMatchObject({ hosting: "provider", result: "Outsourcing (likely)", ict: "Cloud services: SaaS", inHouseAsked: false });
+  expect(saas.reasons).toContain("The provider hosts and runs software the bank would otherwise run itself (SaaS).");
+  const own = await run("A new HR system to replace our payroll tool.", "We install and run it ourselves");
+  expect(own).toMatchObject({ hosting: "own", result: "Not outsourcing (likely)", ict: "Software licensing (excluding SaaS)", inHouseAsked: false });
+  expect(own.reasons).toContain("still an ICT service under DORA");
+  // the words already say it: no question
+  await page.click("#newBtn");
+  await say(page, "A new HR and payroll system as SaaS for 3 years, about 400k");
+  expect(await page.evaluate(() => [S.f.hosting, (S.req || []).includes("hosting") && !known(S.f.hosting)])).toEqual(["provider", false]);
+  // two options, one hosted and one installed: asked
+  expect(await page.evaluate(() => hostingOf("Murex and Calypso would run on our servers in Frankfurt, the SaaS option would host in the US"))).toBeNull();
 });

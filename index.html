@@ -523,6 +523,7 @@ const FACTS = {
   service_levels: {label:"Service levels",  q:()=>"Which service levels matter to you?", ex:f=>f.category==="facilities"?"For example: daily cleaning before 8am and issues fixed within 24 hours.":"For example: 99.9% availability, a response within 4 hours, or a monthly report."},
   ip_ownership:   {label:"Who owns the work", q:()=>"Should we own what the supplier creates, such as designs, code or materials?", ex:()=>"", choices:["Yes, we own it","Shared use is fine","Not sure"]},
   performance:    {label:"Supplier so far", q:f=>`How has ${hasSupplier(f)?f.supplier:"the supplier"} performed so far?`, ex:()=>"Anything to fix in the renewal is useful to know.", choices:["Very well","Okay","Some issues"]},
+  hosting:        {label:"Who runs it", q:()=>"Who will host and run the software: the provider (SaaS or a managed service), or our own Technology team?", ex:()=>"This decides the outsourcing check: software the provider runs for us usually counts as outsourcing, software we install and run ourselves does not.", choices:["The provider hosts and runs it","We install and run it ourselves","Not sure yet"]},
   phasing:        {label:"Phasing", q:()=>"Should any part be delivered first?", ex:()=>"For example: \"the KYC part first, trading in a second release\"."},
 };
 const GOODSLIKE = f => f.demand_type==="goods" || f.demand_type==="software";
@@ -554,7 +555,7 @@ function requiredFor(route, f){
   const steer = ong || (proj && givenText(f.duration) && monthsOf(f.duration)>=6);   // a project of 6 months or more gets project steering
   // data and classification: access is always asked (with details in the same answer); entity, technology and "done in-house" only when the rules can't tell
   const access = () => pureGoods ? [] : ["personal_data", ...on(yes(f.personal_data)&&!known(f.data_details),"data_details"), ...on(cont,"system_access")];
-  const classif = () => pureGoods ? [] : ["tech_service","entity", ...on(ong && !excludedType(f),"in_house")];
+  const classif = () => pureGoods ? [] : ["tech_service","entity", ...on(sw,"hosting"), ...on(ong && !excludedType(f) && !(sw && f.hosting==="own"),"in_house")];
   const impact = () => on(!S.asked.background,"impact_delay");
   switch(route){
     case "catalogue":  return ["item","quantity","needed_by","location"];
@@ -588,7 +589,7 @@ const STAGES=[
   {id:"timing",  name:"Timing and delivery",  intro:"Now, when and where.", facts:["needed_by","location"]},
   {id:"supplier",name:"Budget and supplier",  intro:"A quick word on the budget approval and the supplier.", facts:["budget_approved","supplier","supplier_reason","supplier_terms"]},
   {id:"risk",    name:"Data and classification", intro:"A few checks on data and access. Most of the classification I can work out myself; I'll only ask what isn't clear.",
-   facts:["personal_data","data_details","system_access","entity","in_house","ict_outsourcing","deps_pack","other_risks"]},
+   facts:["personal_data","data_details","system_access","entity","hosting","in_house","ict_outsourcing","deps_pack","other_risks"]},
   {id:"check",   name:"Check",                intro:"Before I write anything, please check what I've worked out.", facts:["confirm_derived"]},
   {id:"review",  name:"Review",               intro:"Here's the route, the service description and the full documents.", facts:[]}
 ];
@@ -605,7 +606,7 @@ const currentStage = () => S.missing.length && S.det ? STAGES[stageOf(S.missing[
 /* =========================================================
    4. STATE
    ========================================================= */
-const BLANK_FACTS = {phasing:null,summary:null,category:null,demand_type:null,item:null,quantity:null,value:null,value_is_estimate:false,deliverables:null,duration:null,
+const BLANK_FACTS = {hosting:null,phasing:null,summary:null,category:null,demand_type:null,item:null,quantity:null,value:null,value_is_estimate:false,deliverables:null,duration:null,
   needed_by:null,location:null,supplier:null,supplier_reason:null,personal_data:null,ict_outsourcing:null,critical_service:null,offshore:null,
   budget_approved:null,decline_contract:null,scope_in:null,scope_out:null,acceptance_pack:null,acc_review:null,qualifications:null,kpis_pack:null,kpis:null,service_model:null,support_model:null,service_hours:null,tools:null,
   governance:null,gov_meetings:null,reporting:null,change_mgmt:null,escalation:null,supplier_terms:null,entity:null,in_house:null,ongoing:null,important_fn:null,deps_pack:null,our_deps:null,prov_assumptions:null,
@@ -769,6 +770,8 @@ function techFromRules(f){
   return it;
 }
 function ictType(f){
+  if(f.category==="software" && f.hosting==="provider") return "Cloud services: SaaS";
+  if(f.category==="software" && f.hosting==="own") return "Software licensing (excluding SaaS)";
   // software follows its Level 4 entry, so the technology type never contradicts the category shown
   if(f.category==="software" && ["L4-1201","L4-1202"].includes(f.l4)) return f.l4==="L4-1202" ? "Cloud services: SaaS" : "Software licensing (excluding SaaS)";
   const t=userText()+" "+[f.item,f.deliverables,f.skills,f.role,f.summary].filter(Boolean).join(" ").toLowerCase(), has=re=>re.test(t);
@@ -849,6 +852,15 @@ function excludedType(f){
     training:"a service the bank would not otherwise perform itself (paragraph 28(g))", marketing:"a service the bank would not otherwise perform itself, such as event services (paragraph 28(g))",
     contingent:"temporary staff working under our direction, not a function run by the provider"})[f.category] || null;
 }
+// who hosts and runs software: "provider" (SaaS, managed), "own" (we install and run it), "unsure", or null when the words don't say
+function hostingOf(t){
+  t=String(t||"").toLowerCase();
+  if(/not sure|unsure|don.?t know|no idea|tbd|not decided|either/.test(t)) return "unsure";
+  const prov=/\b(?:saas|software as a service|cloud[- ]based|hosted by (?:the )?(?:provider|vendor|supplier)|(?:the )?(?:provider|vendor|supplier) hosts?|hosts and runs|managed service|subscription)\b/.test(t) || /^the provider\b/.test(t);
+  const own=/\b(?:on[- ]?prem\w*|our (?:own )?(?:servers|data cent(?:re|er)s?|infrastructure|technology team)|install(?:ed)? (?:it )?(?:ourselves|on our|in our)|we (?:will )?(?:install|host|run) it|run (?:it )?ourselves|runs? on our servers)\b/.test(t) || /^we (?:install|run|host)\b/.test(t);
+  return prov && own ? null : prov ? "provider" : own ? "own" : null;   // both (one option hosted, one installed): ask
+}
+const hostingFromText = f => f.demand_type==="software" ? (o=>o==="unsure"?null:o)(hostingOf(demandText(f))) : null;
 // would we otherwise do this ourselves? true / false / null (unclear)
 function inHouseFromText(f){
   const t=demandText(f);
@@ -858,7 +870,7 @@ function inHouseFromText(f){
   if(f.category==="bpo") return true;   // operations banks typically run themselves
   const D=bankDomain(f); if(!D) return null;
   // software: only a platform the provider hosts and runs for us; software we install and run is the bank's own work
-  if(f.demand_type==="software") return /\b(?:saas|software as a service|cloud|hosted|hosting|subscription)\b/i.test(demandText(f)) ? true : null;   // the Level 4 guess alone does not say who runs it
+  if(f.demand_type==="software") return f.hosting==="provider" ? true : f.hosting ? null : /\b(?:saas|software as a service|cloud|hosted|hosting|subscription)\b/i.test(demandText(f)) ? true : null;   // the Level 4 guess alone does not say who runs it
   return D.ops && kindOf(f)!=="service" ? null : true;
   return null;
 }
@@ -889,12 +901,15 @@ function outsourcing(f){
   const reasons=[], steps=[]; let result, code;
   steps.push(["Excluded under paragraph 28", ex?`Yes: ${ex}`:"No"]);
   if(ex){ result="Not outsourcing"; code="no"; reasons.push(`It is ${ex}.`); }
+  else if(f.demand_type==="software" && f.hosting==="own"){
+    steps.push(["The provider performs a function for the bank (paragraph 26)","No, we install and run the software ourselves"]);
+    result="Not outsourcing (likely)"; code="no"; reasons.push("We install and run the software ourselves; the provider licenses and supports it but does not perform a function for us. Support and maintenance are still an ICT service under DORA."); }
   else {
     steps.push(["Performed on a recurrent or ongoing basis (paragraph 26)", ong?"Yes":"No, a one-off delivery"]);
     if(!ong){ result="Not outsourcing (likely)"; code="no"; reasons.push("It is a one-off delivery, not performed on a recurrent or ongoing basis."); }
     else {
       steps.push(["Would or could realistically be performed by the bank itself (paragraph 26)", ih===true?"Yes":ih===false?"No":"Not clear yet"]);
-      if(ih===true){ result="Outsourcing (likely)"; code="yes"; reasons.push("It is performed on an ongoing basis.", "It is work the bank would or could realistically perform itself."); }
+      if(ih===true){ result="Outsourcing (likely)"; code="yes"; reasons.push("It is performed on an ongoing basis.", f.demand_type==="software"&&f.hosting==="provider" ? "The provider hosts and runs software the bank would otherwise run itself (SaaS)." : "It is work the bank would or could realistically perform itself."); }
       else if(ih===false){ result="Not outsourcing (likely)"; code="no"; reasons.push("It is performed on an ongoing basis, but it is not work the bank would or could realistically perform itself."); }
       else { result="To be determined"; code="tbd"; reasons.push("It is performed on an ongoing basis; whether the bank would or could realistically perform it itself is not clear yet."); }
     }
@@ -937,6 +952,7 @@ function deriveFacts(f){
   derive("tech_service", techFromRules);
   derive("quantity", usersFromAudience);
   derive("entity", entityFrom);
+  derive("hosting", hostingFromText);
   derive("in_house", inHouseFromText);
   derive("offshore", ff=>{ const e=entityById(ff.entity), loc=String(ff.location||"").replace(/\b(?:on[- ]?site|on our premises|at our (?:office|premises|site)s?|visits?|visiting)(?:\s+[\w-]+){0,2}?\s+(?:in|at|to)\s+[\w-]+/gi," ").replace(/\b(?:our|the) (?:team|teams|people|colleagues|staff)\s+(?:sits?|is|are|works?|(?:is |are )?based|(?:is |are )?located)\s+in\s+[^.;]+/gi," "); if(!e||!loc.trim()) return null;   // visits to our sites and where our team sits are not offshoring
     if(/offshore|another country|other country/i.test(loc)) return true;
@@ -1250,7 +1266,7 @@ A suggestion never states facts about this request that the user did not give (f
 Combined questions: the "background" question also asks the impact of delay, so record background and impact_delay from that one answer.
 The software "must_haves" question also asks how success is judged, so record must_haves and acceptance from that one answer. evaluation_priority, supplier_requirements, current_supplier ("None" if new),
 volume, support_needs, data_details (which data and where stored), criticality (what happens if it stops; also set critical_service true if clients or regulated activity are hit),
-subcontracting (true | false | "unsure"), pricing_model, service_levels, ip_ownership, performance (how the current supplier performed), phasing (the order of delivery if the user gives one, e.g. "the KYC part first").
+subcontracting (true | false | "unsure"), pricing_model, service_levels, ip_ownership, performance (how the current supplier performed), phasing (the order of delivery if the user gives one, e.g. "the KYC part first"), hosting ("provider" | "own" | "unsure": who hosts and runs the software).
 External workers or contractors are demand_type contingent_labour.
 
 ${contextLines()}
@@ -1450,6 +1466,7 @@ async function finishIntake(cid, lead){
   catch(e){ if(e instanceof Stale) throw e; console.error(e); S.msgs.push({role:"assistant",kind:"sys",text:"Something went wrong while writing the documents. Please tell me to try again."}); }
   showRecommendation();
   offerImprovement();
+  if(S.sd && !S.sd._ai && aiReady() && !S.submitted) S.choices=[...(S.choices||[]), "Write it with AI again"];
 }
 const corrLabel = ch => Object.entries(ch).map(([k,v])=>k==="category"?`the category to **${catById(v.cat).name}**`:`the ${FACTS[k].label.toLowerCase()} to **${show(k,v)}**`).join(" and ");
 async function handleUser(text){
@@ -1597,6 +1614,12 @@ async function handleTurn(text, cid, opts={}){
     if(/submit anyway|^no\b|not now|^skip|leave it/i.test(tt)){ S.msgs.push({role:"user",text:tt}); S.offerImprove=null; S.belowThresholdOk=true; S.choices=[];
       S.msgs.push({role:"assistant",text:"Okay. The rating and the open points stay visible to the buyer. Press \"Looks right, submit\" on the service description when you're ready."}); render(); return; }
     S.offerImprove=null;
+  }
+  // documents built from the answers alone: the AI writes them again on request
+  if(S.sd && /^write it with ai again$/i.test(text.trim())){
+    S.msgs.push({role:"user",text:text.trim()}); S.choices=[]; S.busy=true; S.docKey=null; render();
+    try{ await buildDoc(cid); }catch(e){ if(e instanceof Stale) throw e; }
+    S.busy=false; if(S.sd && !S.sd._ai) S.choices=["Write it with AI again"]; render(); return;
   }
   // after the results, a closing remark is answered as one ("thanks" is not an update)
   if(S.completed && !S.missing.length && !S.offerImprove && /^(?:thanks?|thank you|thx|cheers|great|perfect|cool|nice|ok(?:ay)?|got it|looks good|all good|done|bye|super|wonderful|brilliant)\b[\s!.,]*(?:(?:so much|a lot|very much|again)[\s!.]*)?$/i.test(text.trim())){
@@ -1746,7 +1769,7 @@ async function handleTurn(text, cid, opts={}){
     } else {
       applyCorrections(tt); S.checkWait=false;
       // only say "updated" when something did change (by the rules or the AI); otherwise ask which point is wrong
-      const CHECKED=["title","l4","category","demand_type","entity","ongoing","in_house","tech_service","important_fn","personal_data","data_details","offshore","location"];
+      const CHECKED=["title","l4","category","demand_type","entity","hosting","ongoing","in_house","tech_service","important_fn","personal_data","data_details","offshore","location"];
       if(!CHECKED.some(k=>JSON.stringify(before[k])!==JSON.stringify(S.f[k]))){
         S.f.confirm_derived=null;
         S.msgs.push({role:"assistant",text:"I couldn't tell what to change. Which point is wrong, and what should it say? For example \"4 is wrong, it's a one-off\" or \"9 is wrong, all the work is done in Germany\"."});
@@ -1943,6 +1966,7 @@ function normFact(k,v){
   if(k==="budget_approved" && /not sure|unsure|unknown|no idea|don.?t know/i.test(String(v))) return "unsure";
   if(k==="supplier" && typeof v==="string") return cleanSupplier(v)||v;
   if(k==="supplier_terms" && typeof v==="boolean") return v?"Yes":"No";
+  if(k==="hosting") return /^(?:provider|own|unsure)$/.test(String(v)) ? String(v) : hostingOf(String(v)) || "unsure";
   if(k==="scope_out" && typeof v==="string") return v.replace(/^(?:exclusions?|out of scope|not (?:in scope|included)|the service does not include)\s*:\s*/i,"");
   if(k==="data_details" && typeof v==="string") return v.replace(/\s+\b(?:probably|maybe|perhaps|i think|i guess)\b\.?$/i,"").trim()||v;
   return typeof v==="string"?v:String(v);
@@ -2724,7 +2748,7 @@ const fmtN = x => /^\d+$/.test(String(x)) ? Number(x).toLocaleString("en-GB") : 
 const cap1 = x => x ? String(x).charAt(0).toUpperCase()+String(x).slice(1) : x;
 // lower-cases the first letter for use mid-sentence, but never an acronym ("EU", "IT hardware", "HR operations")
 const lcFirst = x => { const t=String(x); return /^[A-Z]{2}/.test(t) ? t : t.charAt(0).toLowerCase()+t.slice(1); };
-const CLOSED=["in_house","entity","supplier_terms","contract_ok","value","quantity","headcount","tech_service","personal_data","ict_outsourcing","system_access","budget_approved","subcontracting"];
+const CLOSED=["hosting","in_house","entity","supplier_terms","contract_ok","value","quantity","headcount","tech_service","personal_data","ict_outsourcing","system_access","budget_approved","subcontracting"];
 function readAnswer(k, text){
   const t=text.trim().toLowerCase();
   if(k==="in_house"){ if(/not sure|unsure|don.?t know/.test(t)) return "unsure";
@@ -2736,6 +2760,7 @@ function readAnswer(k, text){
     return /^no\b/.test(t) ? false : null; }
   if(k==="entity"){ const e=ENTITIES.find(x=>t.includes(x.name.toLowerCase())||x.re.test(text)||(x.abbr&&x.abbr.test(text))); return e?e.id:/not sure|don.?t know|no idea|unsure/.test(t)?"Not given":null; }   // an answer naming no entity is asked again
   if(k==="supplier_terms") return /^no\b|none/.test(t)?"No":/not sure|unsure/.test(t)?"Not sure":text.trim();
+  if(k==="hosting") return hostingOf(t);
   if(k==="value"){ const v=parseMoney(text); if(v!=null){S.f.value_is_estimate=false;return v;} if(/know|sure|idea|estimate/.test(t)){S.f.value_is_estimate=true;return defaultEstimate();} return null; }
   if(k==="quantity"||k==="headcount"){ const n=t.replace(/(\d),(\d{3})/g,"$1$2").match(/\d+/); return n?+n[0]:/not sure|don.?t know|unknown|no idea|tbc|to be confirmed/.test(t)?"unsure":(/more/.test(t)?"4+":null); }
   if(k==="criticality"){ if(/client|customer|regulat|payment|trading|can.?t|cannot|outage|down|serious/.test(t) && !/nothing serious|no impact|minor/.test(t)) S.f.critical_service=true; return text.trim(); }
@@ -3300,7 +3325,7 @@ async function buildDoc(cid=S.cid){
         ai=null;
       }
       if(!ai) throw new Error("empty");
-    }catch(e){ if(e instanceof Stale) throw e; guard(cid); ai=null; S.msgs.push({role:"assistant",kind:"sys",text:"The AI couldn't write the documents just now, so they are built from your answers."}); }
+    }catch(e){ if(e instanceof Stale) throw e; guard(cid); ai=null; S.msgs.push({role:"assistant",kind:"sys",text:"The AI couldn't write the documents just now, so they are built from your answers. You can let the AI try again later with \"Write it with AI again\"."}); }
   }
   const name=ai&&ai.description&&scrubText(String(ai.description.name||"")).replace(/\.$/,"");
   S.sd = {title:(name&&words(name)<=8?name:"")||(NEW_DEMAND(S.det.route)?workingTitle():"")||base.title, desc:mergeDesc(desc0, ai&&ai.description), brd:mergeBRD(offlineBRD(base.risk), ai&&ai.brd), _ai:!!ai, _date:new Date()};
@@ -3364,7 +3389,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&
 const md=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
 const money=v=>v==null?"Unknown":new Intl.NumberFormat("en-GB",{style:"currency",currency:CONFIG.currency,maximumFractionDigits:0}).format(v);
 const fmtDate=d=>{const x=new Date(d);return isNaN(x)?d:x.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});};
-const show=(k,v)=>v==="Confirmed"&&bundleOf(k)?(bundleOf(k).map(([,x])=>givenText(S.f[x])).filter(Boolean).join("; ")||"Confirmed"):isTBD(v)?"To be determined":k==="entity"&&entityById(v)?entityById(v).name:k==="l4"&&l4ByCode(v)?`${l4ByCode(v).name} (${v})`:v===true?"Yes":v===false?"No":v==="unsure"?"Not sure":k==="value"?money(Number(v))+(S.f.value_is_estimate?" (est.)":""):["quantity","headcount"].includes(k)?fmtN(v):cap1(String(v));
+const show=(k,v)=>k==="hosting"&&/^(?:provider|own|unsure)$/.test(String(v))?{provider:"The provider hosts and runs it",own:"We install and run it ourselves",unsure:"Not sure yet"}[v]:v==="Confirmed"&&bundleOf(k)?(bundleOf(k).map(([,x])=>givenText(S.f[x])).filter(Boolean).join("; ")||"Confirmed"):isTBD(v)?"To be determined":k==="entity"&&entityById(v)?entityById(v).name:k==="l4"&&l4ByCode(v)?`${l4ByCode(v).name} (${v})`:v===true?"Yes":v===false?"No":v==="unsure"?"Not sure":k==="value"?money(Number(v))+(S.f.value_is_estimate?" (est.)":""):["quantity","headcount"].includes(k)?fmtN(v):cap1(String(v));
 
 // examples on the welcome screen: mostly new demand, each showing a different path, then one per other route
 const TRIES=[
@@ -4007,7 +4032,7 @@ function specModel(withCurrent){
     ul(["**Category:** keywords as whole words (plurals count; `*` marks a stem such as `consult*`). The category with most keywords wins; on a tie the one named last before “for”, “to”, “with”, “that” or a comma. A goods word after “to”, “trading”, “service”, “help” … does not count. With no keyword, management consulting is a guess, never a framework call-off. With AI, the AI's category is used.",
       "**Level 4:** scored within the category (keywords, overlap with name and description). The AI may propose one with the first message. The value confirmed at the check step is final.",
       "**ICT service (DORA):** whether technology is involved comes from the rules or the answer; for software the type follows Level 4 (SaaS or licensing), otherwise keywords.",
-      `**Outsourcing, group standard ${R.current.id}** (the legal entity does not change the result): 1. excluded under paragraph 28 (goods, statutory audit, card schemes, clearing, SWIFT, correspondent banking, legal, facilities, market data, telecom, training, marketing, external workers) → not outsourcing; 2. not performed on a recurrent or ongoing basis (paragraph 26) → not outsourcing (likely); a project with set deliverables is one-off whatever its length (see Kinds of work); 3. work the bank does or could realistically do itself (paragraph 26) → outsourcing (likely); otherwise not outsourcing (likely), or to be determined when unclear. A critical or important function (paragraphs 29–31) is a flag for review, never a decision.`,
+      `**Outsourcing, group standard ${R.current.id}** (the legal entity does not change the result): 1. excluded under paragraph 28 (goods, statutory audit, card schemes, clearing, SWIFT, correspondent banking, legal, facilities, market data, telecom, training, marketing, external workers) → not outsourcing; 2. not performed on a recurrent or ongoing basis (paragraph 26) → not outsourcing (likely); a project with set deliverables is one-off whatever its length (see Kinds of work); for software, who hosts and runs it decides (asked only when the request doesn't say): we install and run it → not outsourcing (likely), still an ICT service under DORA; the provider hosts and runs it (SaaS) → it is software the bank would otherwise run itself; 3. work the bank does or could realistically do itself (paragraph 26) → outsourcing (likely); otherwise not outsourcing (likely), or to be determined when unclear. A critical or important function (paragraphs 29–31) is a flag for review, never a decision.`,
       `**Future rule set ${R.future.id}** (${R.future.status}): shown as a preview only.`,
       "**Critical or important function:** from the answer on impact (clients, payments, regulatory, trading, outage, audit) or a known bank domain (KYC, payments, payroll, contact centre, regulatory reporting, service desk); never for events, training, office or hardware.",
       "**Offshoring:** the provider works from a country other than the entity's. An explicit “no” wins; where users or data are does not count."]));

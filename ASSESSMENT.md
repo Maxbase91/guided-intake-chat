@@ -130,8 +130,8 @@ Three things blocked real users. The first is now fixed:
 
 | Suite | Result |
 | --- | --- |
-| API (`tests/api`, node:test) | 18 passed, 1 known bug recorded as `todo` |
-| End-to-end (`tests/e2e`, Playwright, Chromium) | 135 passed: all behaviour tests; the 4 known-issue tests now guard their fixes |
+| API (`tests/api`, node:test) | 19 passed (the Groq JSON-mode bug is fixed) |
+| End-to-end (`tests/e2e`, Playwright, Chromium) | 137 passed: all behaviour tests; the 4 known-issue tests now guard their fixes |
 | Run time | About a minute. Needs no keys and no network. |
 
 **Covered:**
@@ -187,7 +187,7 @@ Each finding says how it was confirmed:
 | 9 | **Requesters can change the route thresholds under Rules.** Raising the €50,000 threshold turns an RFP into business-led quotes, and only the "why" text records it. | Settings (`index.html` 2967–2994) | Test |
 | 10 | **`?ai=<provider>` can be set by anyone with the link.** A shared link forces one provider (for example Mistral's free plan) for the whole conversation. | `index.html` 286; `api/llm.js` 327 | Test |
 | 11 | **Server state is shared between requests.** `IGNORE_COOLDOWN` is a module variable, so a POST that arrives during a `?check` ignores cooldowns. The deadline is only checked between calls, so one request can run past the 60 s function limit. | `api/llm.js` 61, 140, 205, 276 | Code |
-| 12 | **Groq JSON-mode fallback is unreachable for "not supported" errors.** The first retry branch keeps JSON mode on and fails, so the model is skipped. | `callGroq` (`api/llm.js` 143–147) | Test (`todo`) |
+| 12, **fixed** | **Groq JSON-mode fallback is unreachable for "not supported" errors.** The first retry branch keeps JSON mode on and fails, so the model is skipped. | `callGroq` (`api/llm.js` 143–147) | Test (`todo`) |
 | 13 | **Accessibility basics are missing.** The input has no label. The message list has no `aria-live`/`role="log"`. The drawers have no dialog role, focus trap or Escape key. Each render rebuilds the whole chat with `innerHTML`. | `index.html` 260–263, 2643, 2858, 2962 | Code |
 | 14 | **Compliance flags depend on AI extraction.** Any message can overwrite `personal_data`, `tech_service`, `in_house` or `value`. The output says "Not outsourcing" and has a disclaimer. Since 7baf311 the per-country matrix is gone and the one remaining future reference (EBA/GL/2026/09) is verified, but it will need updating once its application date is set. | `mergeFacts`, `RULESETS` | Code |
 | 21, **fixed** | **Category ties go to the first category in the list.** With one keyword each, IT hardware wins, so "Software to manage our laptop fleet, 20k" is classed as goods and offered a laptop from the catalogue. "A dashboard tool to monitor sanctions alerts" and "a service to screen clients" are also classed as IT hardware. Their 300k–400k budgets now keep them off the catalogue, but the outsourcing check still treats them as goods. | `offlineRead` category scoring, `catFromText` | Test |
