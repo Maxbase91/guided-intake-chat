@@ -856,7 +856,7 @@ function inHouseFromText(f){
   if(f.category==="bpo") return true;   // operations banks typically run themselves
   const D=bankDomain(f); if(!D) return null;
   // software: only a platform the provider hosts and runs for us; software we install and run is the bank's own work
-  if(f.demand_type==="software") return /\b(?:saas|software as a service|cloud|hosted|hosting|subscription)\b/i.test(demandText(f)) || f.l4==="L4-1202" ? true : null;
+  if(f.demand_type==="software") return /\b(?:saas|software as a service|cloud|hosted|hosting|subscription)\b/i.test(demandText(f)) ? true : null;   // the Level 4 guess alone does not say who runs it
   return D.ops && kindOf(f)!=="service" ? null : true;
   return null;
 }

@@ -9,8 +9,8 @@ test("the trading platform is software, its domain is trading, and installed sof
   const errors = await openApp(page);
   await say(page, FIRST);
   const got = await page.evaluate(() => ({ cat: S.f.category, kind: kindOf(S.f), domain: bankDomain(S.f).id, mh: FACTS.must_haves.ex(S.f),
-    installed: inHouseFromText({ ...S.f, l4: "L4-1201" }), saas: (() => { const m = S.msgs; S.msgs = [{ role: "user", text: "A new HR and payroll system as SaaS for 3 years" }]; const r = inHouseFromText({ ...BLANK_FACTS, category: "software", demand_type: "software" }); S.msgs = m; return r; })() }));
-  expect(got).toEqual({ cat: "software", kind: "product", domain: "trading", installed: null, saas: true,
+    installed: inHouseFromText({ ...S.f, l4: "L4-1201" }), guessed: inHouseFromText({ ...S.f, l4: "L4-1202" }), saas: (() => { const m = S.msgs; S.msgs = [{ role: "user", text: "A new HR and payroll system as SaaS for 3 years" }]; const r = inHouseFromText({ ...BLANK_FACTS, category: "software", demand_type: "software" }); S.msgs = m; return r; })() }));
+  expect(got).toEqual({ cat: "software", kind: "product", domain: "trading", installed: null, guessed: null, saas: true,
     mh: expect.stringContaining("real-time trade capture and position keeping") });
   // the existing head-noun rules still hold
   expect(await page.evaluate(() => ["A transaction monitoring system for AML", "Develop a new client onboarding app for our retail bank", "KYC periodic reviews for our corporate clients", "I need three business consultants for a target operating model transformation"]
