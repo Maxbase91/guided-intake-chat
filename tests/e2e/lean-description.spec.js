@@ -90,3 +90,23 @@ test("numbers in the AI's description must be the requester's; the duration keep
   expect(got.duration).toBe("3 years");
   expect(got.qual.filter((x) => /estimate/.test(x))).toHaveLength(1);
 });
+
+// the same live run: Mistral's acceptance suggestion turned "within 6 months" into "within 3 months" and added figures nobody gave
+test("a suggestion keeps only the requester's figures and the standard draft's; a figure with another unit is not theirs", async ({ page }) => {
+  await openApp(page);
+  await say(page, "We need a procurement intake platform for the whole bank, about 2 million over 3 years");
+  const got = await page.evaluate(() => {
+    S.msgs.push({ role: "user", text: "one intake form, approval routing, Ariba and SAP integration, single sign-on; it works if 90% of requests go through it within 6 months" });
+    const mistral = "Acceptance criteria: 90% of procurement requests processed via the platform within 3 months (vs. 6-month target) with <5% manual overrides per quarter; Ariba and SAP integration tested for 100% approval routing accuracy; 90% of requests go through the platform within 6 months\nReview and sign-off: Procurement Head reviews UAT results within 7 working days; Finance Director signs off on financial controls";
+    const draft = offlineSuggest("acceptance_pack");
+    return { out: groundSuggestion("acceptance_pack", mistral), draft, plain: groundSuggestion("audience_fn", "Target audience: requesters across the bank and procurement analysts\nSupported functions: Procurement and Finance") };
+  });
+  const [acc, rev] = got.out.split("\n");
+  expect(acc).toBe("Acceptance criteria: 90% of requests go through the platform within 6 months");
+  expect(rev).toBe("Review and sign-off: Finance Director signs off on financial controls");
+  expect(got.out).not.toMatch(/3 months|<5%|100%|7 working days/);
+  expect(got.plain).toBe("Target audience: requesters across the bank and procurement analysts\nSupported functions: Procurement and Finance");
+  // a line left without points takes the standard draft's line, figures and all
+  const onlyInvented = await page.evaluate(() => groundSuggestion("acceptance_pack", "Acceptance criteria: 99.9% of requests routed correctly within 2 days\nReview and sign-off: Head of Procurement signs off"));
+  expect(onlyInvented.split("\n")[0]).toBe(`Acceptance criteria: ${got.draft.split("\n")[0].replace(/^[^:]+:\s*/, "")}`);
+});

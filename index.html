@@ -2317,7 +2317,7 @@ function routeOptions(){
 }
 // a suggestion for a question that has none of its own: the AI's, or else the question's example
 async function adhocSuggest(k, cid){
-  if(aiReady()){ try{ const out=await callLLM(suggestSystem(k),[{role:"user",content:suggestUser(k)}]); guard(cid); const sg=tidySuggestion(k, out&&out.suggestion||""); if(sg && words(sg)>=3) return sg; }catch(e){ if(e instanceof Stale) throw e; } }
+  if(aiReady()){ try{ const out=await callLLM(suggestSystem(k),[{role:"user",content:suggestUser(k)}]); guard(cid); const sg=groundSuggestion(k, tidySuggestion(k, out&&out.suggestion||"")); if(sg && words(sg)>=3) return sg; }catch(e){ if(e instanceof Stale) throw e; } }
   return cap1(exampleFor(k));
 }
 async function metaTurn(kind, text, cid, aiAnswer, display, posted){
@@ -2687,7 +2687,7 @@ async function handleTurn(text, cid, opts={}){
     let msg;
     if(next==="confirm_derived"){ msg=checkMessage(); }
     else if(isSug(next)){
-      let sg = aiAskedOk && aiSuggestion ? tidySuggestion(next, aiSuggestion) : "";
+      let sg = aiAskedOk && aiSuggestion ? groundSuggestion(next, tidySuggestion(next, aiSuggestion)) : "";
       if(sg && bundleOf(next) && !bundleOf(next).every(([L])=>new RegExp(`(?:^|\\n)\\s*${L.replace(/[/]/g,"\\/").replace(/[()]/g,"\\$&")}\\s*:`,"i").test(sg))) sg="";   // every line, as "Label: text"
       if(sg && words(sg)>=3){ S.suggest[next]=sg;
         const ack=(String(reply||"").split(/(?<=[.!?])\s+(?=[A-Z])/)[0]||"").trim(), useAck=ack && /[.!]$/.test(ack) && !/suggest|template|e\.g\.|:|\?/i.test(ack) && words(ack)<=25;
@@ -3183,7 +3183,7 @@ async function aiSuggest(k, cid){
   try{
     const out=await callLLM(suggestSystem(k),[{role:"user",content:suggestUser(k)}]);
     guard(cid);
-    const sg=tidySuggestion(k, out&&out.suggestion||"");
+    const sg=groundSuggestion(k, tidySuggestion(k, out&&out.suggestion||""));
     if(!sg || words(sg)<4) return null;
     if(lines && !lines.every(L=>new RegExp(L.split(/[ /]/)[0],"i").test(sg))) return null;
     return sg;
@@ -3302,7 +3302,7 @@ function normSuggestion(v, k){
   const nk=x=>String(x).toLowerCase().replace(/[_\s]+/g," ").trim();
   return Object.entries(v).map(([kk,x])=>{ const hit=bundleOf(k).find(([L,fk])=>nk(L)===nk(kk)||fk===kk||nk(kk).startsWith(nk(L).split(/[ /]/)[0])); return hit?`${hit[0]}: ${vals(x)}`:vals(x); }).filter(Boolean).join("\n");
 }
-// a line of a suggestion: about 45 words, whole points only; benefits, selling points and audience lose invented figures ("80% fewer", "12,000+ users")
+// a line of a suggestion: about 30 words, whole points only; benefits, selling points and audience lose invented figures ("80% fewer", "12,000+ users")
 const INVENTED=/\s*(?:by\s+|of\s+|to\s+)?(?:<|>|~|up to\s+|over\s+|around\s+)?\d[\d,.]*\s*\+?\s*(?:%|percent)\+?|\s*\b\d[\d,.]*\s*\+?\s+(?=(?:users|employees|staff|people|countries|line managers|managers|leaders|colleagues)\b)/gi;
 // a figure in brackets goes with its brackets ("teams (1,200 users globally)"); then no "( ", "()" or a lone "+" is left behind
 const dropFigures = t => String(t).replace(/\s*\(\s*(?:~|around\s+|over\s+|up to\s+)?\d[\d,.]*\s*\+?\s*[^)]*\)/g,"").replace(INVENTED," ").replace(/\(\s*\)/g,"").replace(/\(\s+/g,"(").replace(/\s+\+(?=[\s;,.)]|$)/g,"").replace(/\s{2,}/g," ").replace(/\s+([;,.])/g,"$1").trim();
@@ -3313,6 +3313,18 @@ function fitLine(line){
   const pts=body.split(/;\s*/), out=[]; let n=0;
   for(const x of pts){ const w=words(x); if(out.length && n+w>SUG_LINE_MAX) break; out.push(x); n+=w; }
   return head+out.join("; ");
+}
+// numbers in an AI suggestion must be the requester's or come from the app's own standard draft ("99.5% availability"):
+// "within 3 months" when they said 6 months, or "<5% manual overrides" nobody mentioned, goes with its point; a line left
+// without points takes the standard draft's line
+function groundSuggestion(k, sg){
+  if(!sg) return sg;
+  const draft=String(offlineSuggest(k)||""), said=saidNums(draft);
+  const draftLine=L=>(draft.split("\n").find(l=>l.toLowerCase().startsWith(L.toLowerCase()+":"))||"").replace(/^[^:]+:\s*/,"");
+  return sg.split("\n").map(line=>{ const m=line.match(/^([^:]{3,45}):\s*(.*)$/), head=m?m[1]:"", pts=(m?m[2]:line).split(/;\s*/).filter(Boolean);
+    const keep=pts.filter(x=>grounded(x,said));
+    if(keep.length) return (head?head+": ":"")+keep.join("; ");
+    const d=head?draftLine(head):""; return d ? `${head}: ${d}` : null; }).filter(Boolean).join("\n");
 }
 // a suggestion as the user sees it: one label per line, short, no formatting, no invented dates
 function tidySuggestion(k, v){
@@ -3773,11 +3785,18 @@ const EXEC_LISTS=["capabilities","benefits","kpis"];
 // numbers in the AI's description must be the requester's (or in a suggestion they accepted): "from 21 days to ≤7 days" or
 // "two days" they never said goes, with its sentence or point; "90% within 6 months" they said stays
 const NUM_WORDS={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,twenty:20,thirty:30,forty:40,fifty:50,hundred:100};
-const numsIn = t => [...String(t||"").toLowerCase().matchAll(/\d+(?:[.,]\d+)*|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|hundred)\b/g)].map(m=>NUM_WORDS[m[0]] ?? Number(m[0].replace(/,/g,""))).filter(n=>Number.isFinite(n));
+// numbers with their unit: "6 months" is "6 month", "90%" is "90 %", "within 5 working days" is "5 day"; a number without a unit is just the number
+const numTokens = t => [...String(t||"").toLowerCase().matchAll(/(\d+(?:[.,]\d+)*|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty|hundred)\b)\s*(%|percent\b|(?:(?:working|business|calendar)\s+)?(?:days?|weeks?|months?|years?|hours?|minutes?)\b)?/g)]
+  .map(m=>{ const n=NUM_WORDS[m[1]] ?? Number(m[1].replace(/,/g,"")); const u=!m[2]?"":/%|percent/.test(m[2])?"%":m[2].replace(/^(?:working|business|calendar)\s+/,"").replace(/s$/,""); return Number.isFinite(n)?{n,u}:null; }).filter(Boolean);
+const numsIn = t => numTokens(t).map(x=>x.n);
 // (amounts don't count: "2 million" does not make "two days" the requester's, and the description never has amounts)
-const saidNums = () => new Set(numsIn((userText()+" "+Object.entries(S.f).filter(([k,v])=>typeof v==="string" && !/^l4/.test(k)).map(([,v])=>v).join(" "))
-  .replace(/(?:€|eur\b|euros?\b)\s*\d[\d.,]*\s*(?:k|m|bn|million|thousand|billion)?|\d[\d.,]*\s*(?:k|m|bn|million|thousand|billion)\b\s*(?:€|eur\b|euros?\b)?|\d[\d.,]*\s*(?:€|eur\b|euros?\b)/gi," ")));
-const grounded = (t, said) => numsIn(t).every(n=>said.has(n));
+const saidNums = (extra="") => { const said=new Set();
+  numTokens((userText()+" "+Object.entries(S.f).filter(([k,v])=>typeof v==="string" && !/^l4/.test(k)).map(([,v])=>v).join(" ")+" "+extra)
+    .replace(/(?:€|eur\b|euros?\b)\s*\d[\d.,]*\s*(?:k|m|bn|million|thousand|billion)?|\d[\d.,]*\s*(?:k|m|bn|million|thousand|billion)\b\s*(?:€|eur\b|euros?\b)?|\d[\d.,]*\s*(?:€|eur\b|euros?\b)/gi," "))
+    .forEach(x=>{ said.add(x.n); if(x.u) said.add(`${x.n} ${x.u}`); });
+  return said; };
+// a number with a unit must have been said with that unit ("within 3 months" when they said 6 months and 3 years is not theirs)
+const grounded = (t, said) => numTokens(t).every(x=>x.u ? said.has(`${x.n} ${x.u}`) : said.has(x.n));
 const groundedText = (t, said) => String(t||"").split(/\n{2,}/).map(p=>p.split(/(?<=[.!?])\s+/).filter(x=>grounded(x,said)).join(" ")).filter(Boolean).join("\n\n");
 // at most n words, ending at a clause where possible ("…, and Information Security" rather than mid-phrase)
 function clipWords(t, n){
@@ -4780,7 +4799,7 @@ function specModel(withCurrent){
       "**“Use the example”** takes the example the question showed; a message that repeats an earlier question's wording corrects that question.",
       "**Requests to change the documents** go to call D once a description exists.",
       "**Reading the answer:** with AI, call A. Its facts are screened before they are merged: placeholders (“unknown”, “none”) count only for the question just asked; classification flags (critical function, done in-house, ongoing) only at the check step; free text only when at least half of its words were said by the requester or are in the suggestion they accepted; on the first message a clear keyword category wins over the AI's. Its corrections are applied. The rules then read the same answer as a backup (closed questions, dates, amounts, places) and fill only what is still unknown. Without AI, only the rules read it.",
-      "**Suggestions:** “Use this suggestion” or “yes, but add …” stores the suggested lines; “skip” records “Not given”.",
+      "**Suggestions:** “Use this suggestion” or “yes, but add …” stores the suggested lines; “skip” records “Not given”. An AI suggestion keeps a figure only when the requester gave it, with the same unit, or the app's own standard draft has it; otherwise the point goes, and an empty line takes the draft's line. The AI's service description is checked the same way, sentence by sentence.",
       "**The check step and follow-up checks** are resolved: a date fixed or flexible, a thin answer extended, a data location added, an off-topic answer recorded as not given.",
       "**After two tries** a question is given up: a value becomes an estimate, a yes/no becomes “not sure”, anything else “Not given”.",
       "**Recompute:** relative dates become dates (“next week” → “19 Oct 2026 (next week)”); facts are worked out (technology, users, entity, could the bank do it itself, offshoring, Level 4); then the route, the questions needed, the stages and what is still missing.",
