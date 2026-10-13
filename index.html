@@ -220,7 +220,8 @@ body.doc-open{overflow:hidden}
 
 /* side panel */
 .side{min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
-@media(max-width:900px){.side{position:fixed;inset:0 0 0 auto;width:min(360px,92%);background:var(--bg);z-index:30;padding:16px;transform:translateX(100%);transition:.25s;box-shadow:-20px 0 40px rgba(0,0,0,.15)}.side.open{transform:none}}
+.side-close{display:none}
+@media(max-width:900px){.side-close{display:block;margin:0 0 10px auto}.side{position:fixed;inset:0 0 0 auto;width:min(360px,92%);background:var(--bg);z-index:30;padding:76px 16px 16px;transform:translateX(100%);transition:.25s;box-shadow:-20px 0 40px rgba(0,0,0,.15);overflow-y:auto}.side.open{transform:none}.top{position:relative;z-index:40}}
 .panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
 .route{font-family:"Inter Tight";font-size:18px;color:var(--navy);font-weight:700;margin-top:4px}
 .prov{font-size:12px;color:var(--ink-3)}
@@ -496,7 +497,7 @@ const FACTS = {
   renewal_change: {label:"Changes",         q:()=>"Does anything change compared with the current contract?", ex:()=>"For example: \"same scope, 20% more volume\" or \"no changes\"."},
   contract_ok:    {label:"Use existing contract", q:()=>S.det&&S.det.contract?`We already have the ${S.det.contract.title} with ${S.det.contract.supplier} for this kind of work. Would you like to use it?`:"Would you like to use the existing contract?", ex:()=>"That's usually the quickest way, because no new competition is needed.", choices:["Yes, use it","No, look wider"]},
   // ---- sourcing ----
-  background:     {label:"Problem to solve", q:()=>"What business problem does this solve? And what happens if it's delayed?", ex:f=>`For example: ${BG_EX[f.category]||(f.demand_type==="software"?BG_EX.software:BG_EX._)}.`},
+  background:     {label:"Problem to solve", q:()=>"What business problem does this solve? And what happens if it's delayed?", ex:f=>{ const d=bankDomain(f); return `For example: ${d&&d.bg?`"${d.bg}"`:BG_EX[f.category]||(f.demand_type==="software"?BG_EX.software:BG_EX._)}.`; }},
   users:          {label:"Target audience", sug:true, q:()=>"Who is the primary audience: who will use it or benefit from it?", ex:()=>""},
   functions:      {label:"Supported functions", sug:true, q:()=>"Which functions or teams of the organisation does it support?", ex:()=>""},
   benefits:       {label:"Key benefits",    sug:true, q:()=>"What are the main benefits and measurable outcomes?", ex:()=>""},
@@ -522,6 +523,7 @@ const FACTS = {
   service_levels: {label:"Service levels",  q:()=>"Which service levels matter to you?", ex:f=>f.category==="facilities"?"For example: daily cleaning before 8am and issues fixed within 24 hours.":"For example: 99.9% availability, a response within 4 hours, or a monthly report."},
   ip_ownership:   {label:"Who owns the work", q:()=>"Should we own what the supplier creates, such as designs, code or materials?", ex:()=>"", choices:["Yes, we own it","Shared use is fine","Not sure"]},
   performance:    {label:"Supplier so far", q:f=>`How has ${hasSupplier(f)?f.supplier:"the supplier"} performed so far?`, ex:()=>"Anything to fix in the renewal is useful to know.", choices:["Very well","Okay","Some issues"]},
+  phasing:        {label:"Phasing", q:()=>"Should any part be delivered first?", ex:()=>"For example: \"the KYC part first, trading in a second release\"."},
 };
 const GOODSLIKE = f => f.demand_type==="goods" || f.demand_type==="software";
 // relevance rules: an extra question is only asked when it matters
@@ -603,7 +605,7 @@ const currentStage = () => S.missing.length && S.det ? STAGES[stageOf(S.missing[
 /* =========================================================
    4. STATE
    ========================================================= */
-const BLANK_FACTS = {summary:null,category:null,demand_type:null,item:null,quantity:null,value:null,value_is_estimate:false,deliverables:null,duration:null,
+const BLANK_FACTS = {phasing:null,summary:null,category:null,demand_type:null,item:null,quantity:null,value:null,value_is_estimate:false,deliverables:null,duration:null,
   needed_by:null,location:null,supplier:null,supplier_reason:null,personal_data:null,ict_outsourcing:null,critical_service:null,offshore:null,
   budget_approved:null,decline_contract:null,scope_in:null,scope_out:null,acceptance_pack:null,acc_review:null,qualifications:null,kpis_pack:null,kpis:null,service_model:null,support_model:null,service_hours:null,tools:null,
   governance:null,gov_meetings:null,reporting:null,change_mgmt:null,escalation:null,supplier_terms:null,entity:null,in_house:null,ongoing:null,important_fn:null,deps_pack:null,our_deps:null,prov_assumptions:null,
@@ -1248,7 +1250,7 @@ A suggestion never states facts about this request that the user did not give (f
 Combined questions: the "background" question also asks the impact of delay, so record background and impact_delay from that one answer.
 The software "must_haves" question also asks how success is judged, so record must_haves and acceptance from that one answer. evaluation_priority, supplier_requirements, current_supplier ("None" if new),
 volume, support_needs, data_details (which data and where stored), criticality (what happens if it stops; also set critical_service true if clients or regulated activity are hit),
-subcontracting (true | false | "unsure"), pricing_model, service_levels, ip_ownership, performance (how the current supplier performed).
+subcontracting (true | false | "unsure"), pricing_model, service_levels, ip_ownership, performance (how the current supplier performed), phasing (the order of delivery if the user gives one, e.g. "the KYC part first").
 External workers or contractors are demand_type contingent_labour.
 
 ${contextLines()}
@@ -1596,6 +1598,11 @@ async function handleTurn(text, cid, opts={}){
       S.msgs.push({role:"assistant",text:"Okay. The rating and the open points stay visible to the buyer. Press \"Looks right, submit\" on the service description when you're ready."}); render(); return; }
     S.offerImprove=null;
   }
+  // after the results, a closing remark is answered as one ("thanks" is not an update)
+  if(S.completed && !S.missing.length && !S.offerImprove && /^(?:thanks?|thank you|thx|cheers|great|perfect|cool|nice|ok(?:ay)?|got it|looks good|all good|done|bye|super|wonderful|brilliant)\b[\s!.,]*(?:(?:so much|a lot|very much|again)[\s!.]*)?$/i.test(text.trim())){
+    S.msgs.push({role:"user",text:text.trim()}, {role:"assistant",text:S.submitted?"You're welcome. The request is with procurement; they'll be in touch.":"You're welcome. Press \"Looks right, submit\" when you're ready, or tell me what to change."});
+    S.choices=[]; render(); return;
+  }
   // answer to "do you want me to change …?"
   if(S.pendingCorr){
     const pc=S.pendingCorr; S.pendingCorr=null; const tt=text.trim();
@@ -1655,7 +1662,7 @@ async function handleTurn(text, cid, opts={}){
       }
     }
   }
-  if(S.sd && /^(make it|shorten|shorter|add more|rewrite|reword)|\b(summary|description|document)\b/i.test(text) && aiReady()) return refineSD(text);
+  if(S.sd && !S.missing.length && !S.offerImprove && /^(make it|shorten|shorter|add more|rewrite|reword)|\b(summary|description|document)\b/i.test(text) && aiReady()) return refineSD(text);   // during the improvement round it is an answer
   const asked=S.lastAsked; if(asked) S.asked[asked]=(S.asked[asked]||0)+1;
   // a button, a plain "ok" to a suggestion or "skip" needs no AI: the rules read it exactly, and the AI's tokens are kept for real answers
   const said0=String(opts.display||text).trim(), rulesOnly = !!asked && asked!=="need" && (S.choices.some(c=>c.toLowerCase()===said0.toLowerCase())
@@ -1695,6 +1702,8 @@ async function handleTurn(text, cid, opts={}){
       const was={value:S.f.value, quantity:S.f.quantity, supplier:S.f.supplier};
       mergeFacts(nf);
       if(asked==="supplier_terms" && /^yes\b/i.test(text.trim()) && words(text)>3) S.f.supplier_terms=cap1(text.trim().replace(/^yes[,.:;!]?\s*/i,"").replace(/[.!]$/,""));   // which documents, not just "Yes"
+  // 6. an answer in the requester's own words keeps its detail: the AI cut "99.95% availability during trading hours" to "99.95% availability"
+  if(asked && bundleOf(asked) && !ACCEPT.test(said0) && text!=="Use this suggestion" && words(text)>=6) restoreWording(asked, text, before);
   // a budget, quantity or supplier changed in passing ("oh and the budget is now 350k") is said out loud
       const moved=Object.keys(was).filter(k=>k!==asked && known(was[k]) && !isTBD(was[k]) && known(S.f[k]) && String(was[k])!==String(S.f[k]));
       if(moved.length) S.msgs.push({role:"assistant",kind:"sys",text:`Changed: ${moved.map(k=>`${FACTS[k].label.toLowerCase()} from ${show(k,was[k])} to **${show(k,S.f[k])}**`).join("; ")}.`});
@@ -1714,6 +1723,8 @@ async function handleTurn(text, cid, opts={}){
   } else if(!(pend && keepIt)) offlineRead(text, asked);
   // the AI sometimes takes "stored in the EU" or "employees in the UK" as the work location; the rules don't, and neither does the record
   if(LOC_FREE_Q.includes(asked) && before.location!==S.f.location) S.f.location=before.location;
+  if(!known(S.f.phasing)){ const ph=String(text).match(/\b((?:the\s+)?[\w/-]+(?:\s+[\w/-]+){0,3}\s+(?:part|phase|piece|module|workstream|component|release)s?\s+first)\b|\b(in\s+(?:two|three|four|\d)\s+(?:phases|stages|waves|releases))\b|\b(phase\s+(?:1|one)\s*(?:is|:|=|covers|with)?\s+[^.;]{3,60})/i);
+    if(ph) S.f.phasing=cap1((ph[1]||ph[2]||ph[3]).trim()); }   // "the KYC part first" is kept for the timeline
 
   // a suggestion the user accepted (or extended) becomes the answer
   const sugResult = asked && !pend && isSug(asked) ? applySuggestion(asked, text) : false;
@@ -1973,6 +1984,17 @@ function replyAsksAbout(k, reply){
   const topic=new Set(contentWords(F.q(S.f)+" "+F.label+" "+(bundleOf(k)||[]).map(([L])=>L).join(" ")).filter(w=>w.length>3).map(stem));
   return contentWords(q).some(w=>topic.has(stem(w)));
 }
+// a line the AI shortened from the requester's own clause gets the clause back
+function restoreWording(k, text, before){
+  const clauses=String(text).split(/(?<=[.!?;])\s+|;\s*/).map(x=>x.trim()).filter(Boolean).map(c=>({c, cw:contentWords(c).map(stem)})), used=new Set();
+  for(const [,x] of bundleOf(k)){
+    const v=S.f[x]; if(!givenText(v) || before[x]===v) continue;
+    const vw=contentWords(v).map(stem); if(!vw.length) continue;
+    const best=clauses.filter(o=>!used.has(o.c) && vw.every(w=>o.cw.includes(w))).sort((a,b)=>a.cw.length-b.cw.length)[0];
+    if(best && best.cw.length>=vw.length+3){ used.add(best.c);
+      S.f[x]=cap1(best.c.replace(/^(?:no|nope)[,.]?\s+/i,"").replace(/^(?:for (?:the|our) [\w-]+,?\s+)?(?:we|i)\s+(?:need|want|would like|expect)\s+/i,"").replace(/[.;]$/,"")); }
+  }
+}
 // three words in a row from b also in a
 function sharesPhrase(a, b){ const A=" "+contentWords(a).map(stem).join(" ")+" ", w=contentWords(b).map(stem); for(let i=0;i+2<w.length;i++) if(A.includes(` ${w[i]} ${w[i+1]} ${w[i+2]} `)) return true; return false; }
 function mergeFacts(nf){
@@ -2047,7 +2069,13 @@ function shallify(text){
     .map(x=>x.trim().replace(/[.]$/,"").replace(/^(?:they|the provider|the supplier|it)\s+(?:will|should|must|shall)\s+/i,"").replace(/^(?:to|will|should|must)\s+/i,"")).filter(x=>words(x)>=2)
     .slice(0,8).map(back).map(x=>`The Service Provider shall ${SHALL_VERBS.test(x)?lcFirst(x):"deliver "+lcFirst(x)}.`);
 }
-const workingTitle = () => { if(givenText(S.f.title)) return S.f.title;
+const workingTitle = () => {
+  const people=/^(?:an?\s+|\d+\s+|one\s+|two\s+|three\s+|four\s+|five\s+|six\s+|ten\s+)?(?:[\w-]+\s+){0,2}(?:consultants?|advisers?|advisors?|experts?|specialists?|lawyers?|developers?|engineers?|analysts?|contractors?|people|staff)\b/i;
+  if(givenText(S.f.title) && !people.test(S.f.title)) return S.f.title;
+  const first=(S.msgs.find(m=>m.role==="user")||{}).text||"", it0=givenText(S.f.item)||"";
+  if(people.test(it0) || people.test(firstPerson(first))){ const m=first.match(/\bfor\s+(?:a|an|the|our)?\s*(.+?)(?=\s+(?:for|over|during|within|starting|from)\s+(?:\d|the next|a period|about)|[,.;]|$)/i);
+    if(m && words(m[1])>=2 && words(m[1])<=9 && !/^\d/.test(m[1])) return cap1(m[1].replace(/\bour\s+/gi,"")); }
+  if(givenText(S.f.title)) return S.f.title;
   const it=givenText(S.f.item)||givenText(S.f.summary)||"";
   const x=it.replace(/^(?:an?|the)\s+(?:external\s+|new\s+|specialist\s+)?(?:provider|supplier|agency|consultants?|consultancy|company|partner|firm|vendor)s?\s+(?:to|for|who (?:can|will))\s+/i,"").replace(/\bour\s+/gi,"").replace(/[.,;:].*$/,"").trim();
   return x && words(x)<=9 ? cap1(x) : offlineSummary().title; };
@@ -2151,7 +2179,7 @@ const CAT_FUN={software:"the business function that uses it, Technology, and Inf
 // specific kinds of work, recognised from the request; each note is what a large bank typically sees
 // ops: operations the provider would run for us; a project that only touches them (an app for onboarding) takes their audience and benefits, not their service levels
 const DOMAINS=[
-  {ops:true, id:"kyc", name:"KYC and financial crime operations",
+  {ops:true, id:"kyc", name:"KYC and financial crime operations", bg:"periodic reviews are overdue for 400 corporate clients and the regulator flagged it; if it slips, we face a formal finding",
    re:/\b(kyc|know your (?:customer|client)|client onboarding|customer due diligence|\bcdd\b|\bedd\b|periodic review|aml|anti[- ]money|financial crime|sanctions screening|transaction monitoring|name screening|alert (?:review|handling))\b/i,
    aud:"Client onboarding and periodic review teams in Operations (first line of defence), usually in onboarding hubs; relationship managers in Corporate, Commercial and Private Banking whose clients wait on KYC",
    fun:"Client Onboarding / KYC Operations as process owner, Financial Crime Compliance as second-line oversight, and the client-facing businesses",
@@ -2164,7 +2192,7 @@ const DOMAINS=[
    personal:"client names, ID documents, addresses, ownership structures and source-of-wealth information", important:"KYC and financial crime work, which large banks usually treat as supporting a critical or important function",
    deps:"Access to the onboarding and screening systems; our KYC procedures and risk-rating rules; a named Financial Crime Compliance contact for escalations",
    notes:"Usually run in Operations hubs, often nearshore or offshore; client data access makes data protection and outsourcing reviews likely; regulators expect the bank to keep the risk decisions."},
-  {ops:true, id:"payops", name:"Payments and securities operations",
+  {ops:true, id:"payops", name:"Payments and securities operations", bg:"payment exceptions pile up at month end and cut-offs are missed; if it slips, clients are paid late",
    re:/\b(payments? (?:operations|processing|investigations)|swift|reconciliation|trade settlement|settlements?|corporate actions|custody|securities operations|cash management operations)\b/i,
    aud:"Payments, settlements and reconciliations teams in Operations, and the businesses whose clients rely on timely payments",
    fun:"Operations (process owner), Treasury and Finance, with Operational Risk oversight",
@@ -2175,7 +2203,7 @@ const DOMAINS=[
    qual:"Staff experienced in payments or securities operations at a bank; background-checked", personal:"client account details, payment data and counterparties",
    important:"payments and settlement work, which large banks usually treat as an important business service", deps:"System access with dual control; cut-off times and procedures; a named Operations contact",
    notes:"Money movement makes this high risk: dual control, access reviews and operational resilience requirements apply."},
-  {ops:true, id:"ap", name:"Accounts payable and finance operations",
+  {ops:true, id:"ap", name:"Accounts payable and finance operations", bg:"invoices are paid late and we pay about €20,000 a year in late fees; if it slips, supplier complaints grow",
    re:/\b(accounts payable|invoice processing|supplier invoices?|purchase[- ]to[- ]pay|p2p|expense processing|general ledger|record[- ]to[- ]report)\b/i,
    aud:"Accounts Payable and Finance Operations teams, and the suppliers and budget holders who wait on payment",
    fun:"Finance (process owner), Procurement for the purchase-to-pay process, and Tax",
@@ -2185,7 +2213,7 @@ const DOMAINS=[
    qual:"Staff experienced in accounts payable for large companies; background-checked", personal:"supplier bank details and contact data",
    important:null, deps:"Access to the finance system and invoice inbox; approval workflows; a named Finance contact",
    notes:"Usually run from a finance shared-service centre; bank details make fraud controls important."},
-  {ops:true, id:"hrops", name:"HR operations and payroll",
+  {ops:true, id:"hrops", name:"HR operations and payroll", bg:"payroll runs on an old tool and spreadsheets; if it slips, we miss the statutory reporting deadline",
    re:/\b(payroll|hr operations|recruitment process|benefits administration|onboarding of (?:staff|employees))\b/i,
    aud:"HR operations and payroll teams, and all employees in the countries covered", fun:"HR (process owner), Finance for payroll accounting, and Information Security",
    ben:"accurate and on-time pay; less manual work; better employee experience", kpi:"payroll accuracy; payroll delivered on time; employee queries closed on time",
@@ -2228,7 +2256,7 @@ const DOMAINS=[
    out:"Fixing the findings, unless agreed separately", qual:"Certified testers (for example CREST or OSCP); security-cleared staff", personal:"possibly client and employee data in the systems tested",
    important:null, deps:"Scope and rules of engagement; test accounts and access; named Technology contacts",
    notes:"Testers get privileged access; rules of engagement and confidentiality are essential."},
-  {id:"trading", name:"Front-office trading platform",
+  {id:"trading", name:"Front-office trading platform", bg:"our trading platform is end of life and vendor support ends next year; if it slips, we trade on unsupported software",
    re:/\b(trading (?:system|platform|application|software)|front[- ]office (?:trading )?(?:system|platform)|order management system|execution management|trade capture|position keeping|\boms\b|\bems\b)\b/i,
    aud:"Traders, sales and structurers, with Middle Office, Market Risk and Operations using the trade data", fun:"Front office (business owner), Technology, Market Risk, Operations and Compliance",
    ben:"a supported, scalable platform in place of an end-of-life system; trades captured once and processed straight through; real-time positions and risk; fewer manual breaks between front and back office",
@@ -2716,7 +2744,12 @@ function readAnswer(k, text){
     if(/^(no|nope|not|look|rather)/.test(t)){ S.f.decline_contract=true; const named=ALL_SUPPLIERS.find(x=>t.includes(x.toLowerCase())); if(named) S.f.supplier=named; return false; } return null; }
   if(["tech_service","personal_data","ict_outsourcing","system_access","subcontracting"].includes(k) && /not sure|unsure|don.?t know|no idea|maybe|possibly|perhaps|unclear|tbc|to be confirmed/.test(t)) return "unsure";
   if(["tech_service","personal_data","ict_outsourcing","system_access","subcontracting"].includes(k)) return /^(y|yes|yeah|they will|it will)/.test(t)||/\bwill\b(?!.*\bnot\b)/.test(t)?true:/^(n|no|none|nope)\b|not /.test(t)?false:"unsure";
-  if(k==="budget_approved") return /not sure|no idea|don.?t know|unsure|unknown/.test(t)?"unsure":/^y|approved|signed off|confirmed/.test(t)&&!/not|pending|awaiting/.test(t)?"yes":/part/.test(t)?"partly":"no";
+  if(k==="budget_approved"){   // "Frankfurt and London" is no approval answer: asked again instead of recorded as "no"
+    if(/not sure|no idea|don.?t know|unsure|unknown/.test(t)) return "unsure";
+    if(/\bpart(?:ly|ially)?\b|some of it|half/.test(t)) return "partly";
+    if(/^(?:no|nope|not yet)\b|\bnot (?:yet )?(?:approved|signed off|confirmed)\b|\b(?:pending|awaiting|waiting for)\b/.test(t)) return "no";
+    if(/^(?:y|yes|yep|yeah|sure)\b|\b(?:approved|signed off|confirmed|in place|agreed)\b/.test(t)) return "yes";
+    return null; }
   if(k==="supplier"){
     if(S.det&&S.det.route==="contract"&&S.det.contract){ if(/^(y|yes|sure|ok|happy|fine)/.test(t)) return S.det.contract.supplier; if(/^(no|nope|not)/.test(t)){ S.f.decline_contract=true; const named=ALL_SUPPLIERS.find(x=>t.includes(x.toLowerCase())); return named||null; } }
     return /^(no|none|nope|not really|no preference|any)/.test(t)?"None":cleanSupplier(text.trim());
@@ -2994,7 +3027,7 @@ function offlineDetail(brd){
     scope_in: shallify(g("scope_in")||g("must_haves")||g("deliverables")), scope_out: sp(g("scope_out")),
     our_deps: sp(g("our_deps")), assumptions: sp(g("prov_assumptions")),
     delivery: [g("location"), isOffshore(f)&&"Work outside the entity's country (offshoring check)"].filter(Boolean).join("; ")||TBDX,
-    timeline: [g("needed_by")&&`Start or delivery: ${g("needed_by")}`, g("duration")&&`Service period: ${g("duration")}`].filter(Boolean).join(". ")||TBDX,
+    timeline: [g("needed_by")&&`Start or delivery: ${g("needed_by")}`, g("duration")&&`Service period: ${g("duration")}`, g("phasing")&&`Phasing: ${g("phasing")}`].filter(Boolean).join(". ")||TBDX,
     deliverables: sp(g("deliverables")).length?sp(g("deliverables")):(GOODSLIKE(f)&&g("item")?[f.demand_type==="software"?`${g("item")}${known(f.quantity)?` for ${fmtN(f.quantity)} users`:""}`:`${known(f.quantity)?fmtN(f.quantity)+" × ":""}${g("item")}`]
       : shallify(g("scope_in")).map(x=>x.replace(/^The Service Provider shall (?:send|deliver|provide|produce|prepare|write|hand over)\s+/i,"").replace(/^The Service Provider shall .*/,"").replace(/\.$/,"")).filter(x=>x&&/report|plan|design|document|model|map|roadmap|analysis|assessment|code|release|presentation|statement|dashboard|specification/i.test(x)).map(cap1)),
     acceptance: g("acceptance")||TBDX, acceptance_test: g("acc_review")||TBDX,
@@ -3168,7 +3201,7 @@ function offlineBRD(risk){
     success_criteria: split(g("acceptance")).length?split(g("acceptance")):["Deliverables accepted in writing by the requester"],
     scope_in: cont?[...split(g("deliverables")),...(g("role")?[`${g("headcount")||1} × ${g("role")}`]:[])]:(g("deliverables")?split(g("deliverables")):g("item")?[itemLine]:[]).concat(g("support_needs")&&goods?split(g("support_needs")):[]),
     scope_out, requirements, deliverables: g("deliverables")?split(g("deliverables")):(goods&&g("item")?[itemLine]:[]), milestones,
-    timeline:[g("needed_by")&&`Start or delivery: ${g("needed_by")}`, g("duration")&&`Duration: ${g("duration")}`].filter(Boolean).join(". "), location:g("location")||"", volumes:g("volume")||(g("quantity")?`${fmtN(g("quantity"))} ${f.demand_type==="software"?"users":"units"}`:""),
+    timeline:[g("needed_by")&&`Start or delivery: ${g("needed_by")}`, g("duration")&&`Duration: ${g("duration")}`, g("phasing")&&`Phasing: ${g("phasing")}`].filter(Boolean).join(". "), location:g("location")||"", volumes:g("volume")||(g("quantity")?`${fmtN(g("quantity"))} ${f.demand_type==="software"?"users":"units"}`:""),
     service_levels: split(g("service_levels")), supplier_requirements: [...split(g("supplier_requirements")).filter(x=>!/^none$/i.test(x)),...(cont?split(g("skills")):[])],
     risk_and_compliance: risk, commercials, evaluation, stakeholders, assumptions, dependencies,
     open_points:[...open_points,...(aiReady()?[]:["Built from your answers without AI. With AI on, the wording is fuller."])]
@@ -3691,7 +3724,8 @@ function bind(){
 
 function renderSide(){
   const f=S.f, D=S.det;
-  if(!D){ $("#side").innerHTML=`<div class="panel"><div class="eyebrow">Your request</div><p class="muted" style="margin:8px 0 0">Start by describing what you need. The route and what's needed for it appear here.</p></div>`; return; }
+  const closeBtn=`<button type="button" class="btn btn-g side-close" data-act="closeside" aria-label="Close the summary">Close</button>`;
+  if(!D){ $("#side").innerHTML=`${closeBtn}<div class="panel"><div class="eyebrow">Your request</div><p class="muted" style="margin:8px 0 0">Start by describing what you need. The route and what's needed for it appear here.</p></div>`; return; }
   const req=S.req||[], done=req.filter(k=>known(f[k])).length, pct=req.length?Math.round(done/req.length*100):100;
   // only the step being asked is open; the others fold to one line and open with a click.
   // Long answers sit under their label, cut to two lines, and show in full when clicked.
@@ -3706,7 +3740,7 @@ function renderSide(){
         return `<div class="fact ${ok?"ok":""} ${nx?"next":""}${long?" long":""}${long&&S.sideFull[k]?" full":""}"><span class="ic">${ok?"✓":""}</span><span class="k">${FACTS[k].label}</span><span class="v"${long?` data-full="${k}" title="${S.sideFull[k]?"Show less":"Show all"}"`:""}>${esc(v)}</span>${can?`<button class="ed" data-edit="${k}" title="Change" aria-label="Change ${esc(FACTS[k].label)}">✎</button>`:""}</div>`;}).join("")+
       `</div>`;
   }).join("");
-  $("#side").innerHTML=`<div class="panel">
+  $("#side").innerHTML=`${closeBtn}<div class="panel">
       <div class="eyebrow">Route ${S.missing.length?"so far":""}</div>
       <div class="route">${CHANNELS[S.override||D.route].name}</div>
       <div class="prov">${S.missing.length?"May change as you answer":"Ready"} · ${esc(catById(f.category).name)} <button class="ed" data-edit="category" title="Change the category" aria-label="Change the category">✎</button></div>
@@ -4061,6 +4095,10 @@ $("#cfgBtn").onclick=openSettings; $("#howBtn").onclick=openSpec;
 // Escape closes How it works
 document.addEventListener("keydown",e=>{ if(e.key==="Escape" && $("#specPaper")) closeDoc(); });
 $("#newBtn").onclick=reset; $("#sumBtn").onclick=()=>$("#side").classList.toggle("open");
+// phone: the summary panel closes with its Close button, Escape or a tap outside it
+document.addEventListener("click", e=>{ const side=$("#side"); if(!side.classList.contains("open")) return;
+  if(e.target.closest('[data-act="closeside"]') || (!e.target.closest("#side") && !e.target.closest("#sumBtn"))) side.classList.remove("open"); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && $("#side").classList.contains("open") && !$("#specPaper")) $("#side").classList.remove("open"); });
 // access gate: the page stays locked until the server confirms the code
 async function verifyCode(c){
   try{ const r=await fetch("/api/llm?verify=1",{headers:{"x-access-code":c}}); return r.ok; }catch(e){ return null; }

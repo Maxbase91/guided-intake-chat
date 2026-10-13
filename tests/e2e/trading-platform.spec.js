@@ -86,3 +86,23 @@ test("'yes, their standard licence terms and an online SLA' keeps which document
   await say(page, "yes, their standard licence terms and an online SLA document");
   expect(await page.evaluate(() => S.f.supplier_terms)).toBe("Their standard licence terms and an online SLA document");
 });
+
+test("own wording kept, phasing recorded, a title from the purpose and examples by area", async ({ page }) => {
+  await openApp(page);
+  await say(page, FIRST);
+  expect(await lastAssistant(page).innerText()).toContain("our trading platform is end of life and vendor support ends next year");
+  await say(page, "Our platform is 15 years old and support ends in 2027; the KYC part first, trading in a second release. If delayed we run unsupported software");
+  const got = await page.evaluate(() => {
+    const r = { phasing: S.f.phasing, label: FACTS.phasing.label };
+    const before = { ...S.f };
+    S.f.service_levels = "99.95% availability; fixed within 1 hour";
+    restoreWording("kpis_pack", "no, these are for KYC cases. for the platform I need 99.95% availability during trading hours and P1 incidents fixed within 1 hour", before);
+    r.sl = S.f.service_levels;
+    return r;
+  });
+  expect(got).toEqual({ phasing: "The KYC part first", label: "Phasing", sl: "99.95% availability during trading hours and P1 incidents fixed within 1 hour" });
+  // a request that names people takes its title from what they are for
+  await page.click("#newBtn");
+  await say(page, "I need three business consultants for a target operating model transformation in procurement for 9 months");
+  expect(await page.evaluate(() => workingTitle())).toBe("Target operating model transformation in procurement");
+});

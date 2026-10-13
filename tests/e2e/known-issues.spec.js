@@ -1,13 +1,12 @@
-// Known defects found while assessing the app. Each test states the CORRECT behaviour and is marked test.fail(),
-// so the suite stays green while the defect exists and reports "unexpectedly passed" once it is fixed.
-// When that happens, remove the test.fail() line so the test guards the fix.
+// Defects found while assessing the app. Each test states the CORRECT behaviour. A defect that is still open is marked
+// test.fail(), so the suite stays green and reports "unexpectedly passed" once it is fixed; then the marker is removed
+// and the test guards the fix. All four defects found so far are fixed.
 const { test, expect } = require("@playwright/test");
 const { openApp, say, choose, idle, lastAssistant, choices, answerUntilDone, sideFacts, mock } = require("./helpers");
 
 const route = (page) => page.locator("#side .route");
 
 test("an answer of the wrong kind is not recorded as the budget approval", async ({ page }) => {
-  test.fail(true, "offline reading turns any answer to the approval question into yes/no/partly");
   await openApp(page);
   await say(page, "A new HR system to replace our payroll tool.");
   const ANSWERS = [
@@ -30,7 +29,6 @@ test("an answer of the wrong kind is not recorded as the budget approval", async
 });
 
 test("a closing remark after the results is not answered as an update", async ({ page }) => {
-  test.fail(true, "after the results, every message (even 'thanks') is scored and answered with 'Updated. Here are the revised…'");
   await openApp(page);
   await say(page, "We need 15 laptops for new joiners in Frankfurt.");
   await answerUntilDone(page, [[/When (do you need it|should it start)/i, "15 December 2026"]]);
@@ -41,16 +39,20 @@ test("a closing remark after the results is not answered as an update", async ({
 test.describe("phone layout", () => {
   test.use({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
   test("the summary panel can be closed again on a phone", async ({ page }) => {
-    test.fail(true, "the open panel covers the Summary button, and there is no close button, backdrop or Escape handler");
     await openApp(page);
     await say(page, "We need 15 laptops for new joiners in Frankfurt.");
-    await page.click("#sumBtn");
-    await expect(page.locator("#side")).toHaveClass(/open/);
-    await expect(page.locator("#side .route")).toBeInViewport();
-    await page.waitForTimeout(400); // let the slide-in finish
-    await page.keyboard.press("Escape");
-    await page.click("#sumBtn", { timeout: 2000 }).catch(() => {});
-    await expect(page.locator("#side")).not.toHaveClass(/open/, { timeout: 2000 });
+    const side = page.locator("#side");
+    for (const close of ["Escape", "button", "summary", "outside"]) {
+      await page.click("#sumBtn");
+      await expect(side).toHaveClass(/open/);
+      await expect(page.locator("#side .route")).toBeInViewport();
+      await page.waitForTimeout(300); // let the slide-in finish
+      if (close === "Escape") await page.keyboard.press("Escape");
+      if (close === "button") await page.click('#side [data-act="closeside"]');
+      if (close === "summary") await page.click("#sumBtn");          // the header stays above the panel
+      if (close === "outside") await page.mouse.click(20, 400);
+      await expect(side, close).not.toHaveClass(/open/);
+    }
   });
 });
 
@@ -59,7 +61,6 @@ test.describe("AI mode", () => {
   test.beforeEach(async ({ request }) => { await mock(request, { gemini: "ok", groq: "ok", mistral: "ok", coldStart: true, resetCalls: true, nextChat: null }); });
 
   test("an answer that mentions a 'summary' during the improvement round is taken as the answer", async ({ page }) => {
-    test.fail(true, "once a description exists, any message with 'summary', 'description' or 'document' is sent to refineSD");
     await openApp(page, { kind: "ai" });
     await say(page, "An agency for a client dinner for 40 people, around 30k.");
     await page.click("#cfgBtn"); await page.fill("#t4", "100"); await page.click("#close");

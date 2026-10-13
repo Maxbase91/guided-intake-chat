@@ -131,7 +131,7 @@ Three things blocked real users. The first is now fixed:
 | Suite | Result |
 | --- | --- |
 | API (`tests/api`, node:test) | 18 passed, 1 known bug recorded as `todo` |
-| End-to-end (`tests/e2e`, Playwright, Chromium) | 134 passed: 130 behaviour tests and 4 known-issue tests that fail as expected |
+| End-to-end (`tests/e2e`, Playwright, Chromium) | 135 passed: all behaviour tests; the 4 known-issue tests now guard their fixes |
 | Run time | About a minute. Needs no keys and no network. |
 
 **Covered:**
@@ -176,14 +176,14 @@ Each finding says how it was confirmed:
 | 3 | **Without `ACCESS_CODE` the server is an open LLM proxy.** The browser sends the whole system prompt, and there is no per-client rate limit, so anyone with the URL can use the keys or exhaust the quota. | `api/llm.js` 311–322 | Code |
 | 4 | **The access code can be guessed quickly.** Only `?verify` waits 700 ms. A wrong code on POST is refused at once. The comparison is not timing-safe. `?code=` puts the code in logs and browser history. | `api/llm.js` 268–274, 311 | Code (POST 401 checked in a test) |
 | 5, **fixed** | **An amount the AI returns as text is read wrongly.** "€400k" becomes 400, so a €400k request drops to business-led quotes. `parseMoney` already handles this but is not used here. | `normFact` (`index.html` ~1449–1460) | Test |
-| 6 | **On a phone, the Summary panel can't be closed.** It covers 92% of the screen, including the Summary button, and has no close button, backdrop or Escape key. The user has to reload. | CSS `index.html` 200; toggle 3008 | Test |
-| 7 | **Wrong-kind answers are stored without a check in offline mode.** "About 400k" to "Is the budget already approved?" is stored as "No". "No supplier in mind" to "What must it be able to do?" is stored as must-haves (8/10). A location given as deliverables produces "The supplier will deliver." in the description. | `offlineRead` / `readAnswer` | Test and run |
+| 6, **fixed** | **On a phone, the Summary panel can't be closed.** Now: a Close button, Escape, a tap outside, and the header with the Summary button stays above the panel. It covers 92% of the screen, including the Summary button, and has no close button, backdrop or Escape key. The user has to reload. | CSS `index.html` 200; toggle 3008 | Test |
+| 7, **partly fixed** | **Wrong-kind answers are stored without a check in offline mode.** The budget approval is asked again when the answer is not yes, no, partly or not sure; the other examples are still open. "About 400k" to "Is the budget already approved?" is stored as "No". "No supplier in mind" to "What must it be able to do?" is stored as must-haves (8/10). A location given as deliverables produces "The supplier will deliver." in the description. | `offlineRead` / `readAnswer` | Test and run |
 
 ### Medium
 
 | # | Finding | Where | Confirmed by |
 | --- | --- | --- | --- |
-| 8 | **Answers can be taken as document edits.** Once a description exists, any message containing "summary", "description" or "document" is treated as an edit, including answers in the improvement round. | `handleTurn` (`index.html` 1250) | Test |
+| 8, **fixed** | **Answers can be taken as document edits.** Now only once no question is open. Once a description exists, any message containing "summary", "description" or "document" is treated as an edit, including answers in the improvement round. | `handleTurn` (`index.html` 1250) | Test |
 | 9 | **Requesters can change the route thresholds under Rules.** Raising the €50,000 threshold turns an RFP into business-led quotes, and only the "why" text records it. | Settings (`index.html` 2967–2994) | Test |
 | 10 | **`?ai=<provider>` can be set by anyone with the link.** A shared link forces one provider (for example Mistral's free plan) for the whole conversation. | `index.html` 286; `api/llm.js` 327 | Test |
 | 11 | **Server state is shared between requests.** `IGNORE_COOLDOWN` is a module variable, so a POST that arrives during a `?check` ignores cooldowns. The deadline is only checked between calls, so one request can run past the 60 s function limit. | `api/llm.js` 61, 140, 205, 276 | Code |
@@ -197,7 +197,7 @@ Each finding says how it was confirmed:
 | # | Finding | Confirmed by |
 | --- | --- | --- |
 | 15, **fixed** | **Acronyms lose their capitals in generated text:** "fits it hardware", "It provides hR operations", "External java developer". | Test and run |
-| 16 | **A closing remark after the results gets a misleading reply.** "thanks" gets "Updated. Here are the revised service description and route." although nothing changed. | Test |
+| 16, **fixed** | **A closing remark after the results gets a misleading reply.** Now answered as a closing remark. "thanks" gets "Updated. Here are the revised service description and route." although nothing changed. | Test |
 | 17, **partly fixed** | **The second off-topic answer is shown as "Answer quality 8/10" with "That helps."** It is correctly stored as "To be determined", but the feedback contradicts that. The score is no longer shown; the "That helps." reply is unchanged. | Run |
 | 18 | **The improvement round asks the start date again** when the timeline is only partial, instead of asking for the missing end date or duration. The result card above drops the date while the round runs. | Run |
 | 19 | **The browser-key Gemini path puts the key in the URL** (`?key=`). The server sends it in a header. | Code |
