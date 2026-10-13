@@ -1286,7 +1286,7 @@ const STAGES=[
   {id:"risk",    name:"Data and classification", intro:"A few checks on data and access. Most of the classification I can work out myself; I'll only ask what isn't clear.",
    facts:["personal_data","data_details","system_access","entity","hosting","in_house","ict_outsourcing","deps_pack","other_risks"]},
   {id:"check",   name:"Check",                intro:"Before I write anything, please check what I've worked out.", facts:["confirm_derived"]},
-  {id:"review",  name:"Review",               intro:"Here's the route, the service description and the full documents.", facts:[]}
+  {id:"review",  name:"Review",               get intro(){ return `Here's the route and the ${docName()}.`; }, facts:[]}
 ];
 // software as new demand: the user count is asked with "who is it for", not up front
 const swNewDemand = () => S.f && S.f.demand_type==="software" && S.det && NEW_DEMAND(S.det.route);
@@ -2062,11 +2062,12 @@ Return JSON only: {"facts":{...only keys you are setting...},"reply":"","asking"
 function contextLines(){
   const c=S.f.category;
   if(!c) return "Context: none yet (category unknown).";
-  const ctr=CONTRACTS.filter(x=>contractCovers(x,S.f) && new Date(x.expires)>new Date()), pref=preferredFor(S.f), cat=GOODSLIKE(S.f)?CATALOGUE:[];
+  // only the catalogue entries of this request's category, at most 8: the whole catalogue would cost tokens on every turn
+  const ctr=CONTRACTS.filter(x=>contractCovers(x,S.f) && new Date(x.expires)>new Date()), pref=preferredFor(S.f), cat=CATALOGUE.filter(x=>x.cat===c).slice(0,8);
   return "Context you may use in remarks:"+
     (ctr.length?`\nActive contracts for this category: ${ctr.map(x=>`${x.title} with ${x.supplier} (ends ${x.expires})`).join("; ")}.`:"\nNo active contract for this category.")+
     (pref.length?`\nPreferred suppliers: ${pref.join(", ")}.`:"")+
-    (cat.length?`\nCatalogue: ${cat.map(x=>`${x.name} ${money(x.price)}`).join("; ")}.`:"");
+    (cat.length?`\nCatalogue: ${cat.map(x=>x.kind==="shop"?`${x.name} (${x.supplier}, orders up to ${money(x.max_order)})`:`${x.name} ${money(x.price)}`).join("; ")}.`:"");
 }
 // the message sent with each chat turn: recent conversation, the latest answer and the app's state (also shown in How it works)
 const chatUser = (transcript, text, pend) => `${transcript?`Conversation so far:\n${transcript}\n\n`:""}Latest user message:\n${text}${stateBlock(pend)}\n\nAnswer with the JSON object only.`;
@@ -2101,6 +2102,13 @@ function cleanReply(t){
   if((t.match(/\*\*/g)||[]).length%2) t=t.replace(/\*\*/g,"");   // an unmatched "**" would show as is
   const sents=t.split(/(?<=[.!?])\s+/), kept=sents.filter(x=>!INTERNAL_KEYS.test(x) && !INTERNAL_VALS.test(x)).map(x=>x.replace(/\b[a-z]+(?:_[a-z]+)+\b/g,"").trim()).filter(Boolean);
   return kept.length===sents.length ? t : (kept.join(" ").trim() || null);
+}
+// some models answer at length: over 45 words, a chat reply keeps its first sentence and its question
+function shortReply(t){
+  if(!t || typeof t!=="string" || words(t)<=45) return t;
+  const sents=t.split(/(?<=[.!?])\s+/).filter(Boolean), q=[...sents].reverse().find(x=>/\?\s*$/.test(x));
+  if(!q || sents[0]===q) return t;
+  return `${sents[0]} ${q}`;
 }
 class Stale extends Error{}
 const guard = cid => { if(S.cid!==cid) throw new Stale(); };   // the user started a new conversation meanwhile
@@ -2535,7 +2543,7 @@ async function handleTurn(text, cid, opts={}){
       if(moved.length) S.msgs.push({role:"assistant",kind:"sys",text:`Changed: ${moved.map(k=>`${FACTS[k].label.toLowerCase()} from ${show(k,was[k])} to **${show(k,S.f[k])}**`).join("; ")}.`});
       if(asked && !known(S.f[asked]) && CLOSED.includes(asked)){ const v=readAnswer(asked,text); if(known(v) && v!=="unsure"||/sure|know/i.test(text)) S.f[asked]=v; }
       if(!(pend && keepIt)) offlineRead(text, asked);
-      reply=out._raw?null:cleanReply(out.reply||null); if(reply && !/\?/.test(reply) && !out.complete) reply=null; choices=out.choices||[]; complete=!!out.complete; aiAsking=out.asking||null;
+      reply=out._raw?null:shortReply(cleanReply(out.reply||null)); if(reply && !/\?/.test(reply) && !out.complete) reply=null; choices=out.choices||[]; complete=!!out.complete; aiAsking=out.asking||null;
       if(out.assessment && out.assessment.ok===false && out.assessment.fact) aiCheck=out.assessment;
       aiSuggestion=out.suggestion||null;
       if(out.assessment && Number(out.assessment.score)>=1 && Number(out.assessment.score)<=10) aiScore=Math.round(Number(out.assessment.score));
@@ -2668,7 +2676,7 @@ async function handleTurn(text, cid, opts={}){
     S.msgs.push({role:"assistant",kind:"sys",text: shopOrder() ? `You can order this from the ${S.det.catalogue[0].name.toLowerCase()} of ${S.det.catalogue[0].supplier} in our catalogue, so I only need a few details.` : `At ${money(Number(S.f.value))} this is a low-value purchase: no service description, just a few details.`});
 
   if(!S.missing.length){
-    const lead = S.completed ? `Updated. Here are the revised ${docName()} and route.` : S.improveRound ? "Thanks, that makes it stronger. I'm updating the service description now." : `${complete && reply && !aiCheck ? reply.replace(/\s*$/,"") : wrapUp()} ${LIGHT(S.det.route)?"I'm writing the purchase request now. Below it you'll find the route I recommend. Please check them before you submit.":"I'm writing the service description now. Below it you'll find the route I recommend and the full document. Please check them before you submit."}`;
+    const lead = S.completed ? `Updated. Here are the revised ${docName()} and route.` : S.improveRound ? "Thanks, that makes it stronger. I'm updating the service description now." : `${complete && reply && !aiCheck ? reply.replace(/\s*$/,"") : wrapUp()} ${LIGHT(S.det.route)?"I'm writing the purchase request now. Below it you'll find the route I recommend. Please check them before you submit.":"I'm writing the service description now. Below it you'll find the route I recommend. Please check them before you submit."}`;
     await finishIntake(cid, lead);
   } else {
     let next=S.missing[0];
@@ -3293,12 +3301,15 @@ function normSuggestion(v, k){
   return Object.entries(v).map(([kk,x])=>{ const hit=bundleOf(k).find(([L,fk])=>nk(L)===nk(kk)||fk===kk||nk(kk).startsWith(nk(L).split(/[ /]/)[0])); return hit?`${hit[0]}: ${vals(x)}`:vals(x); }).filter(Boolean).join("\n");
 }
 // a line of a suggestion: about 45 words, whole points only; benefits, selling points and audience lose invented figures ("80% fewer", "12,000+ users")
-const INVENTED=/\s*(?:by\s+|of\s+|to\s+)?(?:<|>|~|up to\s+|over\s+|around\s+)?\d[\d,.]*\s*\+?\s*(?:%|percent)|\s*\b\d[\d,.]*\s*\+?\s+(?=(?:users|employees|staff|people|countries|line managers|managers|leaders|colleagues)\b)/gi;
+const INVENTED=/\s*(?:by\s+|of\s+|to\s+)?(?:<|>|~|up to\s+|over\s+|around\s+)?\d[\d,.]*\s*\+?\s*(?:%|percent)\+?|\s*\b\d[\d,.]*\s*\+?\s+(?=(?:users|employees|staff|people|countries|line managers|managers|leaders|colleagues)\b)/gi;
+// a figure in brackets goes with its brackets ("teams (1,200 users globally)"); then no "( ", "()" or a lone "+" is left behind
+const dropFigures = t => String(t).replace(/\s*\(\s*(?:~|around\s+|over\s+|up to\s+)?\d[\d,.]*\s*\+?\s*[^)]*\)/g,"").replace(INVENTED," ").replace(/\(\s*\)/g,"").replace(/\(\s+/g,"(").replace(/\s+\+(?=[\s;,.)]|$)/g,"").replace(/\s{2,}/g," ").replace(/\s+([;,.])/g,"$1").trim();
+const SUG_LINE_MAX=30, SUG_POINT_MAX=20;   // words: a suggestion line, and one point of it (every provider writes at length)
 function fitLine(line){
   const m=line.match(/^([^:]{3,45}:)\s*(.*)$/), head=m?m[1]+" ":"", body0=m?m[2]:line;
-  const body=/^(?:Key benefits|Expected outcomes|Unique selling points|Target audience|Sponsor and stakeholders|Guests|Participants|Regulatory)/i.test(head) ? body0.replace(INVENTED," ").replace(/\s{2,}/g," ").replace(/\s+([;,.])/g,"$1").trim() : body0;
+  const body=/^(?:Key benefits|Expected outcomes|Unique selling points|Target audience|Sponsor and stakeholders|Guests|Participants|Regulatory)/i.test(head) ? dropFigures(body0) : body0;
   const pts=body.split(/;\s*/), out=[]; let n=0;
-  for(const x of pts){ const w=words(x); if(out.length && n+w>45) break; out.push(x); n+=w; }
+  for(const x of pts){ const w=words(x); if(out.length && n+w>SUG_LINE_MAX) break; out.push(x); n+=w; }
   return head+out.join("; ");
 }
 // a suggestion as the user sees it: one label per line, short, no formatting, no invented dates
@@ -3311,7 +3322,7 @@ function tidySuggestion(k, v){
   const DATE=new RegExp(`\\s*,?\\s*\\b(?:(?:confirmed|finalised|finalized|ready|provided|documented|verified|shared|agreed|delivered|completed|signed off|approved|updated|reviewed|in place)\\s+)?(?:by|as of|before|until)\\s+(?:the\\s+)?(?:\\d{1,2}(?:st|nd|rd|th)?\\s+)?${MON}(?:\\s+\\d{1,2}(?:st|nd|rd|th)?)?(?:,?\\s+20\\d\\d)?`,"gi");
   const PAREN=/\s*\([^)]*\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b[^)]*\)|\s*\((?:e\.g\.|i\.e\.|for example|such as)[^)]*\)/gi;
   // a long point keeps whole sentences instead of ending mid-sentence in "…"
-  const shortPt=x=>{ if(words(x)<=40) return x; let out=""; for(const y of x.split(/(?<=[.!?])\s+/)){ if(words(out+" "+y)>40) break; out=(out+" "+y).trim(); } return out||x; };
+  const shortPt=x=>{ if(words(x)<=SUG_POINT_MAX) return x; let out=""; for(const y of x.split(/(?<=[.!?,])\s+/)){ if(words(out+" "+y)>SUG_POINT_MAX) break; out=(out+" "+y).trim(); } return (out||x.split(/\s+/).slice(0,SUG_POINT_MAX).join(" ")).replace(/[,;:]$/,""); };
   const cap=line=>{ const m=line.match(/^([^:]{3,45}:)\s*(.*)$/), keep=m&&(lines||!/^[a-z][a-z_ ]*:$/.test(m[1]));   // never a raw key such as "exclusions:"
     const head=keep?m[1]+" ":"", body=(m?m[2]:line).replace(PAREN,"").replace(DATE,"").replace(/^(?:[a-z][a-z_ ]*:\s*)+/,"");
     const pts=body.split(/;\s*/).map(x=>x.trim().replace(/[.,]$/,"")).filter(Boolean).map(x=>x.replace(/^[a-z][a-z_]*(?: [a-z_]+){0,3}:\s+/,"")).slice(0,4).map(shortPt);
@@ -3757,6 +3768,12 @@ function offlineDescription(){
 const EXEC_ROWS=[["name","Service name"],["audience","Target audience"],["functions","Supported functions"],["problem","Business problem solved"],["capabilities","Key capabilities"],
   ["benefits","Key benefits"],["usp","Unique selling points"],["kpis","KPIs / success measures"],["regulatory","Regulatory / governance benefits"]];
 const EXEC_LISTS=["capabilities","benefits","kpis"];
+// at most n words, ending at a clause where possible ("…, and Information Security" rather than mid-phrase)
+function clipWords(t, n){
+  t=String(t||"").trim(); if(words(t)<=n) return t;
+  const cut=t.split(/\s+/).slice(0,n).join(" "), at=Math.max(cut.lastIndexOf(";"), cut.lastIndexOf(","), cut.lastIndexOf("."));
+  return (at>cut.length/2 ? cut.slice(0,at) : cut).replace(/[\s,;:]+(?:and|or|with|for|of|the|a)?$/i,"").trim();
+}
 const execLimits = () => S.det&&S.det.route==="sourcing" ? {head:100, exec:250, headMin:50, execMin:150} : {head:70, exec:150, headMin:40, execMin:90};
 function clampWords(t, max){
   const paras=String(t||"").split(/\n{2,}/).map(p=>p.replace(/\s+/g," ").trim()).filter(Boolean); let n=0; const out=[];
@@ -3768,9 +3785,9 @@ function offlineExec(lead){
   const f=S.f, c=catById(f.category), cont=f.demand_type==="contingent_labour";
   const g=k=>known(f[k])&&!["Not given","unsure","None","Confirmed"].includes(f[k])&&typeof f[k]==="string"?f[k].trim().replace(/\.$/,""):null;
   const lf=lcFirst, split=x=>!x?[]:(/[;\n]/.test(x)?String(x).split(/;|\n/):/,/.test(x)?String(x).split(/,\s*(?:and\s+)?/i):String(x).split(/\s+and\s+(?=[a-z])/i)).map(t=>t.trim().replace(/\.$/,"")).filter(t=>words(t)>=1).map(cap1);
-  const sc=x=>scrubText(x||"",false), scl=a=>a.map(x=>scrubText(x,true)).filter(Boolean);
+  const sc=x=>clipWords(dropFigures(scrubText(x||"",false)),25), scl=a=>a.map(x=>clipWords(dropFigures(scrubText(x,true)),12)).filter(Boolean).slice(0,5);
   const t={audience:sc(g("users")), functions:sc(g("functions")), problem:sc(g("background")),
-    capabilities:scl(split(g("must_haves")||(cont?g("skills"):g("deliverables"))||g("item"))), benefits:scl(split(g("benefits"))), usp:sc(g("usp")),
+    capabilities:scl(split(g("must_haves")||(cont?g("skills"):g("deliverables")))), benefits:scl(split(g("benefits"))), usp:sc(g("usp")),
     kpis:scl(split(g("kpis")||g("acceptance"))), regulatory:NO_BENEFIT.test(g("reg_benefits")||"")?"":sc(g("reg_benefits"))};
   const L=execLimits(), what=lf(String(lead||c.name).replace(/\.$/,"")), nd=x=>String(x).replace(/\.$/,"");
   // a noun phrase ("a process orchestration platform") becomes a sentence; a problem phrased as a goal ("providing a single entry") is not "today"
@@ -3799,8 +3816,8 @@ function mergeExec(base, ai){
   const L=execLimits();
   for(const [k] of EXEC_ROWS){ if(k==="name") continue;
     let v=ai[k];
-    if(EXEC_LISTS.includes(k)) v=(Array.isArray(v)?v:typeof v==="string"?v.split(/\n|;\s*/):[]).map(x=>scrubText(String(x).replace(/^[-•*]\s*/,""),k==="kpis")).filter(x=>x&&words(x)>=1).slice(0,10);
-    else v=typeof v==="string"?scrubText(v,false):"";
+    if(EXEC_LISTS.includes(k)) v=(Array.isArray(v)?v:typeof v==="string"?v.split(/\n|;\s*/):[]).map(x=>clipWords(dropFigures(scrubText(String(x).replace(/^[-•*]\s*/,""),k==="kpis")),12)).filter(x=>x&&words(x)>=1).slice(0,5);
+    else v=typeof v==="string"?clipWords(dropFigures(scrubText(v,false)),25):"";
     if(k==="regulatory" && NO_BENEFIT.test(v||"")) v="";
     if(v && v.length) out[k]=v;
   }
@@ -3855,18 +3872,20 @@ function intakeRecord(){
   const rows=[["Buying route",CHANNELS[route].name],
     ["Category (Level 4)", fin ? `${fin.name} (${fin.code})${ini?(ini.code===fin.code?", initial classification confirmed":`, changed from ${ini.name}`):""}` : ini ? `${ini.name} (${ini.code}), ${ini.match}% match` : null],
     ["Budget",known(f.value)?money(Number(f.value))+(f.value_is_estimate?" (estimate)":""):null], ["Budget approved",v("budget_approved")],
-    ["Quantity",v("quantity")], ["People",GOODSLIKE(f)?null:v("headcount")], ["Day rate",rateIsTotal(f.day_rate)?null:v("day_rate")], ["Volume",v("volume")],
+    // how many, in the words of the kind of purchase: items, users of software, people; a service has no quantity
+    [f.demand_type==="software"?"Users":"Quantity", ["goods","software"].includes(f.demand_type)&&known(f.quantity)&&Number(f.quantity)>0 ? (f.demand_type==="software"?`About ${fmtN(f.quantity)}`:v("quantity")) : null],
+    ["People",f.demand_type==="contingent_labour"?v("headcount"):null], ["Day rate",rateIsTotal(f.day_rate)?null:v("day_rate")], ["Volume",v("volume")],
     ["Start or delivery",v("needed_by")], ["Duration",v("duration")], ["Where and how",v("location")],
     ["Supplier",supplier], ["Existing contract",D.contract&&route==="contract"?`${D.contract.title} with ${D.contract.supplier} (${D.contract.id})`:null],
     ["Provisioning legal entity", nd && f.demand_type!=="goods" ? (o.entity?o.entity.name:"To be determined") : null],
     ["Data and system access", known(f.personal_data) || a.any ? (a.any?`Yes${givenText(f.data_details)?`: ${f.data_details}`:""}${a.money?" (money or accounts)":""}`:show("personal_data",f.personal_data)) : null],
     ["System access",v("system_access")],
     ["Outsourcing", nd && f.demand_type!=="goods" ? `${o.result} (${o.rs.short}, group standard)` : null],
-    ["Future rule set", nd ? `${o.future.result} (${RULESETS.future.short}, not yet applicable)` : null],
     ["ICT service (DORA)",cl.ict?cl.ict.flag+(["Yes","Possible"].includes(cl.ict.flag)?` · ${cl.type}`:""):null],
     ["Critical or important function", nd && f.demand_type!=="goods" ? (isImportant(f)?"May apply, flagged for review":"No indication") : null],
-    ["Materiality", nd ? "To be determined in the materiality process" : null],
-    ["If it doesn't go ahead",v("impact_delay")], ["Checked by you", nd ? (known(f.confirm_derived)&&!isTBD(f.confirm_derived) ? String(f.confirm_derived) : "Not yet") : null]];
+    // only when it applies: the final materiality call is made in the materiality process
+    ["Material spend review", known(f.value)&&Number(f.value)>=CONFIG.thresholds.materialityMin ? `Yes, the value is ${money(CONFIG.thresholds.materialityMin)} or more` : null],
+    ["If it doesn't go ahead",v("impact_delay")]];
   return rows.filter(r=>r[1]);
 }
 
@@ -4097,7 +4116,9 @@ const execSpec = () => { const L=execLimits(); return `1. "description": the EXE
    STRICT: the description must NOT contain amounts or budgets, dates, timing or duration, delivery location, supplier names or preferences, budget approval, cost centres,
    the buying route, contracts or frameworks, or the risk answers about this purchase (personal data, system access, whether it is outsourcing, criticality, subcontracting). These are captured separately.
    Never copy the user's raw wording such as "I don't know" or typos. Never invent facts: do not add capabilities, integrations, technologies, benefits or outcomes the user did not state or confirm.`; };
-const DOC_SYSTEM = () => `You write two things for a corporate procurement request, based on the conversation and the facts.
+// the documents call writes only the service description: the requirements document and the detailed description are built
+// from the answers (no tokens) and are not shown for now
+const DOC_SYSTEM = () => `You write the service description for a corporate procurement request, based on the conversation and the facts.
 Today is ${fmtDate(new Date())}.
 ${S.det&&NEW_DEMAND(S.det.route)?execSpec():`1. "description": the SERVICE DESCRIPTION, for review by senior stakeholders. It says WHAT is being bought and WHY. Professional, concise, business-focused, third person.
    Fields (plain strings unless stated):
@@ -4116,35 +4137,13 @@ ${S.det&&NEW_DEMAND(S.det.route)?execSpec():`1. "description": the SERVICE DESCR
    the buying route, contracts or frameworks, or risk answers (personal data, system access, outsourcing, criticality, subcontracting). These are captured separately.
    Never copy the user's raw wording such as "I don't know" or typos. Use only what the conversation supports; leave a field "" (or []) when there is nothing to say. Never invent facts.
    For a simple catalogue order or a low-value purchase, fill only name, summary and, if given, problem.`}
-2. "brd": the BUSINESS REQUIREMENTS DOCUMENT content, complete enough for the sourcing, risk and contract teams to work from without asking again. Here all captured details belong.
-${S.det&&NEW_DEMAND(S.det.route)?`   For this new demand fill only requirements, milestones, evaluation, stakeholders and risk_and_compliance in "brd"; the rest goes into "detail".
-3. "detail": the DETAILED SERVICE DESCRIPTION for the sourcing request and contract input. Keys (string, or array of short strings): purpose, scope_in, scope_out, our_deps, assumptions, delivery, timeline,
-   deliverables, acceptance, acceptance_test, service_levels, kpis, tools, qualifications, volumes, access, gov_meetings, reporting, change_mgmt, escalation, supplier_docs, open_points.
-   Writing rules: describe what the third-party Service Provider provides; use "The Service Provider shall ..." for provider obligations (scope_in) and "The organisation shall ..." only for confirmed dependencies;
-   say clearly which party is responsible; no vague wording such as "reasonable efforts", "as required" or "support as needed"; write abbreviations in full the first time;
-   separate confirmed information from assumptions and open points; write "To be determined" where something is unknown and list it in open_points; never invent service levels, access, legal terms or materiality outcomes;
-   do not include intellectual property terms (flag them for Legal review if the user raised them). Captured details (dates, locations, access) belong here.
-4. "compact": a compact sourcing request description in one paragraph (what the provider provides, purpose, key deliverables, timeline and location, access or technology, service levels or acceptance, important open points). No artificial limit, but concise. Do not cut sentences.
-5. In "compact": no abbreviations or shorthand (write "accounts payable", "8,000", "January", "enterprise resource planning system"), and use exactly the same figures as in "detail".
-6. "l4_final": re-check the Level 4 classification against the full description: {"code":"one code from the list","match":0-100,"reason":"short plain reason","uncertainty":""}.`:""}
-Rules for the brd: use every fact and detail from the conversation. Never invent names, numbers or dates. Where something important is unknown, put it in open_points.
-Money: the currency is ${CONFIG.currency} (€). Quote the value exactly as given in value_display. Never recalculate or re-estimate amounts.
-Do not use internal labels such as "contingent labour" or category ids; use plain words. Do not rate the overall risk level yourself; describe the facts.
-The ICT (DORA) and outsourcing determinations are given in the facts; repeat them as flags for review, never as a final classification.
-You may propose sensible out-of-scope items, milestones, assumptions and evaluation weights that follow from the facts; mark proposals with "(proposed)".
-Requirements: clear, testable, one per line, written as "The supplier shall ..." or as a plain statement. Types: Service, Supply, Functional, Timing, Location, Service level, Acceptance, Data protection,
-Security, Resilience, Compliance, Supplier, Commercial, Contract, Resourcing, Skills. Priority: Must, Should or Could. 8 to 20 requirements.
-Plain language, short sentences, no marketing words, no jargon.
+${S.det&&NEW_DEMAND(S.det.route)?`2. "l4_final": re-check the Level 4 classification against the full description: {"code":"one code from the list","match":0-100,"reason":"short plain reason","uncertainty":""}.`:""}
+Length is a hard limit: count the words. audience, functions, problem, usp and regulatory: at most 25 words each. Each item of capabilities, benefits and kpis: at most 12 words, at most 5 items. Shorter is better. Never list teams, user numbers or percentages the user did not give.
+Plain language, short sentences, no marketing words, no jargon. Do not use internal labels such as "contingent labour" or category ids.
 Return JSON only:
 {"description":${S.det&&NEW_DEMAND(S.det.route)?`{"name":"","tagline":"","headline":"","exec":"","audience":"","functions":"","problem":"","capabilities":[""],"benefits":[""],"usp":"","kpis":[""],"regulatory":""}`:`{"name":"","summary":"","audience":"","problem":"","functions":"","capabilities":[""],"benefits":[""],"difference":"","success":"","regulatory":"","narrative":""}`},
- "brd":{"background":"","objectives":[""],"success_criteria":[""],"scope_in":[""],"scope_out":[""],
-  "requirements":[{"type":"","text":"","priority":"Must"}],"deliverables":[""],"milestones":[{"milestone":"","timing":""}],
-  "timeline":"","location":"","volumes":"","service_levels":[""],"supplier_requirements":[""],"risk_and_compliance":[""],
-  "commercials":[""],"evaluation":[{"criterion":"","weight":"40%"}],"stakeholders":[{"role":"","who":""}],
-  "assumptions":[""],"dependencies":[""],"open_points":[""]},
- ${S.det&&NEW_DEMAND(S.det.route)?`"detail":{"purpose":"","scope_in":[""],"scope_out":[""],"our_deps":[""],"assumptions":[""],"delivery":"","timeline":"","deliverables":[""],"acceptance":"","acceptance_test":"","service_levels":[""],"kpis":[""],"tools":[""],"qualifications":"","volumes":"","access":[""],"gov_meetings":"","reporting":"","change_mgmt":"","escalation":"","supplier_docs":"","open_points":[""]},
- "compact":"","l4_final":{"code":"","match":0,"reason":"","uncertainty":""},`:""}
- "quality_remarks":["at most 3 short remarks a buyer would raise: gaps, inconsistencies or risks in this request; empty if none"]}`;
+ ${S.det&&NEW_DEMAND(S.det.route)?`"l4_final":{"code":"","match":0,"reason":"","uncertainty":""},`:""}
+ "quality_remarks":["at most 3 short remarks a buyer would raise about the description: gaps or inconsistencies; empty if none"]}`;
 
 const nonEmpty = v => Array.isArray(v) ? v.filter(x=>x&&(typeof x!=="object"||Object.values(x).some(Boolean))).length>0 : !!(v&&String(v).trim());
 function mergeBRD(base, ai){
@@ -4174,10 +4173,10 @@ async function buildDoc(cid=S.cid){
     }catch(e){ if(e instanceof Stale) throw e; guard(cid); ai=null; S.msgs.push({role:"assistant",kind:"sys",text:"The AI couldn't write the documents just now, so they are built from your answers. You can let the AI try again later with \"Write it with AI again\"."}); }
   }
   const name=ai&&ai.description&&scrubText(String(ai.description.name||"")).replace(/\.$/,"");
-  S.sd = {title:(name&&words(name)<=8?name:"")||(NEW_DEMAND(S.det.route)?workingTitle():"")||base.title, desc:mergeDesc(desc0, ai&&ai.description), brd:mergeBRD(offlineBRD(base.risk), ai&&ai.brd), _ai:!!ai, _date:new Date()};
+  S.sd = {title:(name&&words(name)<=8?name:"")||(NEW_DEMAND(S.det.route)?workingTitle():"")||base.title, desc:mergeDesc(desc0, ai&&ai.description), brd:mergeBRD(offlineBRD(base.risk), null), _ai:!!ai, _date:new Date()};
   if(NEW_DEMAND(S.det.route)){
-    S.sd.detail = mergeDetail(offlineDetail(S.sd.brd), ai&&ai.detail);
-    S.sd.compact = ai&&typeof ai.compact==="string"&&words(ai.compact)>=25 ? ai.compact.trim() : offlineCompact();
+    S.sd.detail = mergeDetail(offlineDetail(S.sd.brd), null);
+    S.sd.compact = offlineCompact();   // in the JSON payload only
     S.sd.l4Final = finalL4(ai&&ai.l4_final);
   }
   S.quality = computeQuality(ai&&Array.isArray(ai.quality_remarks)?ai.quality_remarks:[]);
@@ -4193,18 +4192,18 @@ function docUser(){
         `ICT service (DORA): ${cl.ict?cl.ict.text:"not assessed"}\nOutsourcing: ${cl.out?cl.out.text:"not assessed"}\n`+
         (NEW_DEMAND(S.det.route)?`Critical or important function: ${isImportant(S.f)?"may apply (flag only)":"no indication"}\nProvisioning legal entity: ${(entityById(S.f.entity)||{}).name||"to be determined"}\nDerived facts checked by the requester: ${known(S.f.confirm_derived)&&!isTBD(S.f.confirm_derived)?S.f.confirm_derived:"no"}\n`+
           `Initial Level 4 classification: ${(S.l4Initial||[]).map(x=>`${x.code} ${x.name} (${x.match}%)`).join("; ")}\nLevel 4 candidates: ${[...new Set([S.f.l4,...(S.l4Initial||[]).map(x=>x.code),...classifyL4(S.f).map(x=>x.code)].filter(Boolean))].slice(0,5).map(c=>l4ByCode(c)).filter(Boolean).map(e=>`${e.code} ${e.name}: ${e.desc}`).join(" | ")}\n`:"")+
-        `Recommended route: ${CHANNELS[S.det.route].name}. ${S.det.why}\nChecks triggered: ${S.det.controls.map(c=>c[1]).join(", ")||"none"}\nExisting contract: ${S.det.contract?`${S.det.contract.title} with ${S.det.contract.supplier}`:"none"}\nPreferred suppliers: ${preferredFor(S.f).join(", ")||"none"}`;
+        `Recommended route: ${CHANNELS[S.det.route].name}.`;
 }
 // the message sent to change the documents on request
-const refineUser = (current, text) => `Current service description and requirements document: ${JSON.stringify(current)}\nChange request: ${text}\nReturn the full updated JSON in the same shape. The description rules still apply.`;
+const refineUser = (current, text) => `Current service description: ${JSON.stringify(current)}\nChange request: ${text}\nReturn the full updated JSON in the same shape. The description rules still apply.`;
 async function refineSD(text){
   const cid=S.cid;
   S.msgs.push({role:"user",text}); S.busy=true; render();
-  try{ const d=await callLLM(DOC_SYSTEM(),[{role:"user",content:refineUser({description:{name:S.sd.title,...S.sd.desc},brd:S.sd.brd}, text)}]);
+  try{ const d=await callLLM(DOC_SYSTEM(),[{role:"user",content:refineUser({description:{name:S.sd.title,...S.sd.desc}}, text)}]);
        if(S.cid!==cid) return;
        const nm=d.description&&scrubText(String(d.description.name||"")).replace(/\.$/,"");
-       S.sd={...S.sd,title:nm||S.sd.title,desc:mergeDesc(S.sd.desc,d.description),brd:mergeBRD(S.sd.brd,d.brd)}; S.brdEdited=null;
-       S.msgs.push({role:"assistant",text:"Done, the service description and the requirements document are updated."}); S.msgs.push({role:"assistant",kind:"sd"}); }
+       S.sd={...S.sd,title:nm||S.sd.title,desc:mergeDesc(S.sd.desc,d.description)}; S.brdEdited=null;
+       S.msgs.push({role:"assistant",text:"Done, the service description is updated."}); S.msgs.push({role:"assistant",kind:"sd"}); }
   catch(e){ if(S.cid!==cid) return; S.msgs.push({role:"assistant",kind:"sys",text:"The AI couldn't update it just now. You can edit the text directly."}); }
   if(S.cid!==cid) return;
   S.busy=false; render();
@@ -4214,7 +4213,7 @@ function submit(){ S.holdScroll=false;
   const id="REQ-"+Math.floor(1e5+Math.random()*9e5), ch=CHANNELS[S.override||S.det.route].name;
   S.submitted=id; S.brdEdited=null; S.offerImprove=null; S.choices=[];
   S.belowThreshold = !!(S.quality && NEW_DEMAND(S.det.route) && S.quality.score<CONFIG.thresholds.qualityMin);
-  S.msgs.push({role:"assistant",text:`Submitted. Request **${id}** goes to **${ch}** with ${LIGHT(S.override||S.det.route)?"the purchase request and the captured details":"the service description, the captured details and the full document"} attached.${S.belowThreshold?` It is marked as submitted below the quality threshold (${S.quality.rating}, ${S.quality.score}/100), so the buyer will look at the open points first.`:""} You'll get an update at each step.\n(Prototype: nothing was sent anywhere.)`});
+  S.msgs.push({role:"assistant",text:`Submitted. Request **${id}** goes to **${ch}** with ${LIGHT(S.override||S.det.route)?"the purchase request and the captured details":"the service description and the captured details"} attached.${S.belowThreshold?` It is marked as submitted below the quality threshold (${S.quality.rating}, ${S.quality.score}/100), so the buyer will look at the open points first.`:""} You'll get an update at each step.\n(Prototype: nothing was sent anywhere.)`});
   render();
 }
 function payload(){
@@ -4386,11 +4385,7 @@ function sdHTML(){
   return `<div class="card sd"><div class="sd-h"><small>${light?"Purchase request":"Service description"} · click the text to edit</small><div class="t" contenteditable data-sd="title">${esc(d.title||"Untitled")}</div></div>
     <div class="sec desc">${descHTML(true)}</div>
     <div class="sec record"><h4>Captured for procurement <span class="muted">not part of the description</span></h4><div class="kvg">${rec.map(([k,v])=>`<span>${esc(k)}</span><span>${esc(v)}</span>`).join("")}</div></div>
-    ${d.detail?`<div class="sec srq"><h4>Sourcing request text</h4><p class="cmp">${esc(d.compact)}</p>
-      <div class="cpy"><button class="lnk" data-act="copycompact">Copy sourcing text</button></div></div>`:""}
     ${qualityHTML()}
-    ${light?"":`<div class="sec brdlink"><div><b>${d.detail?"Detailed service description":"Business requirements document"}</b><br><span class="muted">${d.detail?`25 sections, ${n} obligations, outsourcing and ICT determination, sourcing attributes, quality check by section`:`${n} requirements, risk and compliance, commercial terms, evaluation, approvals`}${S.sd._ai?"":" · built from your answers"}</span></div>
-      <button class="btn btn-a" data-act="brd">Open document</button></div>`}
     <div class="acts">${S.submitted?`<span class="muted">Submitted as <b>${esc(S.submitted)}</b></span>`:`<button class="btn btn-p" data-act="submit">Looks right, submit</button>`}
       <button class="lnk" data-act="copy">${light?"Copy request":"Copy description"}</button><span class="muted">Something to change? Just tell me.</span></div></div>`;
 }
@@ -4438,18 +4433,21 @@ function qualityHTML(){
   const oks=q.points.filter(p=>p.lvl==="ok").length, items=[], gaps=qualityGaps();
   q.points.filter(p=>p.lvl!=="ok").forEach(p=>items.push({lvl:p.lvl,html:esc(p.text)}));
   gaps.improve.forEach(r=>items.push({lvl:r.status==="Risk"?"warn":"info", html:`<span><b>${esc(r.sec)}</b>: ${esc(r.issue||r.status.toLowerCase())}${r.fix?`. ${esc(r.fix)}`:""}</span>`}));
-  const names=s=>{ const x=s.map((n,i)=>i?n.toLowerCase():n); return x.length>1?x.slice(0,-1).join(", ")+" and "+x[x.length-1]:x[0]; };
-  const openTxt=(S.sd&&S.sd.detail&&S.sd.detail.open_points||[]).map(x=>String(x).toLowerCase());
-  const optional=gaps.optional.filter(g=>!g.secs.some(sec=>openTxt.some(x=>x.startsWith(sec.toLowerCase())))).map(g=>`<li class="opt"><span><b>${esc(names(g.secs))}</b>: ${g.key?`worth adding because ${esc(g.why)}.`:`${esc(cap1(g.why))}. ${esc(g.fix)}.`}</span>${g.key&&!S.submitted?`<button class="lnk" data-act="addopt" data-key="${g.key}">Add</button>`:""}</li>`);
-  const seen=new Set(), list=items.filter(x=>{ const k=x.html.replace(/<[^>]+>/g,"").toLowerCase().slice(0,60); if(seen.has(k)) return false; seen.add(k); return true; });
-  const secs=new Set(items.map(x=>(x.html.match(/^<span><b>([^<]+)<\/b>/)||[])[1]).filter(Boolean).map(x=>x.toLowerCase()));
-  const open=(S.sd&&S.sd.detail&&S.sd.detail.open_points||[]).filter(x=>!seen.has(String(x).toLowerCase().slice(0,60)) && !secs.has(String(x).split(":")[0].trim().toLowerCase()));
+  // one list: what is weak or still open, each point once ("Must-haves: still to be clarified" and "Must-haves: to be determined" are one);
+  // a point the route did not ask joins only when it improves the description itself, with one question to answer or a wording fix
+  const labelOf=h=>String(h).replace(/<[^>]+>/g,"").split(":")[0].trim().toLowerCase().replace(/[.]$/,"");
+  const seen=new Set(), list=[];
+  const add=(lvl,html)=>{ const l=labelOf(html); if(seen.has(l)) return; seen.add(l); list.push({lvl,html}); };
+  items.forEach(x=>add(x.lvl,x.html));
+  (S.sd&&S.sd.detail&&S.sd.detail.open_points||[]).forEach(x=>add("info",esc(x)));
+  gaps.optional.filter(g=>(g.key && DESC_FACTS.includes(g.key)) || g.secs.includes("Definitions")).forEach(g=>{
+    const html=`<span><b>${esc(g.secs.join(", "))}</b>: ${g.key?`${esc(cap1(g.why))}.`:`${esc(cap1(g.why))}. ${esc(g.fix)}.`}</span>${g.key&&!S.submitted?`<button class="lnk" data-act="addopt" data-key="${esc(g.key)}">Answer one more question</button>`:""}`;
+    add("opt", html); });
   return `<div class="sec qual"><div class="qhead"><span class="qbadge ${cls}">${q.rating}</span><span>Quality check · ${q.score}/100 · ${q.complete}% of the needed details given${oks?` · ${oks} answer${oks>1?"s":""} clarified`:""}</span></div>
-    ${list.length?`<h5 class="qh">To improve</h5><ul class="qlist">${list.map(p=>`<li class="${p.lvl}">${/^<span>/.test(p.html)?p.html:`<span>${p.html}</span>`}</li>`).join("")}</ul>`:""}
-    ${open.length?`<h5 class="qh">Still open (${open.length})</h5><ul class="qlist">${open.map(x=>`<li class="info"><span>${esc(x)}</span></li>`).join("")}</ul>`:""}
-    ${optional.length?`<h5 class="qh">Optional for this request</h5><ul class="qlist">${optional.join("")}</ul>`:""}
-    ${!list.length&&!open.length&&!optional.length?`<ul class="qlist"><li class="ok">No gaps or inconsistencies found.</li></ul>`:""}</div>`;
+    ${list.length?`<h5 class="qh">Still to clarify</h5><ul class="qlist">${list.map(p=>`<li class="${p.lvl}">${/^<span>/.test(p.html)?p.html:`<span>${p.html}</span>`}</li>`).join("")}</ul>`:`<ul class="qlist"><li class="ok">No gaps or inconsistencies found.</li></ul>`}</div>`;
 }
+// the facts the service description is written from: an optional point about them improves the description
+const DESC_FACTS=["users","audience_fn","functions","background","impact_delay","must_haves","value_props","benefits","usp","kpis","kpis_pack","reg_benefits","acceptance","acceptance_pack"];
 function sdText(){ const d=S.sd.desc||{};
   if(d.exec!==undefined) return [`${S.sd.title}${d.tagline?` | ${d.tagline}`:""}`, d.headline, "Executive service description\n"+d.exec,
     "Service summary\n"+EXEC_ROWS.map(([k,l])=>[l,k==="name"?S.sd.title:Array.isArray(d[k])?d[k].join("; "):d[k]]).filter(r=>r[1]).map(([l,v])=>`${l}: ${v}`).join("\n")].filter(Boolean).join("\n\n");
@@ -4760,7 +4758,7 @@ function specModel(withCurrent){
     table(["Call","When","What it gets","What it returns","If it fails"],[
       ["A. Chat turn","Every typed answer while the AI is on. Not for a button click, a plain “ok” to a suggestion or “skip” (the rules read those exactly and save tokens), corrections the rules already understood, questions back the rules answer, or a request to change the documents","The chat prompt (about 20 Level 4 candidates, not the whole list, only on the first message and at the check step); the last 6 messages, each cut to 400 characters; the latest message; the app's state: known facts, route so far, items already checked, a pending check, the next items still needed with their question and example","JSON: facts, reply, asking, choices, complete, suggestion, corrections, answers_question, assessment (fact, ok, issue, follow-up, score 1–10)","A short note in the chat; the rules read the answer and ask the standard question"],
       ["B. Suggestion","The next question is a suggestion item and the chat turn gave no usable suggestion; also when the chat resumes (after a correction, the improvement round or Add)","The suggestion prompt; the question; what is known; the rules' own draft","One plain string; for bundles one “Label: text” line per label","The rules' draft is shown"],
-      ["C. Documents","Once every needed detail is there (rebuilt only when the facts change)","The documents prompt; the whole conversation; the facts; category; ICT and outsourcing result; route and why; reviews; contract; preferred suppliers. New demand also: critical-function flag, entity, check-step result, the Level 4 list","JSON: description, brd; new demand also detail, compact, l4_final, quality_remarks","One retry (none at a usage limit); the documents are built from the answers"],
+      ["C. Documents","Once every needed detail is there (rebuilt only when the facts change)","The documents prompt; the whole conversation; the facts; category; ICT and outsourcing result; route and. New demand also: critical-function flag, entity, check-step result, up to 5 Level 4 candidates. Not for a catalogue order or a low-value purchase (built from the answers)","JSON: the description (with hard word limits per field); new demand also l4_final; quality_remarks","One retry (none at a usage limit); the description is built from the answers"],
       ["D. Document change","“Make it shorter”, “rewrite the summary” … once a description exists","The documents prompt; the current description and requirements; the request","The same JSON; description and requirements are merged","A note; the text can be edited directly"]]));
 
   B.push(h(2,"4. One message, step by step"),
@@ -4836,7 +4834,7 @@ function specModel(withCurrent){
       "**Level 4:** every entry's words are weighted by where they appear (search terms and name 3, Level 3 group 2, Level 2 group and description 1) and by how rare they are across the list; a description's “not X: see Y” part never counts. The rules pick within the category; with no clear signal, the category's “(other)” entry. The subject of the request counts double, what follows “including” a quarter; when a category keyword points elsewhere, the closest entry across the whole list wins if it scores clearly higher; a confident Level 4 stays put so the route does not change halfway. With AI, the first message (and the check step) gets about 20 candidates: the closest entries across the whole list plus the rules' picks; when none fits, the AI names the item in a category list's words and the app looks those up. The AI's pick sets the category too, unless a category is named at the start of the request. The value confirmed at the check step is final; it can be changed in the summary by searching the list.",
       "**ICT service (DORA):** whether technology is involved comes from the rules or the answer; for software the type follows Level 4 (SaaS or licensing), otherwise keywords.",
       `**Outsourcing, group standard ${R.current.id}** (the legal entity does not change the result): 1. excluded under paragraph 28 (goods, statutory audit, card schemes, clearing, SWIFT, correspondent banking, legal, facilities, market data, telecom, training, marketing, external workers) → not outsourcing; 2. not performed on a recurrent or ongoing basis (paragraph 26) → not outsourcing (likely); a project with set deliverables is one-off whatever its length (see Kinds of work); for software, who hosts and runs it decides (asked only when the request doesn't say): we install and run it → not outsourcing (likely), still an ICT service under DORA; the provider hosts and runs it (SaaS) → it is software the bank would otherwise run itself, whatever the business area; 3. work the bank does or could realistically do itself (paragraph 26) → outsourcing (likely); otherwise not outsourcing (likely), or to be determined when unclear. A critical or important function (paragraphs 29–31) is a flag for review, never a decision.`,
-      `**Future rule set ${R.future.id}** (${R.future.status}): shown as a preview only.`,
+      `**Future rule set ${R.future.id}** (${R.future.status}): EBA/GL/2019/02 applies until it does; the app works out the result under it but does not show it.`,
       "**Critical or important function:** from the answer on impact (clients, payments, regulatory, trading, outage, audit) or a known bank domain (KYC, payments, payroll, contact centre, regulatory reporting, service desk); never for events, training, office or hardware.",
       "**Offshoring:** the provider works from a country other than the entity's. An explicit “no” wins; where users or data are does not count."]));
 
@@ -4855,14 +4853,13 @@ function specModel(withCurrent){
     ul(["**Warnings:** an answer confirmed despite a check, no usable answer, a needed detail still open, data without a storage place, budget not approved for an RFP.",
       "**Notes:** a flexible start date, an estimated budget, a tight timeline, up to 2 remarks from the AI."]),
     p(`**Improvement round:** for new demand scoring below ${T.qualityMin}, the chat offers to go through up to 8 points that would lift it; “Submit anyway” stays possible and is recorded as submitted below the threshold.`),
-    p("**To improve** lists gaps in what the route asked, and risks. **Optional for this request** lists sections the route did not ask, only when they matter for this demand (for example governance for long or critical services, change management for software), each with its reason and, where the chat has a question, an Add button."));
+    p("**Still to clarify** is one list: gaps in what the route asked, risks and open points, each once. A point the route did not ask joins it only when it would improve the description itself (who it is for, capabilities, benefits, success measures, or abbreviations to write in full), with an “Answer one more question” button where the chat has a question. Points for the contract (governance, change management, escalation) are left to the buyer."));
 
   B.push(h(2,"10. What comes out"),
     ul([`**Service description:** for new demand a headline (${ex.limits.headMin}–${ex.limits.head} words for an RFP, ${exQuote.limits.headMin}–${exQuote.limits.head} for three quotes), an executive description (${ex.limits.execMin}–${ex.limits.exec} words; ${exQuote.limits.execMin}–${exQuote.limits.exec}) and a summary table (${EXEC_ROWS.map(r=>r[1]).join(", ")}). Other routes get a short description. It never contains amounts, dates, places, suppliers, the route or risk answers.`,
-      "**Captured for procurement:** the record table with the route, Level 4, budget, timing, supplier, entity, data access, outsourcing, ICT, critical function, materiality and the check-step result.",
-      "**Sourcing request text:** one paragraph for the RFP.",
-      `**Detailed document (new demand):** ${DETAIL_SECTIONS.length} sections (${DETAIL_SECTIONS.map(s=>s[1]).join(", ")}), obligations as “The Service Provider shall …”, sourcing attributes, materiality inputs, quality by section, the Level 4 check, and appendices with the facts and the conversation.`,
-      "**Business requirements document (other routes):** requirements with priority, milestones, evaluation, stakeholders, risk and compliance.",
+      "**Captured for procurement:** the record table with the route, Level 4, budget, how many (items, users of software, or people; a service has none), timing, supplier, entity, data access, outsourcing, ICT, critical function, and the material spend review when the value reaches its threshold. The final materiality call is made in the materiality process.",
+      "**Purchase request** (catalogue order, low-value purchase): a short summary and the record, built from the answers without an AI call.",
+      `**Switched off for now, to save tokens:** the detailed service description (${DETAIL_SECTIONS.length} sections), the business requirements document and the sourcing request text. They are still built from the answers and sent with the request (JSON), but not shown, and the AI does not write them.`,
       `**JSON on submit:** ${ex.payloadKeys}.`]));
 
   B.push(h(2,"11. Settings and reference data"),

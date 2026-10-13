@@ -7,7 +7,7 @@
 // Answers follow the shape the app asks for:
 //   chat turns   -> asks the first item in still_needed (with a suggestion when the item expects one)
 //   suggestions  -> {"suggestion": ...}
-//   documents    -> description, brd, detail, compact, l4_final, quality_remarks
+//   documents    -> description, l4_final (new demand), quality_remarks
 //   anything else (status ping) -> {"ok": true}
 // Trigger words in the user's latest message: MOCK_LEAK (reply leaks internal field names),
 // MOCK_OFFTOPIC (assessment flags the answer as off-topic). configure({ nextChat: {...} }) overrides fields of the next chat answer.
@@ -51,33 +51,22 @@ function baseChatAnswer(user) {
 }
 
 function docAnswer(system) {
-  const nd = /"detail":\{/.test(system);
+  const nd = /"exec":""/.test(system);   // new demand: the executive service description
   const description = nd
     ? { name: "Mock HR and payroll platform", tagline: "Accurate pay, less manual work", headline: "A managed HR and payroll platform that replaces manual spreadsheets and an end-of-life tool, giving HR one reliable process for paying employees accurately and on time across the countries covered.",
         exec: "The organisation needs a managed HR and payroll platform. Today payroll depends on an end-of-life tool and manual spreadsheets, which creates errors and rework.\n\nThe platform gives HR and payroll teams one process with an audit trail and self-service for employees.",
         audience: "HR and payroll teams and all employees", functions: "HR, Finance", problem: "End-of-life payroll tool and manual spreadsheets",
         capabilities: ["Payroll calculation", "Employee self-service", "Audit trail"], benefits: ["Accurate pay", "Less manual work"], usp: "One managed platform", kpis: ["Payroll accuracy"], regulatory: "" }
     : { name: "Mock service", summary: "The organisation buys a mock service for this request.", audience: "", problem: "", functions: "", capabilities: ["Mock capability one", "Mock capability two"], benefits: ["Mock benefit"], difference: "", success: "", regulatory: "", narrative: "The organisation buys a mock service for this request." };
-  const out = {
-    description,
-    brd: { background: "Mock background.", objectives: ["Mock objective"], success_criteria: ["Mock success criterion"], scope_in: ["Mock scope"], scope_out: [],
-      requirements: [{ type: "Functional", text: "The supplier shall provide the mock service.", priority: "Must" }, { type: "Service level", text: "The supplier shall meet the agreed service levels.", priority: "Should" }],
-      deliverables: ["Mock deliverable"], milestones: [{ milestone: "Start", timing: "To be determined" }], timeline: "", location: "", volumes: "", service_levels: [], supplier_requirements: [], risk_and_compliance: [],
-      commercials: [], evaluation: [{ criterion: "Quality", weight: "60%" }, { criterion: "Price", weight: "40%" }], stakeholders: [{ role: "Business owner", who: "To be determined" }], assumptions: [], dependencies: [], open_points: [] },
-    quality_remarks: [],
-  };
-  if (nd) {
-    out.detail = { purpose: "Mock purpose.", scope_in: ["The Service Provider shall run the mock service."], scope_out: [], our_deps: [], assumptions: [], delivery: "", timeline: "", deliverables: [], acceptance: "", acceptance_test: "", service_levels: [], kpis: [], tools: [], qualifications: "", volumes: "", access: [], gov_meetings: "", reporting: "", change_mgmt: "", escalation: "", supplier_docs: "", open_points: [] };
-    out.compact = "The Service Provider shall provide a managed HR and payroll platform for the organisation, replacing an end-of-life payroll tool and manual spreadsheets, with employee self-service, an audit trail and support for payroll in the countries covered, starting as agreed.";
-    out.l4_final = { code: "", match: 0, reason: "", uncertainty: "" };
-  }
+  const out = { description, quality_remarks: [] };
+  if (nd) out.l4_final = { code: "", match: 0, reason: "", uncertainty: "" };
   return out;
 }
 
 function answerFor(system, user) {
   if (/You are the intake assistant/.test(system)) return chatAnswer(user);
   if (/\{"suggestion":"\.\.\."\}/.test(system)) return { suggestion: pick(/A generic draft to improve on[^:]*: ([\s\S]*?)\n\nJSON only\./, user) || "A tailored answer for this request, reviewed by the business owner" };
-  if (/"brd":\{/.test(system)) return docAnswer(system);
+  if (/You write the service description/.test(system)) return docAnswer(system);
   return { ok: true };
 }
 

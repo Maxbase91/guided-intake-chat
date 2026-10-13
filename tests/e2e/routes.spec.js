@@ -97,9 +97,6 @@ test("external workers: a total budget given as the 'rate or budget' is not prin
   await answerUntilDone(page, [[/day rate/i, "40k"], ...ANSWERS]);
   await expect(page.locator(".sd .record")).toContainText("€40,000");
   await expect(page.locator(".sd .record")).not.toContainText("Day rate");
-  await page.click("[data-act=brd]");
-  await expect(page.locator("#paper")).toBeVisible();
-  await expect(page.locator("#paper")).not.toContainText("Day rate not above");
 });
 
 // the conversation from a real test run: "next week" for the start and "bank data" for the data question
@@ -168,21 +165,14 @@ test("new demand over the threshold: procurement-led RFP with the full service d
   await expect(page.locator("#msgs")).toContainText("Here's what I've worked out from your answers");
   await expect(page.locator(".rec-h h2")).toHaveText("New demand: procurement-led sourcing");
   await expect(page.locator(".card .sec").filter({ hasText: "Why" })).toContainText("RFP");
-  // executive format: headline, executive description, summary table, sourcing request text
+  // executive format: headline, executive description, summary table; no sourcing request text and no document (switched off)
   await expect(page.locator(".sd")).toContainText("1. Service description headline");
   await expect(page.locator(".sd")).toContainText("2. Executive service description");
-  await expect(page.locator(".sd .srq .cmp")).not.toBeEmpty();
+  await expect(page.locator(".sd .srq, .sd [data-act=brd]")).toHaveCount(0);
   await expect(page.locator(".sd .record")).toContainText("€400,000");
   await expect(page.locator(".sd .record")).toContainText("ICT service (DORA)");
-
-  // the detailed document opens, and downloads as Word
-  await page.click("[data-act=brd]");
-  await expect(page.locator("#paper")).toBeVisible();
-  await expect(page.locator("#paper")).toContainText("The Service Provider shall");
-  const [doc] = await Promise.all([page.waitForEvent("download"), page.click("[data-doc=word]")]);
-  expect(doc.suggestedFilename()).toMatch(/^BRD - .+\.doc$/);
-  await page.click("[data-doc=close]");
-  await expect(page.locator("#paper")).toHaveCount(0);
+  // the record: software counts users, no materiality unless it applies, no "Future rule set" or "Checked by you"
+  await expect(page.locator(".sd .record")).not.toContainText(/Future rule set|Checked by you|Materiality|Quantity/);
 
   await finishAndSubmit(page, "New demand: procurement-led sourcing");
   expect(errors).toEqual([]);
@@ -256,16 +246,22 @@ test("the catalogue is offered only when the value fits the catalogue price", as
 });
 
 // "To improve" keeps what this route did not ask as optional points, chosen for the demand, and each can be added in the chat
-test("optional points are tailored to the demand and can be added in the chat", async ({ page }) => {
+test("the quality check is one list; an optional point joins it only when it improves the description", async ({ page }) => {
   await openApp(page);
   await say(page, "A new HR system to replace our payroll tool.");
   await answerUntilDone(page, ANSWERS);
-  const optional = page.locator(".sd .qual li.opt");
-  await expect(page.locator(".sd .qual")).toContainText("Optional for this request");
-  await expect(optional.filter({ hasText: /change management/i })).toHaveCount(1);
-  await optional.locator('[data-act="addopt"]').first().click();
-  await idle(page);
-  await expect(page.locator("#msgs .m.a").last()).toContainText("Sure, let's add it.");
+  const qual = page.locator(".sd .qual");
+  await expect(qual).not.toContainText(/To improve|Still open|Optional for this request/);
+  // governance and change management matter for the contract, not for the description: left to the buyer
+  await expect(qual).not.toContainText(/change management|Governance|Critical or important function relevance/i);
+  const shown = await page.evaluate(() => qualityGaps().optional.filter((g) => DESC_FACTS.includes(g.key) || g.secs.includes("Definitions")));
+  await expect(page.locator(".sd .qual li.opt")).toHaveCount(shown.length);
+  if (await page.locator('.sd .qual [data-act="addopt"]').count()) {
+    await expect(page.locator('.sd .qual [data-act="addopt"]').first()).toHaveText("Answer one more question");
+    await page.locator('.sd .qual [data-act="addopt"]').first().click();
+    await idle(page);
+    await expect(page.locator("#msgs .m.a").last()).toContainText("Sure, let's add it.");
+  }
 });
 
 test("a one-off event gets no governance or change management points", async ({ page }) => {

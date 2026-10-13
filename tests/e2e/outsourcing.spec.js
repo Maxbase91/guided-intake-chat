@@ -16,7 +16,7 @@ const KYC_ANSWERS = [
   [/Which legal entity of the bank/i, "EU banking entity (Germany)"],
 ];
 
-test("an ongoing KYC operations service is flagged as likely outsourcing, with the test steps in the document", async ({ page }) => {
+test("an ongoing KYC operations service is flagged as likely outsourcing, with the test steps in the record", async ({ page }) => {
   const errors = await openApp(page);
   await say(page, "KYC periodic reviews for our corporate clients for 2 years, around 600k.");
   await answerUntilDone(page, KYC_ANSWERS);
@@ -31,21 +31,14 @@ test("an ongoing KYC operations service is flagged as likely outsourcing, with t
   const record = page.locator(".sd .record");
   await expect(record).toContainText("Provisioning legal entity");
   await expect(record).toContainText("Outsourcing (likely) (EBA/GL/2019/02, group standard)");
-  await expect(record).toContainText("Future rule set");
-  await expect(record).toContainText("EBA/GL/2026/09, not yet applicable");
+  // the new EBA guidelines (EBA/GL/2026/09) have no application date yet: no preview row; "Checked by you" is always true here
+  await expect(record).not.toContainText(/Future rule set|Checked by you/);
   await expect(record).not.toContainText(/Legal entity\b/);
-
-  await page.click("[data-act=brd]");
-  const doc = page.locator("#paper");
-  await expect(doc).toContainText("Outsourcing determination");
+  // the test steps behind the result go to procurement in the request (the detailed document is switched off)
+  const steps = await page.evaluate(() => outsourcing(S.f).steps.map(([s]) => s));
   for (const step of ["Excluded under paragraph 28", "Performed on a recurrent or ongoing basis (paragraph 26)",
-    "Would or could realistically be performed by the bank itself (paragraph 26)", "Critical or important function (paragraphs 29 to 31)"]) await expect(doc).toContainText(step);
-  await expect(doc).toContainText("Checked by the requester");
-  await expect(doc).toContainText("Yes, confirmed");
-  await expect(doc).toContainText("Future rule set (versioned separately)");
-  await expect(doc).toContainText("Finalised 18 September 2026; not yet applicable");
-  await expect(doc).toContainText("it does not change the result above until it applies");
-  await expect(doc).not.toContainText(/PRA SS2\/21|MAS Notice 658|APRA CPS 230|OSFI B-10/);
+    "Would or could realistically be performed by the bank itself (paragraph 26)", "Critical or important function (paragraphs 29 to 31)"]) expect(steps).toContain(step);
+  await expect(page.locator(".sd [data-act=brd]")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

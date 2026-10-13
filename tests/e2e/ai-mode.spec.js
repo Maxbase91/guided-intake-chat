@@ -38,7 +38,9 @@ test("a full new-demand conversation runs on the AI and the documents are writte
   await expect(page.locator(".rec-h h2")).toHaveText("New demand: procurement-led sourcing");
   // the AI's description is used; the route still comes from the rules
   await expect(page.locator('.sd-h [data-sd="title"]')).toHaveText("Mock HR and payroll platform");
-  await expect(page.locator(".sd .srq .cmp")).toContainText("managed HR and payroll platform");
+  await expect(page.locator(".sd .desc")).toContainText("managed HR and payroll platform");
+  // no sourcing request text and no document button: the description, the record and the quality check only
+  await expect(page.locator(".sd .srq, .sd [data-act=brd]")).toHaveCount(0);
   await expect(page.locator(".card .sec").filter({ hasText: "Why" })).toContainText("above the €50,000 threshold");
   const { data } = await downloadJSON(page, async () => { await page.locator("[data-act=more]").last().click(); await page.locator(".more [data-act=json]").last().click(); });
   expect(data.source).toBe("server");
