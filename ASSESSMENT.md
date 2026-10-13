@@ -131,7 +131,7 @@ Three things blocked real users. The first is now fixed:
 | Suite | Result |
 | --- | --- |
 | API (`tests/api`, node:test) | 18 passed, 1 known bug recorded as `todo` |
-| End-to-end (`tests/e2e`, Playwright, Chromium) | 129 passed: 125 behaviour tests and 4 known-issue tests that fail as expected |
+| End-to-end (`tests/e2e`, Playwright, Chromium) | 133 passed: 129 behaviour tests and 4 known-issue tests that fail as expected |
 | Run time | About a minute. Needs no keys and no network. |
 
 **Covered:**
