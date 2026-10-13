@@ -205,7 +205,7 @@ test("a message that copies an earlier question's wording corrects that question
   expect(got.out).toBeFalsy();
   expect(got.asked).toBe("scope_out");
   expect(got.msgs).toMatch(/Changed: what the provider does/);
-  expect(got.msgs).toMatch(/What is not part of the service/);
+  expect(got.msgs).toMatch(/What is not part of the work/);   // a consulting project: "the work", not "the service"
 });
 
 test("'see above' is not an answer, and 'use your example' accepts a suggestion", async ({ page }) => {

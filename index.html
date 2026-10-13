@@ -471,7 +471,7 @@ const FACTS = {
   ict_outsourcing:{label:"Runs it for us",  q:()=>"Will the provider run something for us on an ongoing basis that we would otherwise do ourselves?", ex:()=>"", choices:["Yes","No","Not sure"]},
   // ---- scope, service and governance (new demand) ----
   scope_in:       {label:"What the provider does", q:f=>f.demand_type==="contingent_labour"?"What will they work on, and what should they deliver?":"What exactly must the provider do, and what must they deliver?", ex:f=>f.demand_type==="contingent_labour"?"For example: \"build the new payments API with our team and hand over documented code\".":`List the main activities and outputs, for example: ${DELIV_EX[f.category]||DELIV_EX.bpo}.`},
-  scope_out:      {label:"Out of scope",    sug:true, q:()=>"What is not part of the service? Clear exclusions avoid misunderstandings later.", ex:()=>""},
+  scope_out:      {label:"Out of scope",    sug:true, q:f=>`What is not part of ${{product:"it",project:"the work"}[kindOf(f)]||"the service"}? Clear exclusions avoid misunderstandings later.`, ex:()=>""},
   acceptance_pack:{label:"Acceptance and sign-off", sug:true, q:()=>"How will the work be checked and accepted, and who signs it off?", ex:()=>""},
   qualifications: {label:"Staff qualifications", sug:true, q:f=>QUAL_Q[f.category]||"What skills, experience or qualifications must the provider's people have?", ex:()=>""},
   kpis_pack:      {label:"How success is measured", sug:true, q:f=>kindOf(f)==="project"?"How will you know the work succeeded?":isOngoing(f)?"Which service levels and KPIs should apply?":"How will you measure success? Which KPIs?", ex:()=>""},
@@ -852,15 +852,16 @@ function excludedType(f){
     training:"a service the bank would not otherwise perform itself (paragraph 28(g))", marketing:"a service the bank would not otherwise perform itself, such as event services (paragraph 28(g))",
     contingent:"temporary staff working under our direction, not a function run by the provider"})[f.category] || null;
 }
-// who hosts and runs software: "provider" (SaaS, managed), "own" (we install and run it), "unsure", or null when the words don't say
-function hostingOf(t){
+// who hosts and runs software: "provider" (SaaS, managed), "own" (we install and run it), "unsure", or null when the words don't say.
+// "Not sure" only counts in an answer to the question: in the whole request it is about something else ("requesters don't know where to start").
+function hostingOf(t, answer=true){
   t=String(t||"").toLowerCase();
-  if(/not sure|unsure|don.?t know|no idea|tbd|not decided|either/.test(t)) return "unsure";
+  if(answer && /not sure|unsure|don.?t know|no idea|tbd|not decided|either/.test(t)) return "unsure";
   const prov=/\b(?:saas|software as a service|cloud[- ]based|hosted by (?:the )?(?:provider|vendor|supplier)|(?:the )?(?:provider|vendor|supplier) hosts?|hosts and runs|managed service|subscription)\b/.test(t) || /^the provider\b/.test(t);
   const own=/\b(?:on[- ]?prem\w*|our (?:own )?(?:servers|data cent(?:re|er)s?|infrastructure|technology team)|install(?:ed)? (?:it )?(?:ourselves|on our|in our)|we (?:will )?(?:install|host|run) it|run (?:it )?ourselves|runs? on our servers)\b/.test(t) || /^we (?:install|run|host)\b/.test(t);
   return prov && own ? null : prov ? "provider" : own ? "own" : null;   // both (one option hosted, one installed): ask
 }
-const hostingFromText = f => f.demand_type==="software" ? (o=>o==="unsure"?null:o)(hostingOf(demandText(f))) : null;
+const hostingFromText = f => f.demand_type==="software" ? hostingOf(demandText(f), false) : null;
 // would we otherwise do this ourselves? true / false / null (unclear)
 function inHouseFromText(f){
   const t=demandText(f);
@@ -868,9 +869,10 @@ function inHouseFromText(f){
   if(/\b(?:a bank|banks) (?:wouldn.?t|would not|would never|couldn.?t|could not|don.?t|do not) (?:realistically )?(?:do|perform|run)\b|\bnot (?:work|something) (?:a bank|banks) (?:would|could) (?:realistically )?do\b/.test(t)) return false;
   if(/\b(our (?:own )?(?:team|teams|staff|people|colleagues)\b[^.]{0,40}\b(?:do|does|did|run|runs|handle|handles|process|processes|manage|manages)\b|in[- ]house today|today (?:we|our team)|we (?:currently )?(?:do|run|process|handle|manage) (?:it|this|them)|take over|on our behalf|instead of (?:us|our team)|run (?:our|the) [a-z ]*process|operate (?:our|the)|managed service|outsourc)/.test(t)) return true;
   if(f.category==="bpo") return true;   // operations banks typically run themselves
-  const D=bankDomain(f); if(!D) return null;
-  // software: only a platform the provider hosts and runs for us; software we install and run is the bank's own work
+  // software: only a platform the provider hosts and runs for us; software we install and run is the bank's own work.
+  // Running software is something any bank could do itself, whatever the business area, so no bank domain is needed.
   if(f.demand_type==="software") return f.hosting==="provider" ? true : f.hosting ? null : /\b(?:saas|software as a service|cloud|hosted|hosting|subscription)\b/i.test(demandText(f)) ? true : null;   // the Level 4 guess alone does not say who runs it
+  const D=bankDomain(f); if(!D) return null;
   return D.ops && kindOf(f)!=="service" ? null : true;
   return null;
 }
@@ -943,7 +945,7 @@ function usersFromAudience(f){
   if(f.demand_type!=="software"||!S.det||!NEW_DEMAND(S.det.route)) return null;
   const t=[f.users,typeof f.audience_fn==="string"&&f.audience_fn!=="Confirmed"?f.audience_fn:""].filter(Boolean).join(" ").replace(/(\d),(\d{3})/g,"$1$2");
   const m=t.match(/(\d+)\s*(k)?\+?\s*(?:[a-z-]+\s+){0,2}?(users?|people|colleagues|staff|employees|seats|licen[cs]es|buyers|requesters|approvers|agents|members)\b/i);
-  return m ? +m[1]*(m[2]?1000:1) : null;
+  return m && +m[1]>0 ? +m[1]*(m[2]?1000:1) : null;
 }
 function deriveFacts(f){
   const d=S.derived;
@@ -964,6 +966,9 @@ function deriveFacts(f){
 
 // "next week" or "ASAP" means nothing to the buyer a week later, so it is kept as the date it stood for: "19 Oct 2026 (next week)"
 function datedWhen(v){
+  // a quarter or month with no year ("end of Q2" said in October) gets the year it stands for: "end of Q2 2027"
+  if(typeof v==="string" && new RegExp(`^(?:(?:by|from|in|until|before|ideally|latest|(?:go )?live by)\\s+)?(?:the\\s+)?(?:(?:end|start|beginning|middle|mid|early|late)\\s+(?:of\\s+)?)?(?:q[1-4]|(?:\\d{1,2}(?:st|nd|rd|th)?\\s+(?:of\\s+)?)?${MONTH}(?:\\s+\\d{1,2}(?:st|nd|rd|th)?)?)$`,"i").test(v.trim().replace(/[.!]$/,""))){
+    const d=parseWhen(v); return d ? `${v.trim().replace(/[.!]$/,"")} ${d.getFullYear()}` : v; }
   // only a purely relative answer: anything with a number or a month ("start of March, we're hiring now") stays as given
   if(typeof v!=="string" || /\d|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|\bq[1-4]\b/i.test(v)
      || !/^(?:(?:by|from|starting|start|in|within|ideally|latest)\s+)?(?:asap|as soon as possible|immediately|urgent(?:ly)?|right away|now|next (?:week|month|quarter|year))\b/i.test(v.trim())) return v;
@@ -1578,13 +1583,23 @@ function editSuggestion(sg, text){
   if(m){ const L=lines(), {head,pts}=pointsOf(L[0]), i=nth(m[1]); if(pts[i]!==undefined){ pts[i]=m[2].trim(); L[0]=head+pts.join("; "); out=L.join("\n"); done=true; } }
   m=t.match(/\b(?:drop|remove|delete|leave out|take out)\s+the\s+(first|second|third|fourth|1st|2nd|3rd|4th|last)\s+(?:one|point|item|line|bullet)\b/i);
   if(m){ const L=lines(), {head,pts}=pointsOf(L[0]), i=nth(m[1]); if(pts[i]!==undefined && pts.length>1){ pts.splice(i,1); L[0]=head+pts.join("; "); out=L.join("\n"); done=true; } }
-  m=t.match(/\b(?:drop|remove|delete|leave out|take out|without)\s+(?:the\s+)?(?!first\b|second\b|third\b|fourth\b|last\b)(.+?)(?:[.;!]|,|\s+(?:and|but)\s+|$)/i);
-  if(m){ const key=contentWords(m[1]).map(stem); if(key.length){
+  // "drop the SOX and Basel III part and the 2 days": every target goes. A target that is only a small part of a point
+  // ("2 days" in "cuts the cycle from 3 weeks to 2 days") is cut from that point; the other points that share a word stay.
+  m=t.match(/\b(?:drop|remove|delete|leave out|take out|without)\s+(?:the\s+)?(?!first\b|second\b|third\b|fourth\b|last\b)(.+?)(?:[.;!]|,|\s+(?:and|but)\s+(?=(?:the\s+)?(?:add|replace|change|keep|swap|put|include|make|use|rest|otherwise|everything)\b)|$)/i);
+  if(m) for(const target of m[1].split(/\s+and\s+(?=the\s)/).map(x=>x.replace(/^(?:the|a|an)\s+/i,"").replace(/\s+(?:part|bit|point|one|item|line|bullet|mention|reference)s?$/i,"").trim()).filter(Boolean)){
+    const key=contentWords(target).map(stem); if(!key.length) continue;
+    const phrase=new RegExp(`\\s*(?:\\b(?:to|by|of|within|in|under)\\s+)?\\b${target.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}\\b`,"i"), literal=phrase.test(out);
     out=out.split("\n").map(line=>{ const mm=line.match(/^([^:]{3,45}:)\s*(.*)$/), head=mm?mm[1]+" ":"", pts=(mm?mm[2]:line).split(/;\s*/);
-      const keep=pts.filter(x=>!key.some(w=>contentWords(x).map(stem).includes(w))); if(keep.length<pts.length && keep.length){ done=true; return head+keep.join("; "); } return line; }).join("\n"); } }
-  // "add X" (or "and add X"): to the benefits or outcomes line when there is one, otherwise to the first line
+      const next=pts.map(x=>literal ? (!phrase.test(x) ? x : words(target)*2<words(x) ? x.replace(phrase,"").trim() : null) : key.some(w=>contentWords(x).map(stem).includes(w)) ? null : x), keep=next.filter(Boolean);
+      if(keep.join("; ")!==pts.join("; ") && keep.length){ done=true; return head+keep.join("; "); } return line; }).join("\n");
+  }
+  // "add X" (or "and add X"): to the line it names ("as a KPI", "to the benefits"), else to the benefits or outcomes line, else to the first line
   m=t.match(/\badd\s+(.+?)(?:,\s*(?:rest|the rest|otherwise|everything else)\b|[.;!]|$)/i);
-  if(m && words(m[1])>=1){ const L=lines(), i=Math.max(0, L.findIndex(x=>/^(?:Key benefits|Expected outcomes|Benefits)\s*:/i.test(x))), items=m[1].split(/\s+and\s+(?=(?:a|an|the|[a-z]+ing)\b)|,\s*/).map(x=>x.trim()).filter(Boolean);
+  if(m && words(m[1])>=1){ const L=lines(); let what=m[1], i=-1;
+    const named=what.match(/\s+(?:as|to|in|into|under)\s+(?:an?\s+|the\s+)?([a-z /-]{2,30}?)(?:\s+(?:line|list|section|part))?$/i);
+    if(named){ const nk=contentWords(named[1]).map(stem), j=L.findIndex(x=>{ const h=(x.match(/^([^:]{3,45}):/)||[])[1]; return !!h && contentWords(h).map(stem).some(w=>nk.includes(w)); }); if(j>=0){ i=j; what=what.slice(0,named.index); } }
+    if(i<0) i=Math.max(0, L.findIndex(x=>/^(?:Key benefits|Expected outcomes|Benefits)\s*:/i.test(x)));
+    const items=what.split(/\s+and\s+(?=(?:a|an|the|[a-z]+ing)\b)|,(?!\d{3}\b)\s*/).map(x=>x.trim()).filter(Boolean);   // "5,000 people" is one number
     L[i]=L[i].replace(/[.;\s]*$/,"")+"; "+items.join("; "); out=L.join("\n"); done=true; }
   return done && /\b(?:rest|otherwise|everything else|all else)\b.{0,20}\b(?:fine|ok|okay|good|right)\b|\b(?:fine|ok|okay|good)\s+otherwise\b|^(?:yes|ok|fine)\b|^(?:drop|remove|delete|leave out|take out|replace|change)\b/i.test(t) ? out : null;
 }
@@ -1724,6 +1739,8 @@ async function handleTurn(text, cid, opts={}){
       if(pend && keepIt) delete nf[pend.fact];
       const was={value:S.f.value, quantity:S.f.quantity, supplier:S.f.supplier};
       mergeFacts(nf);
+      // the AI kept the data but left out where it is stored, which the requester said in the same answer
+      if(asked==="data_details" && givenText(S.f.data_details) && !saysWhere(S.f.data_details) && whereFrom(text)) S.f.data_details=`${S.f.data_details.replace(/[.;,\s]+$/,"")}; ${whereFrom(text)}`;
       if(asked==="supplier_terms" && /^yes\b/i.test(text.trim()) && words(text)>3) S.f.supplier_terms=cap1(text.trim().replace(/^yes[,.:;!]?\s*/i,"").replace(/[.!]$/,""));   // which documents, not just "Yes"
   // 6. an answer in the requester's own words keeps its detail: the AI cut "99.95% availability during trading hours" to "99.95% availability"
   if(asked && bundleOf(asked) && !ACCEPT.test(said0) && text!=="Use this suggestion" && words(text)>=6) restoreWording(asked, text, before);
@@ -1804,9 +1821,10 @@ async function handleTurn(text, cid, opts={}){
     } else if(pend.kind==="where"){
       // the place is taken from the requester's reply (never from the AI) and added to the data they gave: "bank data, stored in the EU".
       // A reply that restates the data as well replaces the answer.
-      const base=dataOnly(pend.prev)||String(pend.prev||""), loc=text.trim().replace(/[.!]+$/,"").replace(/^(?:it(?:'s| is| will be)|they(?:'re| are| will be))\s+/i,"");
+      const base=dataOnly(pend.prev)||String(pend.prev||""), loc=text.trim().replace(/[.!]+$/,"").replace(/^(?:as (?:i|we) (?:said|mentioned)|like (?:i|we) said|as mentioned)[,:]?\s*/i,"").replace(/^(?:it(?:'s| is| will be)|they(?:'re| are| will be))\s+/i,"");
       if(saysWhere(loc)){
-        const restated=words(loc)>=6 && /\b(?:data|names?|records?|documents?|details|ids?|salar\w*|accounts?|information)\b/i.test(loc) && !/^(?:stored|hosted|held|kept|processed|in|on|at|within|our|the)\b/i.test(loc);
+        // "the vendor's EU data centre" is a place, not the data restated
+        const restated=words(loc)>=6 && /\b(?:data|names?|records?|documents?|details|ids?|salar\w*|accounts?|information)\b/i.test(loc.replace(/\bdata\s+cent(?:re|er)s?\b/gi,"")) && !/^(?:stored|hosted|held|kept|processed|in|on|at|within|our|the)\b/i.test(loc);
         const where=/^(?:stored|hosted|held|kept|processed|in|on|at|within)\b/i.test(loc) ? loc.replace(/^\w/,c=>c.toLowerCase()) : "in "+loc.replace(/^(?:Our|The|Their|Its)\b/,m=>m.toLowerCase());
         S.f[pend.fact] = restated ? cap1(loc) : `${base}, ${/^(?:stored|hosted|held|kept|processed)\b/i.test(where)?where:"stored "+where}`;
         S.flags.push({fact:pend.fact,issue:pend.issue,status:"corrected"});
@@ -2592,6 +2610,12 @@ const WHERE_UNKNOWN=/\b(?:storage|location|where)\b[^.;]{0,30}\b(?:unknown|uncle
 const LOC_FREE_Q=["audience_fn","users","functions","quantity","volume","must_haves","value_props","benefits","personal_data","data_details"];
 // "in the cloud" says nothing about where: only a place, our own systems or on-premise count
 const saysWhere = v => { const s=String(v||"").replace(/\b(?:(?:stored|hosted|kept|held|processed)\s+)?(?:(?:in|on)\s+)?(?:the\s+|a\s+)?(?:public\s+|private\s+)?cloud\b/gi," "); return WHERE_STORED.test(s) && !WHERE_UNKNOWN.test(s); };
+// where the data is, in the requester's own words: "yes, client names. it would be hosted by the vendor, EU data centre" → "hosted by the vendor, EU data centre"
+function whereFrom(t){
+  const s=String(t||"").split(/(?<=[.;!?])\s+/).find(x=>saysWhere(x)); if(!s) return "";
+  let i=s.search(WHERE_STORED); i-=s.slice(0,i).match(/(?:\b(?:stored|hosted|held|kept|processed|in|on|at|within)\s+)?(?:\b(?:the|our|their|its)\s+)?(?:[\w-]+'s\s+)?$/i)[0].length;   // "in the vendor's EU data centre"
+  return s.slice(i).replace(/[.!?;]+$/,"").trim();
+}
 // the data part of an answer without its storage clause: "client names; stored in the EU" → "client names"
 const dataOnly = v => String(v||"").replace(/[;,]?\s*\(?\s*\b(?:stored|hosted|held|kept|storage|location)\b.*$/i,"").trim();
 const MONTH="(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
@@ -2939,13 +2963,16 @@ function offlineExec(lead){
   t.capabilities=t.capabilities.filter(x=>!/^(?:would|should|could|do|does|will|can) (?:you|we|it)\b/i.test(x));
   t.problem=cap1(t.problem);
   t.tagline=cap1(nd(t.benefits[0]||t.capabilities[0]||c.name));
+  // benefits written as verbs ("Reduces the cycle; cuts data entry") read "It reduces …", not "It delivers reduces …"
+  const VERB=/^(?:reduces|cuts|improves|lowers|increases|speeds|saves|removes|eliminates|enables|provides|gives|ensures|automates|simplifies|streamlines|replaces|supports|helps|creates|brings|makes|allows|boosts|shortens|frees|avoids|prevents|closes|raises|strengthens|accelerates|centralises|centralizes|standardises|standardizes)\b/i,
+    delivers=a=>a.every(x=>VERB.test(x)) ? `It ${listJoin(a.map(lf))}.` : a.some(x=>VERB.test(x)) ? `Benefits: ${listJoin(a.map(lf))}.` : `It delivers ${listJoin(a.map(lf))}.`;
   t.headline=clampWords([isAct ? `It enables ${t.audience?lf(nd(t.audience)):"the business"} to ${act}.` : `It provides ${t.audience?lf(nd(t.audience)):"the business"} with ${what}.`, t.problem&&(goal?`Its goal is ${lf(nd(t.problem))}.`:`It solves this problem: ${lf(nd(t.problem))}.`),
-    t.benefits.length&&`It delivers ${listJoin(t.benefits.slice(0,3).map(lf))}.`].filter(Boolean).join(" "), L.head);
+    t.benefits.length&&delivers(t.benefits.slice(0,3))].filter(Boolean).join(" "), L.head);
   t.exec=clampWords([
     [needs, t.audience&&`It is for ${lf(nd(t.audience))}.`, t.functions&&`It supports ${lf(nd(t.functions))}.`].filter(Boolean).join(" "),
     [t.problem&&(goal?`The goal is ${lf(nd(t.problem))}.`:`Today, ${lf(nd(t.problem))}.`), t.usp&&`${cap1(nd(t.usp))}.`].filter(Boolean).join(" "),
     t.capabilities.length?`Key capabilities: ${listJoin(t.capabilities.map(lf))}.`:"",
-    [t.benefits.length&&`It delivers ${listJoin(t.benefits.map(lf))}.`, t.kpis.length&&`Success means: ${listJoin(t.kpis.map(lf))}.`].filter(Boolean).join(" "),
+    [t.benefits.length&&delivers(t.benefits), t.kpis.length&&`Success means: ${listJoin(t.kpis.map(lf))}.`].filter(Boolean).join(" "),
     t.regulatory?`${cap1(nd(t.regulatory))}.`:""].filter(Boolean).join("\n\n"), L.exec);
   t.summary=t.headline; t.narrative=t.exec;
   return t;
@@ -3105,7 +3132,9 @@ function sectionQuality(){
   add("Critical or important function relevance", known(f.important_fn)&&!isTBD(f.important_fn)?"Complete":"Partial", isImportant(f)?"Indicated by your impact answer; not a final decision":"No indication from your answers", "Confirm in the outsourcing and materiality review");
   add("Active obligations", ins>=2?"Complete":ins?"Partial":"To be determined", ins?"":"No provider obligations captured", ins<2?"Describe what the provider shall do":"");
   add("Responsibility allocation", has("our_deps")?"Complete":"Partial", has("our_deps")?"":"Our own dependencies not stated", has("our_deps")?"":"State what we must provide and by when");
-  const abbr=[...new Set((userRaw().match(/\b[A-Z]{2,5}\b/g)||[]).filter(x=>!["EU","UK","US","IT","HR","OK","CEO","CFO","USA","API","SAP","ERP","CRM","ICT","KPI","SLA"].includes(x)))];
+  // abbreviations in what the description says, not in everything typed ("drop the SOX part"); Roman numerals ("Basel III") are not abbreviations
+  const descText=Object.values(f).filter(x=>typeof x==="string").join(" ");
+  const abbr=[...new Set((descText.match(/\b[A-Z]{2,5}\b/g)||[]).filter(x=>!/^[IVXL]+$/.test(x) && !["EU","UK","US","IT","HR","OK","CEO","CFO","USA","API","SAP","ERP","CRM","ICT","KPI","SLA"].includes(x)))];
   add("Definitions", abbr.length?"Partial":"Complete", abbr.length?`Abbreviations used: ${abbr.slice(0,5).join(", ")}`:"", abbr.length?"Write each abbreviation in full the first time":"");
   if(ict) fromSug("Tools",["tools","support_model"],"Name the tools and who provides them"); else add("Tools","Not applicable","No ongoing technology service","");
   add("Timelines", has("needed_by")&&(has("duration")||GOODSLIKE(f))?"Complete":has("needed_by")?"Partial":"To be determined", has("needed_by")?"":"No start or delivery date", has("needed_by")?"":"Give a date or period");
@@ -4032,7 +4061,7 @@ function specModel(withCurrent){
     ul(["**Category:** keywords as whole words (plurals count; `*` marks a stem such as `consult*`). The category with most keywords wins; on a tie the one named last before “for”, “to”, “with”, “that” or a comma. A goods word after “to”, “trading”, “service”, “help” … does not count. With no keyword, management consulting is a guess, never a framework call-off. With AI, the AI's category is used.",
       "**Level 4:** scored within the category (keywords, overlap with name and description). The AI may propose one with the first message. The value confirmed at the check step is final.",
       "**ICT service (DORA):** whether technology is involved comes from the rules or the answer; for software the type follows Level 4 (SaaS or licensing), otherwise keywords.",
-      `**Outsourcing, group standard ${R.current.id}** (the legal entity does not change the result): 1. excluded under paragraph 28 (goods, statutory audit, card schemes, clearing, SWIFT, correspondent banking, legal, facilities, market data, telecom, training, marketing, external workers) → not outsourcing; 2. not performed on a recurrent or ongoing basis (paragraph 26) → not outsourcing (likely); a project with set deliverables is one-off whatever its length (see Kinds of work); for software, who hosts and runs it decides (asked only when the request doesn't say): we install and run it → not outsourcing (likely), still an ICT service under DORA; the provider hosts and runs it (SaaS) → it is software the bank would otherwise run itself; 3. work the bank does or could realistically do itself (paragraph 26) → outsourcing (likely); otherwise not outsourcing (likely), or to be determined when unclear. A critical or important function (paragraphs 29–31) is a flag for review, never a decision.`,
+      `**Outsourcing, group standard ${R.current.id}** (the legal entity does not change the result): 1. excluded under paragraph 28 (goods, statutory audit, card schemes, clearing, SWIFT, correspondent banking, legal, facilities, market data, telecom, training, marketing, external workers) → not outsourcing; 2. not performed on a recurrent or ongoing basis (paragraph 26) → not outsourcing (likely); a project with set deliverables is one-off whatever its length (see Kinds of work); for software, who hosts and runs it decides (asked only when the request doesn't say): we install and run it → not outsourcing (likely), still an ICT service under DORA; the provider hosts and runs it (SaaS) → it is software the bank would otherwise run itself, whatever the business area; 3. work the bank does or could realistically do itself (paragraph 26) → outsourcing (likely); otherwise not outsourcing (likely), or to be determined when unclear. A critical or important function (paragraphs 29–31) is a flag for review, never a decision.`,
       `**Future rule set ${R.future.id}** (${R.future.status}): shown as a preview only.`,
       "**Critical or important function:** from the answer on impact (clients, payments, regulatory, trading, outage, audit) or a known bank domain (KYC, payments, payroll, contact centre, regulatory reporting, service desk); never for events, training, office or hardware.",
       "**Offshoring:** the provider works from a country other than the entity's. An explicit “no” wins; where users or data are does not count."]));

@@ -131,7 +131,7 @@ Three things blocked real users. The first is now fixed:
 | Suite | Result |
 | --- | --- |
 | API (`tests/api`, node:test) | 19 passed (the Groq JSON-mode bug is fixed) |
-| End-to-end (`tests/e2e`, Playwright, Chromium) | 137 passed: all behaviour tests; the 4 known-issue tests now guard their fixes |
+| End-to-end (`tests/e2e`, Playwright, Chromium) | 142 passed: all behaviour tests; the 4 known-issue tests now guard their fixes |
 | Run time | About a minute. Needs no keys and no network. |
 
 **Covered:**
