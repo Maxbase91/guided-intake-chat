@@ -2,7 +2,7 @@
 // test.fail(), so the suite stays green and reports "unexpectedly passed" once it is fixed; then the marker is removed
 // and the test guards the fix. All four defects found so far are fixed.
 const { test, expect } = require("@playwright/test");
-const { openApp, say, choose, idle, lastAssistant, choices, answerUntilDone, sideFacts, mock } = require("./helpers");
+const { openApp, say, choose, idle, lastAssistant, choices, answerUntilDone, sideFacts, mock, setThreshold } = require("./helpers");
 
 const route = (page) => page.locator("#side .route");
 
@@ -63,7 +63,7 @@ test.describe("AI mode", () => {
   test("an answer that mentions a 'summary' during the improvement round is taken as the answer", async ({ page }) => {
     await openApp(page, { kind: "ai" });
     await say(page, "An agency for a client dinner for 40 people, around 30k.");
-    await page.click("#cfgBtn"); await page.fill("#t4", "100"); await page.click("#close");
+    await setThreshold(page, "qualityMin", 100);
     await choose(page, "Skip for now");
     await answerUntilDone(page, [
       [/exactly must the provider do/i, "Find a venue, run the invitations, organise catering and host the evening"],

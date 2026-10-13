@@ -1,0 +1,9 @@
+id,supplier,title,l4,expires,remaining
+CTR-2501,BrightClean,"Facilities cleaning, EMEA",L4-2502;L4-2503;L4-2504;L4-2505,2027-12-31,900000
+CTR-2301,Coho Creative,Creative and brand framework,L4-2311;L4-2313;L4-2315,2028-06-30,750000
+CTR-2302,Meridian Media House,Media planning and buying framework,L4-2306;L4-2307;L4-2308,2027-01-31,1800000
+CTR-2502,Ironwatch Security,"Security guarding and alarm response, DACH",L4-2510;L4-2511,2028-09-30,1350000
+CTR-2503,Valorline Cash Logistics,Cash-in-transit and ATM replenishment,L4-2513,2026-12-31,420000
+CTR-2601,Contoso Office,Office supplies catalogue framework,L4-2601;L4-2602;L4-2603;L4-2605;L4-2607;L4-2613;L4-2614,2028-03-31,310000
+CTR-3101,Alpenstrom Energie,Green electricity supply 2027-2029,L4-3101,2029-12-31,2600000
+CTR-3201,Wayfarer Corporate Travel,Travel management company framework,L4-3204;L4-3207;L4-3209,2028-12-31,450000

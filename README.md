@@ -18,9 +18,9 @@ Purpose questions (sourcing, quotes for services, external workers): "What probl
 
 **ICT and outsourcing** follow a decision tree run by rules, not a picker. The technology question is asked only when the rules can't tell (for example consulting without any IT context); the DORA service type (from the 19 types of the register of information) is proposed from the description. The outsourcing question is asked only for an ongoing technology service. Both are shown as flags for review, never as a final classification.
 
-All reference data (catalogue, contracts, preferred suppliers) is mock data. Use dummy requests only.
+The Level 4 list (395 categories), its 183 suppliers and 40 framework contracts are realistic **test data** for a European bank; the catalogue and legal entities are mock data. Use dummy requests only. See "Level 4 categories, suppliers and frameworks" below to load your own list.
 
-The welcome screen offers examples to start from. Six are new demand, each showing a different path: software with an RFP, outsourcing of a business process (KYC), offshore delivery, over €1 million (material spend review), market data (not outsourcing), and under €50k (three quotes). Then there is one each for catalogue, call-off and external workers. Consulting, IT services, cloud, legal, facilities, training and external workers have framework contracts in the mock data, so requests in those categories go to a call-off. A request whose category the rules can only guess never does.
+The welcome screen offers examples to start from. Six are new demand, each showing a different path: software with an RFP, outsourcing of a business process (KYC), offshore delivery, over €1 million (material spend review), market data (not outsourcing), and under €50k (three quotes). Then there is one each for catalogue, call-off and external workers. Frameworks cover specific Level 4 entries (for example operations consulting, the legal panel, office cleaning, external workers), so a request whose Level 4 a framework covers goes to a call-off. A request whose category the rules can only guess never does.
 
 ## How it is built
 
@@ -36,7 +36,7 @@ The **How it works** link in the header opens a specification written for someon
 The panel is built from the code when it opens, so it never goes out of date:
 
 - The prompts are the exact texts the app sends, built for a welcome example ("A new HR system to replace our payroll tool.") in a copy of the state. They sit behind "Show full prompt" toggles. The real conversation is left untouched.
-- Thresholds, routes, lead times, quality weights and rating bands are read from the current Rules and constants.
+- Thresholds, routes, lead times, quality weights and rating bands are read from the settings and constants in the code.
 - Once a request has started, a "Your current request" block shows the prompt for the next message in this conversation. It appears only in the panel.
 
 **Download (.md)** saves the same content as Markdown (`guided-intake-how-it-works.md`) without the "Your current request" block, so the file never contains what a requester typed. **Print** prints it with every prompt expanded.
@@ -53,15 +53,15 @@ On free plans the binding limits are requests per day (Gemini) and tokens per da
 
 1. Import this repo in Vercel. Framework preset: **Other**. No build command.
 2. Add environment variables under **Settings → Environment Variables**:
-   - Any of `GEMINI_API_KEY` (https://aistudio.google.com/apikey), `GROQ_API_KEY` (https://console.groq.com/keys), `MISTRAL_API_KEY` (https://console.mistral.ai, free Experiment plan; it may use requests for training, so dummy data only)
+   - Any of `GEMINI_API_KEY` (https://aistudio.google.com/apikey), `GROQ_API_KEY` (https://console.groq.com/keys), `MISTRAL_API_KEY` (https://console.mistral.ai, free Experiment plan; it may use requests for training, so dummy data only), `OPENROUTER_API_KEY` (https://openrouter.ai/keys; only its free `:free` models are used, about 50 requests a day without credits, so it is the last backup)
    - Optional: `ACCESS_CODE` to stop strangers using your key. Visitors are asked for it once.
-   - Optional: `LLM_PROVIDER` (`gemini`, `groq` or `mistral`, which goes first), `GEMINI_MODEL`, `GROQ_MODEL`, `MISTRAL_MODEL` (if missing or unavailable, the best available model is picked automatically)
+   - Optional: `LLM_PROVIDER` (`gemini`, `groq`, `mistral` or `openrouter`, which goes first), `GEMINI_MODEL`, `GROQ_MODEL`, `MISTRAL_MODEL`, `OPENROUTER_MODEL` (if missing or unavailable, the best available model is picked automatically)
    - Check all providers at `/api/llm?check=1&code=YOUR_ACCESS_CODE` (shows each model and the Groq rotation)
 
-Default order: Gemini, then Groq, then Mistral. When a model hits its limit the server moves to the next one and rotates across several Groq and Mistral models (their limits apply per model). If everything is briefly limited, the page waits the few seconds the provider asks for and retries once, then falls back to rule-based questions.
+Default order: Gemini, then Groq, then Mistral, then OpenRouter. When a model hits its limit the server moves to the next one and rotates across several Groq, Mistral and OpenRouter models (their limits apply per model). If everything is briefly limited, the page waits the few seconds the provider asks for and retries once, then falls back to rule-based questions.
 3. Redeploy so the variables take effect.
 
-The page checks `/api/llm` on load. If the server has a key, the pill shows **AI on**, and after the first answer it names the provider that actually replied (Gemini, Groq or Mistral). Hover over it to see the fallback order. Without a key, it runs offline keyword rules.
+The page checks `/api/llm` on load. If the server has a key, the pill shows **AI on**, and after the first answer it names the provider that actually replied (Gemini, Groq, Mistral or OpenRouter). Hover over it to see the fallback order. Without a key, it runs offline keyword rules.
 
 ## Run locally
 
@@ -76,7 +76,7 @@ npm run start:mock             # AI mode with fake Gemini/Groq/Mistral answers: 
 
 `scripts/dev-server.js` serves `index.html` and runs `api/llm.js` the way Vercel does. Use `PORT=4000 npm start` for another port.
 
-You can also open `index.html` straight from disk and paste a key into `CONFIG.keys` at the top of the script, or into the **Rules** panel (key fields only appear when no server is found). Do not commit a key.
+Opened straight from disk, `index.html` runs the offline rules only: AI keys live on the server, never in the page.
 
 ## Tests
 
@@ -96,7 +96,7 @@ The end-to-end tests start three local servers: offline (no key), AI (mock provi
 | --- | --- |
 | `tests/api/llm.test.js` | Status and verify endpoints, access code, request validation, provider order, fallback on rate limits and errors, cooldown, forced provider, live check |
 | `tests/e2e/routes.spec.js` | One full conversation per route (catalogue, call-off, external workers, new demand under and over €50,000), result cards, JSON and Word downloads, submit; catalogue matching (whole words, demand type, value that fits the catalogue price) |
-| `tests/e2e/conversation.spec.js` | Corrections in words and in the side panel, unclear corrections, off-topic answers, dates in the past, skipping, Rules thresholds, route override, improvement round, inline edits |
+| `tests/e2e/conversation.spec.js` | Corrections in words and in the side panel, unclear corrections, off-topic answers, dates in the past, skipping, a changed threshold re-routes, route override, improvement round, inline edits |
 | `tests/e2e/ai-mode.spec.js` | AI through the server: provider label, Gemini → Groq fallback, all providers down, internal field names hidden, AI off-topic check, AI toggle, `?ai=` |
 | `tests/e2e/outsourcing.spec.js` | Outsourcing determination under EBA/GL/2019/02: a full KYC conversation with the test steps in the document, a branch outside the EU, and a rule table for paragraphs 26 and 28 and the EBA/GL/2026/09 preview |
 | `tests/e2e/live-ai-run.spec.js` | Defects found in live AI conversations: check-step corrections, work location and offshoring, Level 4 consistency, single source, date scrubbing, object-shaped AI suggestions |
@@ -106,14 +106,35 @@ The end-to-end tests start three local servers: offline (no key), AI (mock provi
 | `tests/e2e/pushback.spec.js` | From a live AI test: "why do you need that?", "what would you suggest?", route pushback, side remarks and other purchases, a budget change in passing, "ok" to a follow-up, a past start kept, "Excel", timing checks beyond the limit, supplier, entity, data location, officials and domain rules, "why is this outsourcing?" at the check step |
 | `tests/e2e/trading-platform.spec.js` | From a live AI test: a trading platform with KYC is software (also when the AI says KYC operations), trading notes lead, installed software is not assumed outsourcing; "add …", "replace the first one", "drop the last one"; accepted suggestions win over the AI's copy; nested data answers, "(≈ users)", digits glued to words; inflated answers and replies about another topic; several suppliers; data transfer flag; a description led by an action |
 | `tests/e2e/orchestration-platform.spec.js` | From a live AI test: a procurement orchestration platform (SaaS, no bank domain). "5,000 people" stays one number; several drops in one message, a figure cut from a point ("the 2 days"), "add … as a KPI" goes to the KPIs; "hosted by the vendor" answers the hosting question and the provider hosting it makes it outsourcing without a bank domain; the place kept when the AI leaves it out, "as I said, the vendor's EU data centre"; "end of Q2" gets its year; benefits written as verbs; only the description's abbreviations |
-| `tests/e2e/how-it-works.spec.js` | The How it works panel: opens at desktop and phone width, Escape closes it, the prompts shown are the ones the app sends, thresholds follow the Rules, the Markdown download never contains the requester's words, opening it mid-conversation changes nothing |
+| `tests/e2e/l4-scale.spec.js` | ~400 Level 4 entries: recognition on 60 realistic requests (`tests/fixtures/l4-benchmark.json`; category, Level 4, AI shortlist), prompt size and speed, the AI's `l4_terms` when no candidate fits, category and Level 4 never disagree, the search in the summary panel, How it works by category, preferred suppliers and frameworks per Level 4, the import script |
+| `tests/e2e/how-it-works.spec.js` | The How it works panel: opens at desktop and phone width, Escape closes it, the prompts shown are the ones the app sends, thresholds follow the settings, the Markdown download never contains the requester's words, opening it mid-conversation changes nothing |
 | `tests/e2e/known-issues.spec.js` | Defects found in the assessment (see `ASSESSMENT.md`): budget approval of the wrong kind, "thanks" after the results, the phone summary panel, "summary" in an answer during the improvement round. All four are fixed and the tests guard them; a new defect is added here with `test.fail()` until it is fixed |
 
 `scripts/mock-providers.js` answers in the shapes the app asks for. To exercise failures, the AI server accepts `POST /__mock` with `{"gemini":"429","groq":"500","coldStart":true}` (mock mode only).
 
 ## Change the rules
 
-Thresholds sit in `CONFIG.thresholds` and can also be changed live in the **Rules** panel. Catalogue, contracts and preferred suppliers sit in section 2 of the script.
+Thresholds sit in `CONFIG.thresholds` at the top of the script. They are set by procurement in the code; requesters can't change them (there is no Rules panel). The catalogue and legal entities sit in section 2 of the script.
+
+## Level 4 categories, suppliers and frameworks
+
+The Level 4 list, the preferred suppliers and the framework contracts live in one JSON block in `index.html` (`<script id="taxonomy-data">`). Don't edit it by hand: put CSV files in a folder and run
+
+```bash
+python3 scripts/import_taxonomy.py data/taxonomy-test --check   # validate only
+python3 scripts/import_taxonomy.py data/taxonomy-test           # write into index.html
+```
+
+| File | Columns |
+|---|---|
+| `l4*.csv` | `code` (L4-1234), `name`, `l1`, `l2`, `l3`, `theme`, `desc` (one sentence; "Not X: see Y" helps with neighbours), `kw` (search terms, `;`-separated) |
+| `suppliers*.csv` | `supplier`, `preferred_l4` (codes, `;`-separated) |
+| `contracts*.csv` | `id`, `supplier`, `title`, `l4` (codes covered), `expires` (YYYY-MM-DD), `remaining` |
+| `theme-map.csv` (optional) | `level` (l1, l2 or l3), `name`, `theme`: fills an empty `theme` from the parent names |
+
+`theme` is one of the 20 buying categories (`CATEGORIES` in the script: software, consulting, bpo, fin-infra, travel, …). It decides the questions and the outsourcing check, so the import refuses any row without one. To load the real list, save the Excel sheets as CSV with these columns. `data/taxonomy-test` holds the test data (395 entries) and `SKELETON.md` explains how it was built.
+
+**Matching at this size.** Each entry's words are weighted by where they appear (search terms and name, then the Level 3 group, then the Level 2 group and the description) and by how rare they are across the list. The subject of the request counts double ("25 laptops" in "25 laptops for new joiners"), what follows "including" a quarter. The rules pick within the category; when a keyword points to the wrong category ("agency" in "temps through an agency"), the closest entry across the whole list wins if it scores clearly higher. A confident Level 4 stays as worked out from the request, so the route doesn't change halfway. With AI, the first message and the check step get about 20 candidates (the closest entries across the whole list plus the rules' picks), never the whole list, so the prompt stays the same size however long the list gets. When none fits, the AI names the item in a category list's words (`l4_terms`, for example "courier delivery") and the app looks those up in the whole list. The AI's pick sets the category too, unless a category is named at the start of the request. Preferred suppliers are per Level 4 ("A, B, C and 4 more" when there are many), and a framework applies to the Level 4 entries it lists. In the summary, the pencil next to the category opens a search over the whole list. `tests/e2e/l4-scale.spec.js` measures recognition on 60 realistic requests (`tests/fixtures/l4-benchmark.json`); the results are in `docs/l4-recognition-report.md`.
 
 Category and catalogue keywords match whole words, plurals included ("monitor" matches "monitors" but not "monitoring"). End a keyword with `*` to match it as a stem (`consult*` matches "consultant" and "consulting"). The category with the most keywords wins. On a tie, the category named last before the first "for", "to", "with" or comma wins, because that's the thing being bought ("software to manage our laptops" is software). A goods keyword right after "to" is read as a verb and doesn't count. A catalogue item is offered only for its own demand type (`goods` or `software`), and only when the stated value fits its price: at most twice price × quantity, or, with no quantity yet, no more than the business-led sourcing threshold.
 
@@ -131,7 +152,7 @@ If the answer to the data question doesn't say where the data is stored, the cha
 
 ## Quality thresholds and improvement round
 
-Two thresholds sit in `CONFIG.thresholds` and in the **Rules** panel:
+Two thresholds sit in `CONFIG.thresholds`:
 
 - **Per-answer tip** (`answerTip`, default 5): when an answer for new demand scores 5/10 or less on an internal score that is not shown (for example KPIs or acceptance without any number), the chat gives one specific tip with an example and asks for a bit more. "Keep it as is" keeps the answer and notes it for the buyer; anything else is added to the answer. At most once per question and three times per conversation.
 - **Minimum quality** (`qualityMin`, default 75 = Good): when the finished new-demand request scores below it, the chat says so after the route card, lists the points that would strengthen it (skipped or thin answers, weak sections) and offers to go through them. Afterwards the description is rebuilt and the new rating is shown. "Submit anyway" stays available; the submission, the payload and the document record that it was submitted below the threshold.
@@ -161,7 +182,7 @@ For the profile points (audience, functions, benefits, unique selling points, KP
 
 New demand combines the front door with a tiered version of a detailed service-description intake:
 
-1. **Your need**: what, value, duration, and whether technology is involved (only if the rules can't tell). The first message is classified against a Level 4 category list (mock) with match % and reasoning. Software is not asked "how many users or licences" up front: the chat asks who will use it and roughly how many people together with the audience ("not sure yet" is fine), and the licence count and pricing model are listed as points to confirm with suppliers. Catalogue orders still ask the count first.
+1. **Your need**: what, value, duration, and whether technology is involved (only if the rules can't tell). The first message is classified against the Level 4 list (about 400 entries) with match % and reasoning. Software is not asked "how many users or licences" up front: the chat asks who will use it and roughly how many people together with the audience ("not sure yet" is fine), and the licence count and pricing model are listed as points to confirm with suppliers. Catalogue orders still ask the count first.
 2. **Purpose and profile**: problem and impact of delay, who it is for (suggested), today's solution and why external, benefits (and selling points for products) and regulatory benefits (suggested).
 3. **Scope and deliverables**: what the provider does (played back as "The Service Provider shall…"), out of scope (suggested), acceptance and sign-off (suggested), staff qualifications, volumes.
 4. **Running the service** (ongoing services): service levels and KPIs, support model and tools (technology only), governance, reporting, change and escalation (suggested standard pack).
@@ -192,4 +213,4 @@ The thing being bought is the subject: "transform our front office trading syste
 
 **Outputs** for new demand: executive service description; detailed service description (25 sections); structured sourcing input attributes; materiality and governance input summary (materiality always "to be determined"); compact sourcing request text; quality check by section; final Level 4 validation.
 
-All entities, categories and suppliers in the code are mock data.
+The entities are mock data; the Level 4 list, suppliers and frameworks are test data (see above).

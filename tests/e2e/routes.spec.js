@@ -37,7 +37,7 @@ async function finishAndSubmit(page, routeName) {
 test("catalogue order: laptops are ordered from the catalogue", async ({ page }) => {
   const errors = await openApp(page);
   await say(page, "We need 15 laptops for new joiners in Frankfurt.");
-  await expect(page.locator("#msgs")).toContainText("IT hardware and peripherals");
+  await expect(page.locator("#msgs")).toContainText("Laptops and desktops");
   await expect(page.locator("#msgs")).toContainText("is in our catalogue");
   await expect(page.locator("#stepbar")).toContainText("Timing and delivery");
   await answerUntilDone(page, ANSWERS);
@@ -81,7 +81,7 @@ test("contract call-off: more support from the framework supplier", async ({ pag
 test("external workers: contractors go through the staffing contract", async ({ page }) => {
   const errors = await openApp(page);
   await say(page, "Two Java developers as contractors for 9 months.");
-  await expect(page.locator("#msgs")).toContainText("Contingent workforce and contractors");
+  await expect(page.locator("#msgs")).toContainText("IT contractors");
   await answerUntilDone(page, ANSWERS);
   await expect(page.locator(".rec-h h2")).toHaveText("Contract call-off");
   await expect(page.locator(".card .sec").filter({ hasText: "Why" })).toContainText("External workers MSP with Tailspin Talent");
@@ -149,7 +149,7 @@ test("obligations keep the requester's verb", async ({ page }) => {
 test("new demand under the threshold: business-led sourcing with three quotes", async ({ page }) => {
   const errors = await openApp(page);
   await say(page, "An agency for a client dinner for 40 people, around 30k.");
-  await expect(page.locator("#msgs")).toContainText("Marketing, events and hospitality");
+  await expect(page.locator("#msgs")).toContainText("Events and hospitality");
   await answerUntilDone(page, ANSWERS);
   await expect(page.locator(".rec-h h2")).toHaveText("New demand: business-led sourcing");
   await expect(page.locator(".card .sec").filter({ hasText: "Why" })).toContainText("at least three quotes");
@@ -161,7 +161,7 @@ test("new demand under the threshold: business-led sourcing with three quotes", 
 test("new demand over the threshold: procurement-led RFP with the full service description", async ({ page }) => {
   const errors = await openApp(page);
   await say(page, "A new HR system to replace our payroll tool.");
-  await expect(page.locator("#msgs")).toContainText("Software as a service");
+  await expect(page.locator("#msgs")).toContainText("HR and payroll software");
   await answerUntilDone(page, ANSWERS);
 
   // the check step lists what the rules worked out and was confirmed

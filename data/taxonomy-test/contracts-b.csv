@@ -1,0 +1,9 @@
+id,supplier,title,l4,expires,remaining
+CTR-2101,Lakeshore Advisory,Operations consulting framework,L4-2101;L4-2103;L4-2104;L4-2105;L4-2117,2027-06-30,600000
+CTR-2201,Wingtip Legal,"Legal panel, commercial",L4-2201;L4-2203;L4-2204;L4-2205;L4-2206;L4-2207;L4-2208;L4-2209;L4-2210;L4-2212;L4-2213;L4-2214;L4-2215;L4-2216,2027-09-30,350000
+CTR-1601,Datum Feeds,Enterprise market data licence,L4-1601;L4-1602;L4-1603,2028-12-31,3200000
+CTR-1602,Ashgrove Terminals,Market data terminals and add-ins,L4-1605;L4-1606,2027-01-31,1450000
+CTR-1603,Clearlist Screening Data,Sanctions and PEP screening data,L4-1624;L4-1625,2028-06-30,420000
+CTR-2102,Blue Yonder Partners,Risk and regulatory consulting framework,L4-2109;L4-2110;L4-2112,2028-09-30,1100000
+CTR-2103,Quantmere Model Validation,Independent model validation,L4-2127,2026-12-31,95000
+CTR-2001,Linden Tax Partners,Tax compliance and advisory framework,L4-2005;L4-2006;L4-2008,2029-03-31,480000

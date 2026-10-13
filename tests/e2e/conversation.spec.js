@@ -1,6 +1,6 @@
 // Conversation features in offline rules mode: corrections, checks, skipping, side panel edits, rules and outputs.
 const { test, expect } = require("@playwright/test");
-const { openApp, say, choose, idle, answerUntilDone, sideFacts, downloadJSON, lastAssistant, choices } = require("./helpers");
+const { openApp, say, choose, idle, answerUntilDone, sideFacts, downloadJSON, lastAssistant, choices, setThreshold } = require("./helpers");
 
 const DINNER = "An agency for a client dinner for 40 people, around 30k.";
 const routeInPanel = (page) => page.locator("#side .route");
@@ -129,15 +129,12 @@ test("an example on the welcome screen starts the conversation, and New starts o
   await expect(page.locator("#inp")).toBeFocused();
 });
 
-test("changing the sourcing threshold under Rules re-routes the current request", async ({ page }) => {
+test("a lower sourcing threshold re-routes the current request; there is no Rules panel for requesters", async ({ page }) => {
   await openApp(page);
   await say(page, DINNER);
   await expect(routeInPanel(page)).toHaveText("New demand: business-led sourcing");
-  await page.click("#cfgBtn");
-  await expect(page.locator(".drawer")).toBeVisible();
-  await expect(page.locator(".drawer")).toContainText("No server found");
-  await page.fill("#t2", "20000");
-  await page.click("#close");
+  await expect(page.locator("#cfgBtn")).toHaveCount(0);
+  await setThreshold(page, "quickQuoteMax", 20000);
   await expect(routeInPanel(page)).toHaveText("New demand: procurement-led sourcing");
 });
 
@@ -158,9 +155,7 @@ test("a route override is recorded with its justification in the JSON payload", 
 test("below the quality threshold the chat offers an improvement round, and submitting anyway is recorded", async ({ page }) => {
   await openApp(page);
   await say(page, DINNER);
-  await page.click("#cfgBtn");
-  await page.fill("#t4", "100");
-  await page.click("#close");
+  await setThreshold(page, "qualityMin", 100);
   await choose(page, "Skip for now");
   await answerUntilDone(page, ANSWERS);
   await expect(page.locator("#msgs")).toContainText("Shall we go through them?");
@@ -176,9 +171,7 @@ test("below the quality threshold the chat offers an improvement round, and subm
 test("the improvement round asks for the weak points and rebuilds the description", async ({ page }) => {
   await openApp(page);
   await say(page, DINNER);
-  await page.click("#cfgBtn");
-  await page.fill("#t4", "100");
-  await page.click("#close");
+  await setThreshold(page, "qualityMin", 100);
   await choose(page, "Skip for now");
   await answerUntilDone(page, ANSWERS);
   await choose(page, "Yes, let's improve it");
@@ -213,9 +206,10 @@ test("edits made directly in the service description are kept in the output", as
 
 test("acronyms keep their capitals in generated text", async ({ page }) => {
   await openApp(page);
-  await say(page, "We need 15 laptops for new joiners in Frankfurt.");
-  await expect(page.locator("#msgs")).toContainText("which fits IT hardware");
-  await expect(page.locator("#msgs")).not.toContainText("fits it hardware");
+  // the Level 4 reason starts with the entry's name in lower case: "IT" keeps its capitals
+  await say(page, "Two Java developers as contractors for 9 months.");
+  await expect(page.locator("#msgs")).toContainText("Closest in meaning to IT contractors");
+  await expect(page.locator("#msgs")).not.toContainText("to it contractors");
 });
 
 test("the side panel folds finished steps and shortens long answers until clicked", async ({ page }) => {

@@ -4,11 +4,13 @@
 //   GEMINI_API_KEY         Google AI Studio key
 //   GROQ_API_KEY           Groq key
 //   MISTRAL_API_KEY        Mistral key (free "Experiment" plan works; set any one or more)
-//   LLM_PROVIDER           optional: "gemini", "groq" or "mistral" goes first (default order: Gemini, Groq, Mistral)
+//   OPENROUTER_API_KEY     OpenRouter key: its free models (":free") are tried last, as a backup (about 50 requests a day without credits)
+//   LLM_PROVIDER           optional: "gemini", "groq", "mistral" or "openrouter" goes first (default order: Gemini, Groq, Mistral, OpenRouter)
 //   GEMINI_MODEL           optional, default "gemini-2.5-flash"
 //   GEMINI_FALLBACK_MODEL  optional, default "gemini-2.5-flash-lite"
 //   GROQ_MODEL             optional; if missing or unavailable, the best model the account can use is picked automatically
 //   MISTRAL_MODEL          optional; default rotation ministral-14b, ministral-8b, then mistral-small/medium
+//   OPENROUTER_MODEL       optional; otherwise the best free models listed by OpenRouter are picked automatically
 //   ACCESS_CODE            optional: callers must send it in the x-access-code header
 //
 // GET /api/llm             -> which providers are configured (no secrets)
@@ -37,6 +39,9 @@ const GROQ_PREFERRED = [
 // On the free Experiment plan the Ministral models answer; Small/Medium are kept last in case the plan changes.
 const MISTRAL_PREFERRED = ["ministral-14b-latest", "ministral-8b-latest", "mistral-small-latest", "mistral-medium-latest"];
 
+// OpenRouter's free models change often, so they are ranked by family rather than by exact id; the first 4 available are rotated
+const OPENROUTER_RANK = [/gpt-oss-120b/, /deepseek-(?:chat|v3)/, /llama-3\.3-70b/, /qwen3-(?:235b|32b|30b)/, /gemma-3-27b/, /mistral-small/, /llama-4/, /qwen/, /llama/];
+
 class LlmError extends Error { constructor(msg, status) { super(msg); this.status = status; } }
 const isQuota = (e) => e && (e.status === 429 || /quota|rate limit|resource_exhausted|too many requests/i.test(e.message || ""));
 const isModelMissing = (e) => e && (e.status === 404 || /does not exist|not found|decommissioned|not supported|no access|do not have access/i.test(e.message || ""));
@@ -53,7 +58,7 @@ function retrySeconds(e, fallbackS = DEFAULT_COOLDOWN_S) {
   const a = m.match(/try again in\s+([\d.]+)\s*s/i); if (a) s = parseFloat(a[1]);
   const b = m.match(/retry in\s+(?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?/i); if (!s && b && (b[1] || b[2] || b[3])) s = (+b[1] || 0) * 3600 + (+b[2] || 0) * 60 + (parseFloat(b[3]) || 0);
   if (!s && e && e.retryAfter) s = e.retryAfter;
-  if (!s && /per ?day|daily|RPD/i.test(m)) s = 3600;
+  if (!s && /per ?day|per-day|daily|RPD/i.test(m)) s = 3600;
   return Math.min(Math.max(s || fallbackS, 1), 6 * 3600);
 }
 const cool = (key, e, fallbackS) => cooldown.set(key, Date.now() + retrySeconds(e, fallbackS) * 1000);
@@ -233,6 +238,71 @@ async function callMistral(system, history, info, deadline) {
   throw e;
 }
 
+let openrouterListCache = null;
+async function openrouterCandidates() {
+  let ids = null;
+  if (openrouterListCache && Date.now() - openrouterListCache.at < 30 * 60 * 1000) ids = openrouterListCache.ids;
+  else {
+    try {
+      const r = await fetch("https://openrouter.ai/api/v1/models", { signal: AbortSignal.timeout(8000), headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` } });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) {
+        ids = (d.data || []).filter((m) => /:free$/.test(m.id) && (m.context_length || 0) >= 32000 && !/vision|-vl\b|embed|guard/i.test(m.id)).map((m) => m.id);
+        openrouterListCache = { ids, at: Date.now() };
+      }
+    } catch (e) { ids = null; }
+  }
+  const rank = (id) => { const i = OPENROUTER_RANK.findIndex((re) => re.test(id)); return i < 0 ? OPENROUTER_RANK.length : i; };
+  const free = ids ? ids.slice().sort((a, b) => rank(a) - rank(b)).slice(0, 4) : [];
+  return [...new Set([process.env.OPENROUTER_MODEL, ...free].filter(Boolean))];
+}
+
+async function callOpenRouterWith(model, system, history, opts = {}) {
+  const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "X-Title": "Guided Intake" },
+    body: JSON.stringify({
+      model, temperature: 0.3, max_tokens: 8000,
+      ...(opts.noJson ? {} : { response_format: { type: "json_object" } }),
+      messages: [{ role: "system", content: system }, ...history.map((m) => ({ role: m.role, content: m.content }))],
+    }),
+  });
+  const d = await r.json().catch(() => ({}));
+  // OpenRouter can also answer 200 with an error from the model host in the body
+  if (!r.ok || d.error) {
+    const e = new LlmError(d?.error?.message || `OpenRouter error ${r.status}`, r.ok ? (d?.error?.code || 502) : r.status);
+    e.retryAfter = parseFloat(r.headers?.get?.("retry-after")) || null; throw e;
+  }
+  const text = (d.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  if (!text) throw new LlmError("OpenRouter returned an empty answer", 502);
+  return text;
+}
+
+// free OpenRouter models in turn; a model that refuses JSON mode is asked again without it
+async function callOpenRouter(system, history, info, deadline) {
+  const models = await openrouterCandidates();
+  let last = null, tried = 0;
+  for (const model of models) {
+    if (coolingFor(`openrouter:${model}`) > 0) continue;
+    if (Date.now() > deadline) break;
+    tried++; info.model = model;
+    try {
+      try { return await callOpenRouterWith(model, system, history); }
+      catch (e) { if (isJsonModeIssue(e)) return await callOpenRouterWith(model, system, history, { noJson: true }); throw e; }
+    } catch (e) {
+      last = e;
+      if (isQuota(e)) cool(`openrouter:${model}`, e);
+      else if (isModelMissing(e)) cooldown.set(`openrouter:${model}`, Date.now() + 6 * 3600 * 1000);
+    }
+  }
+  if (!models.length) throw new LlmError("No free OpenRouter model is available", 502);
+  const w = models.map((m) => coolingFor(`openrouter:${m}`)).filter((x) => x > 0 && x < 3600);
+  const e = last || new LlmError(tried ? "OpenRouter could not answer" : "All OpenRouter models are at their usage limit", tried ? 502 : 429);
+  if (w.length) e.waitFor = Math.min(...w);
+  throw e;
+}
+
 function plan() {
   const gem = !!process.env.GEMINI_API_KEY, groq = !!process.env.GROQ_API_KEY;
   const gMain = process.env.GEMINI_MODEL || "gemini-2.5-flash";
@@ -240,9 +310,10 @@ function plan() {
   const gemini = gem ? [{ provider: "gemini", model: gMain }, ...(gFb !== gMain ? [{ provider: "gemini", model: gFb }] : [])] : [];
   const groqs = groq ? [{ provider: "groq", model: "rotating" }] : [];
   const mistrals = process.env.MISTRAL_API_KEY ? [{ provider: "mistral", model: "rotating" }] : [];
-  const order = { gemini, groq: groqs, mistral: mistrals };
+  const openrouters = process.env.OPENROUTER_API_KEY ? [{ provider: "openrouter", model: "rotating" }] : [];
+  const order = { gemini, groq: groqs, mistral: mistrals, openrouter: openrouters };
   const firstPick = (process.env.LLM_PROVIDER || "").toLowerCase();
-  const names = ["gemini", "groq", "mistral"];
+  const names = ["gemini", "groq", "mistral", "openrouter"];
   const seq = names.includes(firstPick) ? [firstPick, ...names.filter((n) => n !== firstPick)] : names;
   return seq.flatMap((n) => order[n]);
 }
@@ -251,7 +322,8 @@ async function runAttempt(a, system, history, deadline = Date.now() + TOTAL_BUDG
   const info = { provider: a.provider, model: a.model };
   const text = a.provider === "gemini" ? await callGemini(system, history, a.model)
     : a.provider === "groq" ? await callGroq(system, history, info, deadline)
-    : await callMistral(system, history, info, deadline);
+    : a.provider === "mistral" ? await callMistral(system, history, info, deadline)
+    : await callOpenRouter(system, history, info, deadline);
   return { text, info };
 }
 
@@ -264,7 +336,7 @@ module.exports = async (req, res) => {
     const base = {
       ok: steps.length > 0,
       provider: first || null,
-      providers: { gemini: !!process.env.GEMINI_API_KEY, groq: !!process.env.GROQ_API_KEY, mistral: !!process.env.MISTRAL_API_KEY },
+      providers: { gemini: !!process.env.GEMINI_API_KEY, groq: !!process.env.GROQ_API_KEY, mistral: !!process.env.MISTRAL_API_KEY, openrouter: !!process.env.OPENROUTER_API_KEY },
       accessRequired: !!process.env.ACCESS_CODE,
     };
     const q = req.query || {};
@@ -307,17 +379,18 @@ module.exports = async (req, res) => {
           limits: { rps: hdr("x-ratelimit-limit-req-second") || hdr("ratelimitbysize-limit"), tokensMinute: hdr("x-ratelimit-limit-tokens-minute"), tokensMonth: hdr("x-ratelimit-limit-tokens-month"), remainingMonth: hdr("x-ratelimit-remaining-tokens-month") } });
       }
     }
-    let groqRotation = null, mistralRotation = null;
+    let groqRotation = null, mistralRotation = null, openrouterRotation = null;
     try { if (process.env.GROQ_API_KEY) groqRotation = await groqCandidates(); } catch (e) {}
     try { if (process.env.MISTRAL_API_KEY) mistralRotation = await mistralCandidates(); } catch (e) {}
-    return res.status(200).json({ ...base, checks, groqRotation, mistralRotation, ...(mistralDetail ? { mistralDetail } : {}) });
+    try { if (process.env.OPENROUTER_API_KEY) openrouterRotation = await openrouterCandidates(); } catch (e) {}
+    return res.status(200).json({ ...base, checks, groqRotation, mistralRotation, openrouterRotation, ...(mistralDetail ? { mistralDetail } : {}) });
   }
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   if (process.env.ACCESS_CODE && req.headers["x-access-code"] !== process.env.ACCESS_CODE) {
     return res.status(401).json({ error: "Access code required" });
   }
-  if (!steps.length) return res.status(500).json({ error: "No API key configured on the server. Set GEMINI_API_KEY, GROQ_API_KEY or MISTRAL_API_KEY in Vercel." });
+  if (!steps.length) return res.status(500).json({ error: "No API key configured on the server. Set GEMINI_API_KEY, GROQ_API_KEY, MISTRAL_API_KEY or OPENROUTER_API_KEY in Vercel." });
 
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }

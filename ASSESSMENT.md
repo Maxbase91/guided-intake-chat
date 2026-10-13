@@ -130,8 +130,8 @@ Three things blocked real users. The first is now fixed:
 
 | Suite | Result |
 | --- | --- |
-| API (`tests/api`, node:test) | 19 passed (the Groq JSON-mode bug is fixed) |
-| End-to-end (`tests/e2e`, Playwright, Chromium) | 142 passed: all behaviour tests; the 4 known-issue tests now guard their fixes |
+| API (`tests/api`, node:test) | 21 passed (the Groq JSON-mode bug is fixed; OpenRouter added as the fourth provider) |
+| End-to-end (`tests/e2e`, Playwright, Chromium) | 151 passed: all behaviour tests; the 4 known-issue tests now guard their fixes |
 | Run time | About a minute. Needs no keys and no network. |
 
 **Covered:**
@@ -184,7 +184,7 @@ Each finding says how it was confirmed:
 | # | Finding | Where | Confirmed by |
 | --- | --- | --- | --- |
 | 8, **fixed** | **Answers can be taken as document edits.** Now only once no question is open. Once a description exists, any message containing "summary", "description" or "document" is treated as an edit, including answers in the improvement round. | `handleTurn` (`index.html` 1250) | Test |
-| 9 | **Requesters can change the route thresholds under Rules.** Raising the €50,000 threshold turns an RFP into business-led quotes, and only the "why" text records it. | Settings (`index.html` 2967–2994) | Test |
+| 9, **fixed** | **Requesters can change the route thresholds under Rules.** Now the Rules panel is gone; thresholds are set in the code only. Raising the €50,000 threshold turns an RFP into business-led quotes, and only the "why" text records it. | Settings (`index.html` 2967–2994) | Test |
 | 10 | **`?ai=<provider>` can be set by anyone with the link.** A shared link forces one provider (for example Mistral's free plan) for the whole conversation. | `index.html` 286; `api/llm.js` 327 | Test |
 | 11 | **Server state is shared between requests.** `IGNORE_COOLDOWN` is a module variable, so a POST that arrives during a `?check` ignores cooldowns. The deadline is only checked between calls, so one request can run past the 60 s function limit. | `api/llm.js` 61, 140, 205, 276 | Code |
 | 12, **fixed** | **Groq JSON-mode fallback is unreachable for "not supported" errors.** The first retry branch keeps JSON mode on and fails, so the model is skipped. | `callGroq` (`api/llm.js` 143–147) | Test (`todo`) |
@@ -200,7 +200,7 @@ Each finding says how it was confirmed:
 | 16, **fixed** | **A closing remark after the results gets a misleading reply.** Now answered as a closing remark. "thanks" gets "Updated. Here are the revised service description and route." although nothing changed. | Test |
 | 17, **partly fixed** | **The second off-topic answer is shown as "Answer quality 8/10" with "That helps."** It is correctly stored as "To be determined", but the feedback contradicts that. The score is no longer shown; the "That helps." reply is unchanged. | Run |
 | 18 | **The improvement round asks the start date again** when the timeline is only partial, instead of asking for the missing end date or duration. The result card above drops the date while the round runs. | Run |
-| 19 | **The browser-key Gemini path puts the key in the URL** (`?key=`). The server sends it in a header. | Code |
+| 19, **fixed** | **The browser-key Gemini path puts the key in the URL** (`?key=`). The server sends it in a header. Now the page has no key mode: AI runs through the server only. | Code |
 | 20 | **The mock contract CTR-7120 expires on 30 November 2026**, so demo requests in that category will switch to new demand. There are no security headers (CSP, frame-ancestors). | Code |
 
 ## Maintainability
@@ -230,7 +230,7 @@ Each finding says how it was confirmed:
 3. **Before any pilot:**
    - Show a "dummy data only" banner.
    - Move to paid LLM endpoints with no data retention.
-   - Make thresholds admin-only.
+   - Make thresholds admin-only (done: the Rules panel is removed).
    - Never let the AI weaken a compliance flag without the user confirming it.
 4. **Fix the phone panel and the accessibility basics.**
 5. **Start splitting the file.** Move the rules engine (`determine`, `parseMoney`, `normFact`, matching) into a module with unit tests, then the reference data.

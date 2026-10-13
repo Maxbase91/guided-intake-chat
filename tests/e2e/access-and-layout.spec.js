@@ -25,6 +25,23 @@ test.describe("access code gate", () => {
     expect(errors).toEqual([]);
   });
 
+  test("a code the server stops accepting re-opens the gate; that turn runs on the rules", async ({ page }) => {
+    const errors = await openApp(page, { kind: "gated", waitReady: false });
+    await page.fill("#gateCode", "demo-code");
+    await page.press("#gateCode", "Enter");
+    await expect(page.locator("#gate")).toBeHidden();
+    await page.evaluate(() => { CONFIG.accessCode = "changed-on-the-server"; });
+    await say(page, "We need 15 laptops for new joiners in Frankfurt.");
+    await expect(page.locator("#gateForm")).toBeVisible();
+    await expect(page.locator("#gateErr")).toHaveText("The access code has changed or expired. Please enter it again.");
+    await expect(page.locator("#msgs")).toContainText("Please enter it above");
+    await page.fill("#gateCode", "demo-code");
+    await page.press("#gateCode", "Enter");
+    await expect(page.locator("#gate")).toBeHidden();
+    expect(await page.evaluate(() => CONFIG.accessCode)).toBe("demo-code");
+    expect(errors).toEqual([]);
+  });
+
   test("the API refuses chat calls without the code", async ({ request }) => {
     const r = await request.post("http://localhost:4312/api/llm", { data: { system: "s", history: [{ role: "user", content: "hi" }] } });
     expect(r.status()).toBe(401);

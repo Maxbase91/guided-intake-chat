@@ -104,13 +104,11 @@ test("a storage location the AI adds on its own is asked about, and dropped if t
   expect(await page.evaluate(() => S.f.data_details)).toBe("employee names and salaries");
 });
 
-test("turning the AI off under Rules switches to offline questions without reloading", async ({ page, request }) => {
+test("no Rules panel: the pill names the fallback order, and the page opened without a server uses the rules only", async ({ page, request }) => {
   await openApp(page, { kind: "ai" });
-  await page.click("#cfgBtn");
-  await expect(page.locator(".drawer")).toContainText("Connected through the server: Gemini, then Groq, then Mistral as backup");
-  await page.uncheck("#aiToggle");
-  await expect(page.locator(".drawer")).toContainText("Nothing leaves the browser");
-  await page.click("#close");
+  await expect(page.locator("#cfgBtn")).toHaveCount(0);
+  await expect(page.locator(".top .pill")).toHaveAttribute("title", /Fallback order: Gemini → Groq → Mistral/);
+  await page.evaluate(() => { CONFIG.provider = "offline"; render(); });
   await expect(page.locator("#aiLabel")).toHaveText("Offline rules");
   await say(page, HR);
   expect(await calls(request)).toEqual([]);

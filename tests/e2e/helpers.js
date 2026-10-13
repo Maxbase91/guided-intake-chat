@@ -76,10 +76,15 @@ async function downloadJSON(page, trigger) {
   return { name: dl.suggestedFilename(), data: JSON.parse(fs.readFileSync(await dl.path(), "utf8")) };
 }
 
+// thresholds are set in the code (no Rules panel); a test changes one and the current request is re-routed, as a new deployment would
+async function setThreshold(page, key, value) {
+  await page.evaluate(([k, v]) => { CONFIG.thresholds[k] = v; if (S.det) { refresh(); if (!S.missing.length && S.sd) showRecommendation(); } render(); }, [key, value]);
+}
+
 async function mock(request, opts) {
   const r = await request.post(`http://localhost:${PORTS.ai}/__mock`, { data: opts });
   expect(r.ok()).toBeTruthy();
   return r.json();
 }
 
-module.exports = { PORTS, urlFor, TODAY, openApp, idle, say, choose, lastAssistant, choices, answerUntilDone, sideFacts, downloadJSON, mock };
+module.exports = { PORTS, urlFor, TODAY, openApp, idle, say, choose, lastAssistant, choices, answerUntilDone, sideFacts, downloadJSON, setThreshold, mock };

@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const path = require("node:path");
 
 const API = path.join(__dirname, "..", "..", "api", "llm.js");
-const ENV_KEYS = ["GEMINI_API_KEY", "GROQ_API_KEY", "MISTRAL_API_KEY", "ACCESS_CODE", "LLM_PROVIDER", "GEMINI_MODEL", "GEMINI_FALLBACK_MODEL", "GROQ_MODEL", "MISTRAL_MODEL"];
+const ENV_KEYS = ["GEMINI_API_KEY", "GROQ_API_KEY", "MISTRAL_API_KEY", "ACCESS_CODE", "LLM_PROVIDER", "GEMINI_MODEL", "GEMINI_FALLBACK_MODEL", "GROQ_MODEL", "MISTRAL_MODEL", "OPENROUTER_API_KEY", "OPENROUTER_MODEL"];
 const realFetch = global.fetch;
 let savedEnv, calls;
 
@@ -19,11 +19,12 @@ const chatOk = (text = '{"ok":true}') => reply(200, { choices: [{ message: { con
 function stub(routes) {
   global.fetch = async (url, init = {}) => {
     const u = new URL(url), method = init.method || "GET";
-    const provider = u.hostname.includes("googleapis") ? "gemini" : u.hostname.includes("groq") ? "groq" : u.hostname.includes("mistral") ? "mistral" : "other";
+    const provider = u.hostname.includes("googleapis") ? "gemini" : u.hostname.includes("groq") ? "groq" : u.hostname.includes("mistral") ? "mistral" : u.hostname.includes("openrouter") ? "openrouter" : "other";
     const body = init.body ? JSON.parse(init.body) : null;
     const model = provider === "gemini" ? decodeURIComponent(u.pathname.split("/models/")[1].split(":")[0]) : body && body.model;
     if (method === "GET" && u.pathname.endsWith("/models")) {
       if (routes.models && routes.models[provider]) return routes.models[provider]();
+      if (provider === "openrouter") return reply(200, { data: [{ id: "openai/gpt-4o", context_length: 128000 }, { id: "google/gemma-3-27b-it:free", context_length: 96000 }, { id: "meta-llama/llama-3.3-70b-instruct:free", context_length: 131072 }, { id: "tiny/model:free", context_length: 8000 }] });
       return reply(200, { data: (provider === "groq" ? ["llama-3.3-70b-versatile", "openai/gpt-oss-20b"] : ["ministral-8b-latest"]).map((id) => ({ id })) });
     }
     calls.push({ provider, model, body, headers: init.headers });
@@ -47,7 +48,7 @@ afterEach(() => { global.fetch = realFetch; ENV_KEYS.forEach((k) => (savedEnv[k]
 test("GET reports no providers when no key is set", async () => {
   const r = await call(load(), { method: "GET" });
   assert.equal(r.status, 200);
-  assert.deepEqual(r.body, { ok: false, provider: null, providers: { gemini: false, groq: false, mistral: false }, accessRequired: false });
+  assert.deepEqual(r.body, { ok: false, provider: null, providers: { gemini: false, groq: false, mistral: false, openrouter: false }, accessRequired: false });
   assert.equal(r.headers["cache-control"], "no-store");
 });
 
@@ -56,7 +57,7 @@ test("GET reports configured providers and the access requirement without leakin
   const r = await call(load(), { method: "GET" });
   assert.equal(r.body.ok, true);
   assert.equal(r.body.provider, "groq");
-  assert.deepEqual(r.body.providers, { gemini: false, groq: true, mistral: true });
+  assert.deepEqual(r.body.providers, { gemini: false, groq: true, mistral: true, openrouter: false });
   assert.equal(r.body.accessRequired, true);
   assert.doesNotMatch(JSON.stringify(r.body), /secret|letmein/);
 });
@@ -185,6 +186,30 @@ test("an empty Gemini answer moves on to the next provider", async () => {
   stub({ gemini: () => reply(200, { candidates: [{ content: { parts: [] } }] }), groq: () => chatOk() });
   const r = await call(load(), { body: chatBody() });
   assert.equal(r.body.provider, "groq");
+});
+
+test("OpenRouter is tried last, with its best free model first, and drops JSON mode when a model refuses it", async () => {
+  Object.assign(process.env, { GROQ_API_KEY: "g", OPENROUTER_API_KEY: "o" });
+  stub({
+    groq: () => reply(429, { error: { message: "Rate limit reached. Please try again in 30s." } }),
+    openrouter: ({ body, n }) => n === 1 ? reply(400, { error: { message: "This model does not support response_format json_object" } }) : chatOk('{"from":"openrouter"}'),
+  });
+  const r = await call(load(), { body: chatBody() });
+  assert.equal(r.status, 200);
+  assert.deepEqual([r.body.provider, r.body.model, r.body.text], ["openrouter", "meta-llama/llama-3.3-70b-instruct:free", '{"from":"openrouter"}']);
+  const or = calls.filter((c) => c.provider === "openrouter");
+  assert.equal(or[0].body.response_format.type, "json_object");
+  assert.equal(or[1].body.response_format, undefined);
+  // only free models with a large enough context are used, never a paid one
+  assert.ok(calls.every((c) => c.provider !== "openrouter" || /:free$/.test(c.model)));
+});
+
+test("an error OpenRouter returns inside a 200 answer moves on like a failure", async () => {
+  Object.assign(process.env, { OPENROUTER_API_KEY: "o" });
+  stub({ openrouter: () => reply(200, { error: { message: "Provider returned error", code: 502 } }) });
+  const r = await call(load(), { body: chatBody() });
+  assert.equal(r.status, 502);
+  assert.equal(r.body.attempts[0].provider, "openrouter");
 });
 
 test("when every provider is rate limited the answer is 429 with a retry time", async () => {

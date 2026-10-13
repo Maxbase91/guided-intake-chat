@@ -1,0 +1,492 @@
+[
+  {
+    "id": "b01",
+    "text": "Can you help me buy 25 laptops for new joiners in the Frankfurt risk team? 14 inch with docking stations, needed before 1 December.",
+    "expect": [
+      "L4-1101"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b02",
+    "text": "Pen test for our new mobile banking app before go-live in March, budget around 40k EUR.",
+    "expect": [
+      "L4-1322"
+    ],
+    "note": "Near neighbours: security assessments, endpoint security software and cyber insurance."
+  },
+  {
+    "id": "b03",
+    "text": "We have to rotate our external auditor for the FY2027 financial statements and need to run a tender for the new firm.",
+    "expect": [
+      "L4-2001"
+    ],
+    "note": "Audit firm request; near neighbours are tax advisory and other assurance work."
+  },
+  {
+    "id": "b04",
+    "text": "Looking for a low-latency real-time price feed for European equities and govvies, delivered straight into our pricing engine.",
+    "expect": [
+      "L4-1601"
+    ],
+    "note": "Feed vs terminals, exchange licence fees and low-latency network connectivity."
+  },
+  {
+    "id": "b05",
+    "text": "We need a consultancy to set up and lead a one-off KYC remediation project after the internal audit findings, about six months.",
+    "expect": [
+      "L4-2111",
+      "L4-2808"
+    ],
+    "note": "One-off remediation run by consultants: financial crime advisory or remediation operations; not ongoing KYC ops or KYC software."
+  },
+  {
+    "id": "b06",
+    "text": "Looking for a provider to take over our ongoing periodic KYC reviews for corporate clients, roughly 1,500 cases a month, from mid-2027.",
+    "expect": [
+      "L4-2807",
+      "L4-2802"
+    ],
+    "note": "Ongoing KYC operations vs one-off remediation project vs KYC software."
+  },
+  {
+    "id": "b07",
+    "text": "I want to buy a tool for our retail app that checks ID documents and runs KYC checks when customers open an account online.",
+    "expect": [
+      "L4-1225"
+    ],
+    "note": "KYC software vs KYC operations and identity and access management software."
+  },
+  {
+    "id": "b08",
+    "text": "Looking for a cloud HR system to manage onboarding, absences and performance reviews for about 3,000 employees.",
+    "expect": [
+      "L4-1204"
+    ],
+    "note": "HR SaaS vs HR consulting vs HR admin outsourcing; also generic SaaS."
+  },
+  {
+    "id": "b09",
+    "text": "We need an HR consultancy to redesign our bonus and pay structure so it complies with the CRD remuneration rules.",
+    "expect": [
+      "L4-2116"
+    ],
+    "note": "HR consulting vs HR software vs HR outsourcing; regulatory change consulting is also close."
+  },
+  {
+    "id": "b10",
+    "text": "I want to outsource our HR admin (employment contracts, leaver letters, personnel files) to a shared service provider from next year.",
+    "expect": [
+      "L4-2823"
+    ],
+    "note": "HR outsourcing vs HR software vs HR consulting vs payroll processing."
+  },
+  {
+    "id": "b11",
+    "text": "We want to replace our old antivirus with a proper EDR agent across about 6,000 laptops and servers.",
+    "expect": [
+      "L4-1238"
+    ],
+    "note": "Security software vs managed SOC/MDR service vs penetration testing."
+  },
+  {
+    "id": "b12",
+    "text": "Our cyber policy expires on 31 December and the broker needs the questionnaire back, can we get the renewal moving?",
+    "expect": [
+      "L4-3304"
+    ],
+    "note": "Cyber insurance vs insurance broker services vs cyber security services."
+  },
+  {
+    "id": "b13",
+    "text": "Bloomberg-style terminals for 12 new traders on the rates desk, starting January.",
+    "expect": [
+      "L4-1605"
+    ],
+    "note": "Terminals vs data feeds vs research vs trading desk workstations."
+  },
+  {
+    "id": "b14",
+    "text": "Subscription to sell-side equity and macro research for the portfolio managers, ideally with analyst access.",
+    "expect": [
+      "L4-1617"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b15",
+    "text": "Need a PO for next year's Visa scheme and network fees on our debit card portfolio.",
+    "expect": [
+      "L4-2901"
+    ],
+    "note": "Scheme fees vs card issuing/processing software and card printing or statement production."
+  },
+  {
+    "id": "b16",
+    "text": "Flights to New York for four board members for the investor roadshow in February, business class please.",
+    "expect": [
+      "L4-3201"
+    ],
+    "note": "Flights vs travel management company vs meetings and incentive travel."
+  },
+  {
+    "id": "b17",
+    "text": "Our contract with the travel agency that books all our business trips ends next year, we need to retender it.",
+    "expect": [
+      "L4-3204"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b18",
+    "text": "Company cars for 20 sales managers on 36-month leases, preferably fully electric.",
+    "expect": [
+      "L4-3211"
+    ],
+    "note": "Leasing vs car servicing vs pool vehicles vs EV charging energy."
+  },
+  {
+    "id": "b19",
+    "text": "The two pool cars at our Munich branch need their annual inspection and winter tyres, who do we use for that?",
+    "expect": [
+      "L4-3213"
+    ],
+    "note": "Servicing vs pool vehicles vs leasing; 'pool cars' is a distractor."
+  },
+  {
+    "id": "b20",
+    "text": "Urgent: signed loan documents need to go from Frankfurt to a notary in Milan by tomorrow morning.",
+    "expect": [
+      "L4-2531"
+    ],
+    "note": "Courier vs postal services vs mailroom; 'notary' is a distractor."
+  },
+  {
+    "id": "b21",
+    "text": "Need someone to run the post room at HQ, sorting incoming mail and internal distribution, two people on site.",
+    "expect": [
+      "L4-2530"
+    ],
+    "note": "Mailroom vs postal services vs courier vs integrated facility management."
+  },
+  {
+    "id": "b22",
+    "text": "Bulk letter postage for the branch network, around 40,000 letters a month, current contract ends in June.",
+    "expect": [
+      "L4-2532"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b23",
+    "text": "Daily cleaning for our new Hamburg office, three floors, about 4,000 m2, starting 1 February.",
+    "expect": [
+      "L4-2502"
+    ],
+    "note": "Cleaning vs integrated facility management vs deep cleaning."
+  },
+  {
+    "id": "b24",
+    "text": "One provider for all building services across our six German sites: cleaning, maintenance, reception and guarding.",
+    "expect": [
+      "L4-2501"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b25",
+    "text": "We're hosting our annual client conference in Vienna in May for 250 guests and need a venue plus an event agency.",
+    "expect": [
+      "L4-2302",
+      "L4-2301"
+    ],
+    "note": "Event we host vs attending a conference vs sponsorship."
+  },
+  {
+    "id": "b26",
+    "text": "Tickets for five people from my team to attend Money20/20 Europe in Amsterdam in June.",
+    "expect": [
+      "L4-2410"
+    ],
+    "note": "Attending a conference vs hosting one vs client entertainment tickets."
+  },
+  {
+    "id": "b27",
+    "text": "We'd like to be main partner of the city marathon: our logo on runners' shirts and a stand at the finish line.",
+    "expect": [
+      "L4-2304"
+    ],
+    "note": "Sponsorship vs exhibition stands vs event production."
+  },
+  {
+    "id": "b28",
+    "text": "We need three temps through an agency for the mortgage back office for about 8 weeks to cover the peak.",
+    "expect": [
+      "L4-2703"
+    ],
+    "note": "Temporary staff vs recruitment agency vs mortgage processing outsourcing."
+  },
+  {
+    "id": "b29",
+    "text": "Looking for an agency to find us two permanent compliance officers, paid on a success fee.",
+    "expect": [
+      "L4-2710"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b30",
+    "text": "Need advice on the tax treatment of a new structured note we're launching in Luxembourg and Germany.",
+    "expect": [
+      "L4-2006"
+    ],
+    "note": "Tax advisory vs tax compliance vs statutory audit."
+  },
+  {
+    "id": "b31",
+    "text": "Translation of our annual report and website content into French and Italian, about 120 pages, by end of March.",
+    "expect": [
+      "L4-2323"
+    ],
+    "note": "Written before the test list had a translation entry; Translation and interpreting (L4-2323) was added for it."
+  },
+  {
+    "id": "b32",
+    "text": "Looking for a process orchestration platform for procurement, to route intake requests and approvals across legal, risk and finance.",
+    "expect": [
+      "L4-1209",
+      "L4-1206"
+    ],
+    "note": "Workflow/orchestration software vs source-to-pay software; either is defensible."
+  },
+  {
+    "id": "b33",
+    "text": "We need an external team to move 15 years of loan history from the old system onto the new core platform, roughly 9 months.",
+    "expect": [
+      "L4-1312"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b34",
+    "text": "Internal chatbot on top of GPT so relationship managers can search our policies and procedures, about 500 users.",
+    "expect": [
+      "L4-1233"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b35",
+    "text": "Annual support and maintenance renewal for our database licences with the original vendor, due end of November, around 220k.",
+    "expect": [
+      "L4-1247"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b36",
+    "text": "Two Teams Rooms kits with cameras and soundbars for the new meeting rooms on the 4th floor.",
+    "expect": [
+      "L4-1105"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b37",
+    "text": "We need someone to run our IT service desk and desk-side support for 2,500 staff from January, three-year deal.",
+    "expect": [
+      "L4-1302",
+      "L4-1315"
+    ],
+    "note": "Service desk vs managed workplace services; both cover desk-side support."
+  },
+  {
+    "id": "b38",
+    "text": "Replace the dealer boards on the FX desk, 30 positions, plus new speakers for the squawk box.",
+    "expect": [
+      "L4-1509"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b39",
+    "text": "Looking for a company to securely dispose of about 800 old laptops and hard drives, with certified data wiping.",
+    "expect": [
+      "L4-1333"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b40",
+    "text": "A small project to build Power BI dashboards for the finance team, maybe 30 days of effort.",
+    "expect": [
+      "L4-1329"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b41",
+    "text": "More cloud capacity for the risk team's overnight batch runs, we'll blow through our committed spend this quarter.",
+    "expect": [
+      "L4-1401"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b42",
+    "text": "Independent review of our IFRS 9 expected credit loss models before the ECB inspection in spring.",
+    "expect": [
+      "L4-2127"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b43",
+    "text": "Consultants to help us redesign the target operating model of the retail bank, about four months.",
+    "expect": [
+      "L4-2103"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b44",
+    "text": "Clients keep asking for a SOC 1 type 2 report on our custody controls, we need a firm to issue one.",
+    "expect": [
+      "L4-2002"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b45",
+    "text": "Clearing house fees for our listed futures and options, need to set up the PO for 2027.",
+    "expect": [
+      "L4-2906"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b46",
+    "text": "We need help with the DORA gap analysis and setting up our ICT third-party risk framework.",
+    "expect": [
+      "L4-2108",
+      "L4-2109"
+    ],
+    "note": "ICT risk advisory vs regulatory change consulting; both fit a DORA engagement."
+  },
+  {
+    "id": "b47",
+    "text": "Law firm to defend us in a customer class action over mortgage fees.",
+    "expect": [
+      "L4-2205"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b48",
+    "text": "PEP and sanctions lists for our screening tool, the current data contract ends in March.",
+    "expect": [
+      "L4-1624",
+      "L4-1625"
+    ],
+    "note": "Combined PEP and sanctions data; either list category is acceptable."
+  },
+  {
+    "id": "b49",
+    "text": "Analyst research seats for the CIO office, the kind with vendor rankings, market guides and inquiry calls.",
+    "expect": [
+      "L4-1620"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b50",
+    "text": "We want to outsource payroll for our three Spanish subsidiaries, about 450 employees, from 1 January.",
+    "expect": [
+      "L4-2821"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b51",
+    "text": "External call centre to take overflow calls on the credit card hotline, 30 agents, German and English.",
+    "expect": [
+      "L4-2826"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b52",
+    "text": "Printing and posting the annual account statements for 1.2 million customers.",
+    "expect": [
+      "L4-2833",
+      "L4-2832"
+    ],
+    "note": "Statement printing vs print and mail outsourcing; both cover print plus posting."
+  },
+  {
+    "id": "b53",
+    "text": "Budget for next year's SWIFT traffic charges, we send roughly 2 million payment messages.",
+    "expect": [
+      "L4-2909"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b54",
+    "text": "Headhunter for a new Chief Risk Officer, confidential search.",
+    "expect": [
+      "L4-2711"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b55",
+    "text": "Leadership programme for 40 newly promoted team leads, three modules over six months.",
+    "expect": [
+      "L4-2402"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b56",
+    "text": "Pre-employment checks for all new hires (criminal record, credit history, references), around 600 a year.",
+    "expect": [
+      "L4-2713"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b57",
+    "text": "Christmas presents for our top 200 private banking clients, something nice like wine or chocolates, around 80 EUR each.",
+    "expect": [
+      "L4-2319"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b58",
+    "text": "We have about 5,000 boxes of old loan files that need to go to an offsite archive warehouse.",
+    "expect": [
+      "L4-2534",
+      "L4-2834"
+    ],
+    "note": "Physical archive storage vs records management and archiving outsourcing."
+  },
+  {
+    "id": "b59",
+    "text": "The air conditioning in the 2nd floor server room keeps failing, we need a maintenance contract.",
+    "expect": [
+      "L4-2518"
+    ],
+    "note": ""
+  },
+  {
+    "id": "b60",
+    "text": "Green electricity for all our offices from 2027, ideally with guarantees of origin.",
+    "expect": [
+      "L4-3101",
+      "L4-3105"
+    ],
+    "note": "Electricity supply vs energy brokerage and certificates."
+  }
+]

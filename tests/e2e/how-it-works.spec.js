@@ -1,7 +1,7 @@
 // The "How it works" panel: a specification generated from the page's own code, with the exact prompts and a Markdown download.
 const { test, expect } = require("@playwright/test");
 const fs = require("fs");
-const { openApp, say, idle, lastAssistant } = require("./helpers");
+const { openApp, say, idle, lastAssistant, setThreshold } = require("./helpers");
 
 const panel = (page) => page.locator("#specPaper");
 
@@ -45,11 +45,9 @@ test("the prompts are the ones the app sends, behind a toggle", async ({ page })
   expect(same).toBe(true);
 });
 
-test("thresholds in the specification follow the Rules", async ({ page }) => {
+test("thresholds in the specification follow the settings in the code", async ({ page }) => {
   await openApp(page);
-  await page.click("#cfgBtn");
-  await page.fill("#t2", "60000");
-  await page.click("#close");
+  await setThreshold(page, "quickQuoteMax", 60000);
   await page.click("#howBtn");
   await expect(panel(page)).toContainText("€60,000");
 });

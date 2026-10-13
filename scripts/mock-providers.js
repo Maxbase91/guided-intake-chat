@@ -1,8 +1,8 @@
-// Fake Gemini, Groq and Mistral endpoints for local tests: no keys, no network, deterministic answers.
+// Fake Gemini, Groq, Mistral and OpenRouter endpoints for local tests: no keys, no network, deterministic answers.
 // install() wraps global fetch; calls to the three provider hosts are answered here, everything else passes through.
 //
 // Each provider has a mode: "ok" (default), "429" (rate limited), "500" (server error) or "empty" (blank answer).
-// Set it with MOCK_GEMINI / MOCK_GROQ / MOCK_MISTRAL, or at runtime with configure({ gemini: "429" }).
+// Set it with MOCK_GEMINI / MOCK_GROQ / MOCK_MISTRAL / MOCK_OPENROUTER, or at runtime with configure({ gemini: "429" }).
 //
 // Answers follow the shape the app asks for:
 //   chat turns   -> asks the first item in still_needed (with a suggestion when the item expects one)
@@ -12,8 +12,8 @@
 // Trigger words in the user's latest message: MOCK_LEAK (reply leaks internal field names),
 // MOCK_OFFTOPIC (assessment flags the answer as off-topic). configure({ nextChat: {...} }) overrides fields of the next chat answer.
 
-const HOSTS = { gemini: "generativelanguage.googleapis.com", groq: "api.groq.com", mistral: "api.mistral.ai" };
-const state = { modes: { gemini: "ok", groq: "ok", mistral: "ok" }, calls: [], nextChat: null };
+const HOSTS = { gemini: "generativelanguage.googleapis.com", groq: "api.groq.com", mistral: "api.mistral.ai", openrouter: "openrouter.ai" };
+const state = { modes: { gemini: "ok", groq: "ok", mistral: "ok", openrouter: "ok" }, calls: [], nextChat: null };
 
 function configure(opts = {}) {
   for (const p of Object.keys(HOSTS)) if (opts[p]) state.modes[p] = String(opts[p]);
@@ -85,6 +85,7 @@ function failure(provider, mode) {
   if (mode === "429") {
     if (provider === "mistral") return json(429, { message: "Requests rate limit exceeded" }, { "retry-after": "1" });
     if (provider === "groq") return json(429, { error: { message: "Rate limit reached for model. Please try again in 1.5s." } }, { "retry-after": "2" });
+    if (provider === "openrouter") return json(429, { error: { message: "Rate limit exceeded: free-models-per-day", code: 429 } });
     return json(429, { error: { message: "Resource has been exhausted (e.g. check quota). Please retry in 2s." } });
   }
   if (mode === "500") return json(500, provider === "mistral" ? { message: "Internal server error" } : { error: { message: `${provider} mock internal error` } });
@@ -95,6 +96,7 @@ async function handle(provider, url, init) {
   const u = new URL(url);
   const method = (init && init.method) || "GET";
   if (method === "GET" && /\/models$/.test(u.pathname)) {
+    if (provider === "openrouter") return json(200, { data: [{ id: "meta-llama/llama-3.3-70b-instruct:free", context_length: 131072 }, { id: "openai/gpt-oss-120b:free", context_length: 131072 }, { id: "openai/gpt-4o", context_length: 128000 }] });
     const ids = provider === "groq" ? ["llama-3.3-70b-versatile", "openai/gpt-oss-20b"] : ["ministral-8b-latest", "mistral-small-latest"];
     return json(200, { data: ids.map((id) => ({ id, active: true })) });
   }
