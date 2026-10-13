@@ -140,6 +140,7 @@ test("the provisioning legal entity is the one named, not where data is stored o
     [["A new HR system"], "On our premises in London", "UK"],
     [["Market data for the US entity in New York"], "", "US"],
     [["A new tool for the team"], "", null],
+    [["Consultants for our procurement model", "our team sits in London and Singapore"], "Mostly remote, sometimes on site in Frankfurt", "UK"],
   ];
   const got = await page.evaluate((cases) => cases.map(([msgs, location]) => {
     S.msgs = msgs.map((text) => ({ role: "user", text }));

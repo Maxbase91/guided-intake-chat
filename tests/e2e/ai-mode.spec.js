@@ -1,7 +1,7 @@
 // AI mode: the page talks to the real api/llm.js, whose Gemini, Groq and Mistral calls are answered by scripts/mock-providers.js.
 // The mock server is shared, so these tests run one after another and reset it first.
 const { test, expect } = require("@playwright/test");
-const { openApp, say, choose, idle, lastAssistant, answerUntilDone, mock, downloadJSON, PORTS } = require("./helpers");
+const { openApp, say, choose, idle, lastAssistant, choices, answerUntilDone, mock, downloadJSON, PORTS } = require("./helpers");
 
 test.describe.configure({ mode: "serial" });
 test.beforeEach(async ({ request }) => {
@@ -97,7 +97,8 @@ test("a storage location the AI adds on its own is asked about, and dropped if t
   await say(page, HR);
   // as in a real run: the requester names the data only, the AI copies the question's example "stored in the EU"
   await mock(request, { nextChat: { facts: { personal_data: true, data_details: "employee names and salaries; stored in the EU" } } });
-  await say(page, "About 400k");
+  // the requester names the data (the AI may only record what was said); the place comes from the question's example
+  await say(page, "About 400k, and the provider will see employee names and salaries");
   await expect(lastAssistant(page)).toContainText("where will that data (employee names and salaries) be stored");
   await say(page, "Not sure");
   expect(await page.evaluate(() => S.f.data_details)).toBe("employee names and salaries");
@@ -135,7 +136,7 @@ test("a place in the answer about where data is stored does not become the work 
   await openApp(page, { kind: "ai" });
   await say(page, HR);
   await mock(request, { nextChat: { facts: { personal_data: true, data_details: "employee names and salaries" } } });
-  await say(page, "About 400k");
+  await say(page, "About 400k, and the provider will see employee names and salaries");
   await expect(lastAssistant(page)).toContainText("where will that data");
   // as in a live run: the AI also took "in the EU" as the location of the work
   await mock(request, { nextChat: { facts: { location: "EU" } } });
@@ -174,4 +175,63 @@ test("'No, look wider' leaves the framework even when the AI records the answer 
   expect(got.declined).toBe(true);
   await expect(page.locator("#side .route")).not.toContainText("Contract call-off");
   expect(errors).toEqual([]);
+});
+
+// from a live AI test (October 2026): the AI filled gaps with "unknown"/"none", invented facts and flags, overrode a clear category,
+// saved line labels as an answer, and changed the budget in passing. The app now screens what the AI records.
+test("the AI records only what was said: placeholders, invented details and flags are dropped", async ({ page, request }) => {
+  const errors = await openApp(page, { kind: "ai" });
+  await mock(request, { nextChat: { facts: { category: "marketing", demand_type: "services", supplier: "unknown", entity: "unknown", location: "unknown", impact_delay: "none",
+    current_solution: "none", important_fn: true, in_house: false, budget_approved: "unsure", must_haves: "menu options, seating, decor", usp: "fancy menu and ambience",
+    audience_fn: "Sponsor and stakeholders, Teams involved", users: "clients", item: "Dinner" } } });
+  await say(page, "dinner for some clients in December, maybe 30 people. my boss wants it fancy lol");
+  const got = await page.evaluate(() => ({ f: Object.fromEntries(["supplier", "entity", "location", "impact_delay", "current_solution", "important_fn", "budget_approved", "must_haves", "usp", "audience_fn", "users"].map((k) => [k, S.f[k]])),
+    controls: S.det.controls.map((c) => c[1]), first: S.msgs.filter((m) => m.role === "assistant" && m.text).map((m) => m.text).join("\n") }));
+  expect(got.f).toEqual({ supplier: null, entity: null, location: null, impact_delay: null, current_solution: null, important_fn: null, budget_approved: null,
+    must_haves: null, usp: null, audience_fn: null, users: "clients" });
+  expect(got.controls).not.toContain("Non-preferred supplier");
+  expect(got.controls).not.toContain("Critical or important function check");
+  expect(got.first).not.toMatch(/"none"/);
+  expect(errors).toEqual([]);
+});
+
+test("a clear keyword category beats the AI's category on the first message (KYC is not legal)", async ({ page, request }) => {
+  await openApp(page, { kind: "ai" });
+  await mock(request, { nextChat: { facts: { category: "legal", demand_type: "services", l4: "L4-2201" } } });
+  await say(page, "KYC periodic reviews for our corporate clients by an external provider for 2 years, around 600k");
+  expect(await page.evaluate(() => [S.f.category, S.det.route, S.f.l4 === "L4-2201"])).toEqual(["bpo", "sourcing", false]);
+});
+
+test("a question back is answered by the AI, nothing is recorded, and the same question comes back with its buttons", async ({ page, request }) => {
+  await openApp(page, { kind: "ai" });
+  await say(page, "We need business consultants to redesign our procurement operating model, about 200k for 6-12 months");
+  expect(await page.evaluate(() => S.lastAsked)).toBe("contract_ok");
+  await mock(request, { nextChat: { answers_question: false, facts: {}, reply: "Lakeshore Advisory was selected for the operations consulting framework in a competitive tender. Would you like to use it?" } });
+  await say(page, "are they even any good at procurement?");
+  await expect(lastAssistant(page)).toContainText("selected for the operations consulting framework in a competitive tender");
+  await expect(lastAssistant(page)).toContainText("Would you like to use it?");
+  expect(await choices(page).allInnerTexts()).toEqual(["Yes, use it", "No, look wider"]);
+  expect(await page.evaluate(() => [S.f.contract_ok, S.lastAsked])).toEqual([null, "contract_ok"]);
+});
+
+test("a budget the AI changes in passing is said out loud", async ({ page, request }) => {
+  await openApp(page, { kind: "ai" });
+  await say(page, HR);
+  await say(page, "About 400k");
+  await mock(request, { nextChat: { facts: { value: 450000, background: "Our payroll tool is end of life" } } });
+  await say(page, "Our payroll tool is end of life, and we found another 50k");
+  expect(await page.evaluate(() => S.msgs.map((m) => m.text || "").join("\n"))).toContain("Changed: budget from €400,000 to **€450,000**");
+});
+
+test("a suggestion the AI writes without its line labels is replaced, and its lead-in is not glued to the question", async ({ page, request }) => {
+  await openApp(page, { kind: "ai" });
+  await say(page, HR);
+  await say(page, "About 400k");
+  await mock(request, { nextChat: { asking: "audience_fn", suggestion: "Target audience – e.g. HR teams; Supported functions – e.g. Finance",
+    reply: "Here's a quick template you could use: Target audience – e.g. Who uses it? My suggestion follows." } });
+  await say(page, "Our payroll tool is end of life and payroll runs on spreadsheets; if delayed we miss the reporting deadline");
+  const last = await lastAssistant(page).innerText();
+  expect(last).toMatch(/Target audience: /);
+  expect(last).toMatch(/Supported functions: /);
+  expect(last).not.toMatch(/quick template|– e\.g\./);
 });

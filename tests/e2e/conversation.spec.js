@@ -22,7 +22,7 @@ test("a budget correction mid-way re-routes across the €50,000 threshold", asy
   await expect(lastAssistant(page)).toContainText("New demand: procurement-led sourcing");
   await expect(lastAssistant(page)).toContainText("Back to where we were");
   await expect(routeInPanel(page)).toHaveText("New demand: procurement-led sourcing");
-  await expect(page.locator("#stepbar")).toContainText("Running the service");
+  await expect(page.locator("#stepbar")).toContainText("Success and steering");   // an event is a project: measured and steered, not run
   // the correction is not taken as the answer to the open question
   expect((await sideFacts(page))["Problem to solve"]).not.toMatch(/80k/);
   expect(errors).toEqual([]);

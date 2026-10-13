@@ -388,11 +388,11 @@ const L4 = [
 ];
 /* Provisioning legal entities (mock). The outsourcing test is one group-wide rule set for every entity (not per jurisdiction). */
 const ENTITIES = [
-  {id:"EU", name:"EU banking entity (Germany)", country:"Germany", re:/frankfurt|germany|berlin|munich|hamburg|cologne|düsseldorf|stuttgart|europe\b/i, abbr:/\bEU\b/},
-  {id:"UK", name:"UK banking entity (London)", country:"United Kingdom", re:/london|united kingdom|england|britain|edinburgh/i, abbr:/\bUK\b/},
+  {id:"EU", name:"EU banking entity (Germany)", country:"Germany", re:/frankfurt|germany|german\b|berlin|munich|hamburg|cologne|düsseldorf|stuttgart|europe\b/i, abbr:/\bEU\b/},
+  {id:"UK", name:"UK banking entity (London)", country:"United Kingdom", re:/london|united kingdom|england|english\b|britain|british\b|edinburgh/i, abbr:/\bUK\b/},
   {id:"SG", name:"Singapore branch", country:"Singapore", re:/singapore/i},
   {id:"HK", name:"Hong Kong branch", country:"Hong Kong", re:/hong kong/i},
-  {id:"US", name:"US entity (New York)", country:"United States", re:/new york|united states|america/i, abbr:/\b(?:US|USA)\b/},
+  {id:"US", name:"US entity (New York)", country:"United States", re:/new york|united states|america(?:n)?\b/i, abbr:/\b(?:US|USA)\b/},
   {id:"AU", name:"Australia branch", country:"Australia", re:/sydney|melbourne|australia/i},
   {id:"CA", name:"Canada branch", country:"Canada", re:/toronto|canada/i}
 ];
@@ -458,7 +458,7 @@ const FACTS = {
   need:           {label:"What you need",   q:()=>"Could you tell me a bit more about what you need?", ex:()=>"For example: \"an agency to run a client dinner for 40 people in March\"."},
   item:           {label:"Item",            q:f=>f.demand_type==="services"?"What exactly are you buying?":"Which item or product do you need?", ex:f=>f.demand_type==="software"?"For example: \"a project-tracking tool for 25 users\".":f.demand_type==="services"?"For example: \"one ticket for the Procurement Leaders conference\".":"For example: \"a 27-inch monitor\" or a product link."},
   quantity:       {label:"Quantity",        q:f=>f.demand_type==="software"&&S.det&&NEW_DEMAND(S.det.route)?"Who will use it, and roughly how many people? A rough number is fine.":f.demand_type==="software"?"How many users or licences?":"How many do you need?", ex:f=>f.demand_type==="software"&&S.det&&NEW_DEMAND(S.det.route)?"For example: \"about 400 buyers and requesters across Europe\", or \"not sure yet\". The licence count and pricing model are agreed with suppliers later.":"", choices:f=>f.demand_type==="software"&&S.det&&NEW_DEMAND(S.det.route)?["Not sure yet"]:null},
-  value:          {label:"Budget",          q:()=>"Roughly what will this cost in total?", ex:f=>`A rough figure is fine${f.duration?`, for the full ${f.duration}`:""}. If you don't know, just say so and I'll estimate it.`, why:()=>"The amount decides how much competition is needed."},
+  value:          {label:"Budget",          q:()=>"Roughly what will this cost in total?", ex:f=>`A rough figure is fine${f.duration&&/week|month|year/i.test(f.duration)?`, for the full ${f.duration}`:""}. If you don't know, just say so and I'll estimate it.`, why:()=>"The amount decides how much competition is needed."},
   deliverables:   {label:"Deliverables",    q:f=>f.demand_type==="contingent_labour"?"What will they work on?":"What should the supplier deliver?", ex:f=>f.demand_type==="contingent_labour"?"For example: \"building the new payments API with our team\".":`For example: ${DELIV_EX[f.category]||DELIV_EX._}.`},
   duration:       {label:"Duration",        q:f=>f.wants_renewal?"How long should the renewed contract run?":"How long will the work run?", ex:()=>"", choices:["Under 3 months","3–6 months","6–12 months","Over a year"]},
   needed_by:      {label:"Start / delivery",q:f=>["goods","software"].includes(f.demand_type)?"When do you need it?":"When should it start?", ex:()=>"A date or \"as soon as possible\" is fine."},
@@ -580,7 +580,7 @@ const STAGES=[
    facts:["background","impact_delay","audience_fn","users","functions","current_solution","value_props","usp","benefits","reg_benefits","profile"]},
   {id:"scope",   name:"Scope and deliverables", intro:"Next, what exactly the provider does and delivers, and how the work is accepted.",
    facts:["scope_in","deliverables","must_haves","scope_out","acceptance_pack","acceptance","qualifications","volume"]},
-  {id:"service", name:"Running the service",  intro:"How the service is measured and run. I'll suggest standard answers you can accept or change.", facts:["kpis_pack","service_model","governance"]},
+  {id:"service", get name(){ return kindOf(S.f)==="project"?"Success and steering":"Running the service"; },  get intro(){ return kindOf(S.f)==="project"?"How success is measured and how the project is steered. I'll suggest standard answers you can accept or change.":this._intro; }, _intro:"How the service is measured and run. I'll suggest standard answers you can accept or change.", facts:["kpis_pack","service_model","governance"]},
   {id:"timing",  name:"Timing and delivery",  intro:"Now, when and where.", facts:["needed_by","location"]},
   {id:"supplier",name:"Budget and supplier",  intro:"A quick word on the budget approval and the supplier.", facts:["budget_approved","supplier","supplier_reason","supplier_terms"]},
   {id:"risk",    name:"Data and classification", intro:"A few checks on data and access. Most of the classification I can work out myself; I'll only ask what isn't clear.",
@@ -617,7 +617,7 @@ function fresh(){ return {cid:++CONV_SEQ, curStage:null, stageIds:[], recapped:{
 const catById = id => CATEGORIES.find(c=>c.id===id) || {id, name:id||"–", type:"services"};
 const known = v => v!==null && v!==undefined && v!=="";
 const contractAgreed = f => f.contract_ok===true || (S.det && S.det.contract && hasSupplier(f) && String(f.supplier).toLowerCase().includes(S.det.contract.supplier.toLowerCase().split(" ")[0]));
-const hasSupplier = f => known(f.supplier) && !/^(none|no|no preference|not sure|n\/a)$/i.test(String(f.supplier).trim());
+const hasSupplier = f => known(f.supplier) && !/^(none|no|no preference|not sure|n\/a|unknown|tbd|tbc|not known|any|open|to be decided)$/i.test(String(f.supplier).trim());
 const yes = v => v===true || /^y/i.test(String(v));
 // work outside the entity's country: an explicit "no" from the requester wins over the wording of the location
 const isOffshore = f => f.offshore===false ? false : yes(f.offshore) || /offshore|other country|another country/i.test(f.location||"");
@@ -694,8 +694,9 @@ function controlsFor(route, ctr){
   if(yes(f.subcontracting)) out.push(["w","Subcontractor check","The supplier may use subcontractors."]);
   if(route!=="catalogue" && /on.?site|office/i.test(f.location||"") && f.demand_type!=="goods") out.push(["i","Site access","Building access is arranged before the start."]);
   if(v!=null && v>=T.materialityMin) out.push(["w","Material spend review",`Value is ${money(T.materialityMin)} or more.`]);
-  if(hasSupplier(f) && NEW_DEMAND(route) && !(PREFERRED[f.category]||[]).some(p=>p.toLowerCase()===String(f.supplier).toLowerCase()))
-    out.push(["b","Non-preferred supplier",`${f.supplier} is not a preferred supplier for this category.`]);
+  if(hasSupplier(f) && NEW_DEMAND(route)){   // each named supplier on its own: "Lakeshore and Blue Yonder Partners" are both preferred
+    const pref=(PREFERRED[f.category]||[]).map(p=>p.toLowerCase()), other=supplierNames(f.supplier).filter(n=>!pref.some(p=>p.includes(n.toLowerCase())||n.toLowerCase().includes(p)));
+    if(other.length) out.push(["b","Non-preferred supplier",`${listJoin(other)} ${other.length>1?"are":"is"} not a preferred supplier for this category.`]); }
   if(route==="sourcing" && soleSupplier(f)) out.push(["b","Single-source justification","You asked for one named supplier. Procurement checks the reason."]);
   if(route!=="catalogue" && f.demand_type!=="goods") out.push(["i","Risk questionnaire, pre-filled","Answers come from this conversation. You only confirm them."]);
   return out;
@@ -705,8 +706,8 @@ function bankChecks(f){
   const t=userText(), c=f.category, out=[];
   if(["consulting","audit-tax"].includes(c)) out.push(["i","Auditor independence check","If the firm is our statutory auditor, non-audit work needs Audit Committee approval first."]);
   if(c==="legal") out.push(["i","Instructed through Legal","External counsel is engaged by Legal, after a conflict check with the firm."]);
-  if(c==="marketing" && /\b(clients?|guests?|prospects?|officials?|regulators?|government)\b/.test(t)){
-    const officials=/\b(public officials?|government officials?|regulators?|civil servants?|politicians?)\b/.test(t) && !/\b(?:no|not any|without|none)\s+(?:\w+\s+){0,2}(?:officials?|regulators?)\b/.test(t);
+  if(c==="marketing" && /\b(clients?|guests?|prospects?|officials?|regulators?|government|ministry|minister)\b/.test(t)){
+    const officials=/\b(public officials?|government officials?|officials?|regulators?|supervisors?|civil servants?|politicians?|ministry|minister|government|central bank|mayor|ambassador|state-owned|public sector)\b/.test(t) && !/\b(?:no|not any|without|none)\s+(?:\w+\s+){0,2}(?:officials?|regulators?|ministry|government)\b/.test(t);
     out.push(officials ? ["w","Gifts and hospitality approval","Public officials may attend: Compliance approves the invitation and the cost per guest before it goes out."]
       : ["i","Gifts and hospitality approval","Client hospitality needs approval under the gifts and entertainment policy."]); }
   if(c==="market-data") out.push(["i","Data licence check","The price and permitted use depend on who uses the data and how: on screen, in applications or models, or passed on to clients."]);
@@ -732,7 +733,10 @@ function userRaw(){ return " "+S.msgs.filter(m=>m.role==="user").map(m=>m.text).
 // a named supplier with a reason is a single-source request, unless the requester wants it in the competition ("include", "invite");
 // "only", "directly" or "no tender" make it one even without a reason
 const SOLE_RE=/\b(?:only|solely|exclusively|directly|sole[- ]source\w*|single[- ]source\w*|no (?:competition|tender|rfp|other (?:suppliers?|vendors?|providers?|offers?|quotes?))|without (?:a |any )?(?:competition|tender|rfp)|(?:nobody|no one|no-one) else|just (?:them|go with|use them|buy from|award))\b/i;
-const INCLUDE_RE=/\b(?:include|including|invite|shortlist|as one of|alongside|among others|in the (?:competition|tender|rfp)|also (?:ask|invite|consider))\b/i;
+const INCLUDE_RE=/\b(?:include|including|invite|shortlist|as one of|alongside|among others|in the (?:competition|tender|rfp)|also (?:ask|invite|consider)|compare|comparison|benchmark|open to (?:others|alternatives)|other options|look at others)\b/i;
+const supplierNames = s => String(s||"").split(/\s*(?:,|;|\/|&|\band\b|\bor\b|\bplus\b)\s*/i).map(x=>x.trim()).filter(x=>x && !/^(?:others?|etc\.?|similar)$/i.test(x));
+// "Workday maybe" is Workday
+const cleanSupplier = v => String(v).replace(/\s*\b(?:maybe|perhaps|probably|possibly|i guess|i think|i suppose|or similar|or so)\b[?.!]?\s*/gi," ").replace(/\s+/g," ").trim();
 function soleSupplier(f){
   if(!hasSupplier(f)) return false;
   const key=String(f.supplier).toLowerCase().split(/\s+/)[0];
@@ -802,7 +806,8 @@ function entityFrom(f){
     .replace(new RegExp(String.raw`\b(?:stored|hosted|kept|held|backed up|processed)\s+(?:in|within|inside)\s+`+place,"gi")," ")
     .replace(new RegExp(String.raw`\bprovider'?s?\s+(?:own\s+)?[\w-]+(?:\s+[\w-]+)?\s+in\s+`+place,"gi")," ");
   const hits=ENTITIES.map(e=>{ const m=[e.re.exec(raw), e.abbr&&e.abbr.exec(raw)].filter(Boolean).sort((a,b)=>a.index-b.index)[0];
-    return m && {id:e.id, i:m.index, named:/^\s*(?:branch|entity|banking entity|office|subsidiary|bank)\b/i.test(raw.slice(m.index+m[0].length)) || /\b(?:branch|entity|office) (?:in|of) (?:the )?$/i.test(raw.slice(Math.max(0,m.index-20),m.index))}; }).filter(Boolean);
+    return m && {id:e.id, i:m.index, named:/^\s*(?:branch|entity|banking entity|office|subsidiary|bank)\b/i.test(raw.slice(m.index+m[0].length)) || /\b(?:branch|entity|office) (?:in|of) (?:the )?$/i.test(raw.slice(Math.max(0,m.index-20),m.index))
+      || /\b(?:our (?:team|teams|department|unit|people|colleagues)|we)\s+(?:sits?|is|are|work|works|(?:is |are )?based|(?:is |are )?located)\s+(?:in|at)\s+(?:the\s+)?$/i.test(raw.slice(Math.max(0,m.index-40),m.index))}; }).filter(Boolean);   // "our team sits in London" names the entity
   if(!hits.length) return null;
   const named=hits.filter(h=>h.named);
   return (named.length?named:hits).sort((a,b)=>a.i-b.i)[0].id;
@@ -917,7 +922,7 @@ function deriveFacts(f){
   derive("quantity", usersFromAudience);
   derive("entity", entityFrom);
   derive("in_house", inHouseFromText);
-  derive("offshore", ff=>{ const e=entityById(ff.entity), loc=String(ff.location||""); if(!e||!loc) return null;
+  derive("offshore", ff=>{ const e=entityById(ff.entity), loc=String(ff.location||"").replace(/\b(?:on[- ]?site|on our premises|at our (?:office|premises|site)s?|visits?)\s+(?:in|at|to)\s+[\w-]+/gi," "); if(!e||!loc.trim()) return null;   // visits to our sites are not offshoring
     if(/offshore|another country|other country/i.test(loc)) return true;
     const places=PLACES.split("|").filter(p=>p.length>2 && new RegExp(`\\b${p}\\b`,"i").test(loc));
     return places.length && places.some(p=>!e.re.test(p) && !(e.abbr&&e.abbr.test(p))) ? true : null; });
@@ -958,7 +963,7 @@ function refresh(){
   S.req = req;
   S.stageIds = STAGES.filter(st=>st.id==="review"||req.some(k=>factsOf(st).includes(k))).map(st=>st.id);
   const order = [...req].sort((a,b)=>(stageOf(a)-stageOf(b))||(posIn(a)-posIn(b)));
-  S.missing = order.filter(k=>!known(f[k]));
+  S.missing = order.filter(k=>!known(f[k]) && !(bundleOf(k) && bundleOf(k).every(([,x])=>givenText(f[x]))));
 }
 /* ---------- answer quality checks (rules; the AI adds its own view on top) ---------- */
 const MONTHS=["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
@@ -995,7 +1000,7 @@ const STOP=new Set("the and for with that this from have has had are was were wi
 const BIZ=/\b(teams?|staff|employees?|users?|customers?|clients?|colleagues|buyers?|requesters?|process\w*|manual\w*|slow\w*|delay\w*|costs?|costly|saving\w*|audit\w*|complian\w*|regulat\w*|risks?|controls?|data|systems?|tools?|platforms?|software|reports?|reporting|deadlines?|suppliers?|vendors?|contracts?|services?|support\w*|business|operations?|operational|finance|financial|legal|hr|payroll|procurement|ict|sales|marketing|quality|errors?|mistakes?|spreadsheets?|excel|emails?|mailbox\w*|sharepoint|lists?|databases?|trackers?|workflows?|approv\w*|growth|growing|capacity|skills?|expertise|experience\w*|budget|projects?|deliver\w*|implement\w*|integrat\w*|migrat\w*|security|licen[cs]\w*|office|offices|sites?|events?|training|workshops?|launch\w*|replac\w*|end of life|out of support|problems?|issues?|fail\w*|missing|lack\w*|improv\w*|reduc\w*|increas\w*|faster|efficien\w*|onboard\w*|requests?|orders?|invoices?|pay\w*|paid|penalt\w*|fines?|revenue|profit\w*|loss\w*|lose|losing|miss\w*|late|complain\w*|frustrat\w*|satisf\w*|reputation\w*|findings?|breach\w*|outages?|downtime|blocked|waiting|chas\w*|impact\w*|consequen\w*|serious|critical|minor|visibility|transparen\w*|scal\w*|volume|demand|productiv\w*|workload|bottleneck\w*|backlog|outdated|legacy|obsolete|expir\w*|renew\w*|guests?|venue|catering|cleaning|maintenance|hardware|laptops?|devices?|network|cloud|hosting|applications?|apps?|api|sso|sign-on|portal|dashboards?|interfaces?|sap|developers?|engineers?|consult\w*|advis\w*|strategy|roadmap|analysis|assessment|governance|resilien\w*|polic\w*|certif\w*|requirement\w*|stakeholders?|management|managers?|department|function\w*|bank\w*|trading|regions?|countries|global|internal\w*|external\w*|in-house|outsourc\w*|vendor|tender\w*|rfp|quotes?|kpis?|sla|uptime|availability|automat\w*|digital\w*|standard\w*|consolidat\w*|central\w*|single|manual)\b/i;
 function contentWords(t){ return (String(t||"").toLowerCase().match(/[a-zäöüß][a-zäöüß-]{2,}/g)||[]).filter(w=>!STOP.has(w)); }
 function offTopic(k, v){
-  if(!TEXT_FACTS.includes(k) || typeof v!=="string") return false;
+  if(!TEXT_FACTS.includes(k) || k==="supplier_reason" || typeof v!=="string") return false;
   const ws=contentWords(v); if(ws.length<4) return false;            // short answers are handled by the vague check
   if(BIZ.test(v) || /\b(?:IT|ICT|HR|ERP|CRM)\b/.test(v)) return false;
   const prior=S.msgs.filter(m=>m.role==="user").slice(0,-1).map(m=>m.text).join(" ")+" "+(FACTS[k]?FACTS[k].q(S.f):"")+" "+catById(S.f.category).name+" "+[S.f.item,S.f.deliverables,S.f.summary].filter(x=>typeof x==="string").join(" ");
@@ -1019,7 +1024,9 @@ function findIssue(changed){
     if(["deliverables","scope_in","acceptance","background","users","current_solution","impact_delay","must_haves","data_details","skills","supplier_reason","renewal_change","item"].includes(k) && typeof v==="string"){
       const tooShort = ["deliverables","scope_in","acceptance","background","users","current_solution","must_haves"].includes(k) ? words(v)<2 : k==="supplier_reason" ? words(v)<3 : false;
       if((VAGUE.test(v.trim()) && !((k==="renewal_change"||k==="impact_delay")&&/no/i.test(v))) || tooShort)
-        return {fact:k, issue:"too vague to act on", message:`Could you say a little more? "${v}" is hard for ${k==="supplier_reason"?"procurement to accept as a reason":"a supplier to work with"}. ${FACTS[k].ex(f)||FACTS[k].q(f)}`.trim()};
+        return k==="current_solution" && !VAGUE.test(v.trim()) && kindOf(f)!=="people"
+          ? {fact:k, issue:"too vague to act on", message:`Thanks, so today it's ${v.trim().replace(/[.!]$/,"")}. And why can't that, or our own team, do the job?`}
+          : {fact:k, issue:"too vague to act on", message:`Could you say a little more? "${v}" is hard for ${k==="supplier_reason"?"procurement to accept as a reason":"a supplier to work with"}. ${FACTS[k].ex(f)||FACTS[k].q(f)}`.trim()};
     }
     // the data question has two parts; "bank data" alone leaves the data protection review without a location.
     // The place must come from the requester's own answer: the AI sometimes fills in the question's example ("stored in the EU").
@@ -1068,17 +1075,20 @@ const QUALITY={warn:15, info:5, incomplete:0.5, partialSection:3, riskSection:8,
 function computeQuality(aiRemarks){
   const f=S.f, route=S.det.route, req=S.req||[], pts=[];
   const label=k=>FACTS[k]?FACTS[k].label:k;
+  // the AI's own wording of an issue ("the user asked…, but the system…") is not for the buyer
+  const iss=fl=>{ const x=String(fl.issue||"").replace(/[.\s]+$/,""); return !x || words(x)>12 || /\b(?:user|system|assistant|the ai|asking|asked)\b/i.test(x) ? "needed a second look" : x; };
   for(const fl of S.flags){
-    if(fl.status==="confirmed") pts.push({lvl:"warn",text:`${label(fl.fact)}: ${fl.issue}. Confirmed by you, so the buyer may ask again.`});
+    if(fl.status==="confirmed") pts.push({lvl:"warn",text:`${label(fl.fact)}: ${iss(fl)}. Confirmed by you, so the buyer may ask again.`});
     else if(fl.status==="flexible") pts.push({lvl:"info",text:`Start date is flexible (${fl.issue}).`});
     else if(fl.status==="corrected") pts.push({lvl:"ok",text:`${label(fl.fact)} clarified during the intake.`});
     else if(fl.status==="unanswered") pts.push({lvl:"warn",text:`${label(fl.fact)}: no usable answer given.`});
   }
   const swCount=k=>k==="quantity"&&f.demand_type==="software"&&NEW_DEMAND(route);
-  req.filter(k=>(f[k]==="Not given"||f[k]==="unsure") && !S.flags.some(x=>x.fact===k&&x.status==="unanswered")).forEach(k=>pts.push(swCount(k)?{lvl:"info",text:"Number of users: to confirm with suppliers."}:{lvl:"warn",text:`${label(k)}: still to be clarified.`}));
+  req.filter(k=>(f[k]==="Not given"||f[k]==="unsure") && k!=="budget_approved" && !S.flags.some(x=>x.fact===k&&x.status==="unanswered")).forEach(k=>pts.push(swCount(k)?{lvl:"info",text:"Number of users: to confirm with suppliers."}:{lvl:"warn",text:`${label(k)}: still to be clarified.`}));
   if(givenText(f.data_details) && !saysWhere(f.data_details)) pts.push({lvl:"warn",text:"Data involved: where the data is stored is not given."});
   if(f.value_is_estimate && !["catalogue"].includes(route)) pts.push({lvl:"info",text:`The budget of ${money(Number(f.value))} is an estimate.`});
-  if(route==="sourcing" && f.budget_approved && f.budget_approved!=="yes") pts.push({lvl:"warn",text:"Budget not yet approved. Sourcing can only start once it is."});
+  if(route==="sourcing" && f.budget_approved==="unsure") pts.push({lvl:"info",text:"Whether the budget is approved isn't known yet. Sourcing can only start once it is."});
+  else if(route==="sourcing" && f.budget_approved && f.budget_approved!=="yes") pts.push({lvl:"warn",text:`Budget ${f.budget_approved==="partly"?"only partly":"not yet"} approved. Sourcing can only start once it is.`});
   if(known(f.needed_by) && !S.flags.some(x=>x.fact==="needed_by")){ const d=parseWhen(f.needed_by); if(d){ const days=(d-new Date())/864e5; if(days<(LEAD_DAYS[route]||0)) pts.push({lvl:"info",text:`Tight timeline: ${CHANNELS[route].name} usually takes ${CHANNELS[route].days} working days.`}); } }
   (aiRemarks||[]).filter(x=>typeof x==="string"&&x.trim()&&!/^(none|n\/a|no (issues|concerns|remarks)|nothing)\b/i.test(x.trim())).slice(0,2).forEach(x=>pts.push({lvl:"info",text:x.trim().replace(/\.?$/,".")}));
   const answered=req.filter(k=>known(f[k])&&f[k]!=="Not given"&&f[k]!=="unsure").length, complete=req.length?Math.round(answered/req.length*100):100;
@@ -1176,6 +1186,8 @@ Your job each turn:
    When ok is false, "reply" must be only a short, friendly follow-up that names the issue and asks to confirm or correct it. Do not ask the next item in that case.
 7. Corrections: if the user changes something they said or confirmed earlier (for example a different category, budget, number of users, start date, duration, supplier, provisioning legal entity, location or title), put only the corrected items in "corrections" (same keys as facts; category as a category id) and NOT in "facts". Set "answers_question" false when the message does not also answer your last question; then do not record anything for that question.
 6. If pending_check is set, the user is answering your earlier check on that item: update the fact if they corrected it, keep it if they confirmed it.
+8. If the user asks you a question instead of answering (for example "are they any good?" or "what does that mean?"), answer it briefly and honestly in "reply" (say so if you don't know), record no facts, set "answers_question" false, and do not ask the next item.
+9. Record only what the user said or accepted. Never fill a fact with "unknown", "none", "not specified" or a guess; leave it out. Never record a question the user asked as a fact.
 Keep the conversation light: ask only what is in still_needed, and never ask about cost centres, payment models, subcontractors, certifications, service levels, ownership of work or evaluation weights unless the user raises them.
 
 Fact keys:
@@ -1204,7 +1216,8 @@ At the check step (asking = confirm_derived) the user confirms or corrects facts
 Suggested answers: items marked suggest=true in still_needed are answered by suggestion. When you ask one, put a concrete suggestion tailored to this request in "suggestion" (one plain string, never an object or a list)
 (based on what the user said and on what is typical at a large international bank for this kind of service, using the domain notes; specific, not generic; never invent facts about this organisation; plain words, at most 4 points per line, separated by semicolons), and in "reply" say briefly that this is your suggestion, show it, and ask whether it fits or what to change.
 When an item has "lines", the suggestion must be exactly those lines, each "Label: text" on its own line, in that order.
-Never record a suggestion as a fact yourself; the app does that when the user accepts it. If the user changes a suggestion, record their version of that item.
+Never record a suggestion as a fact yourself; the app does that when the user accepts it. If the user changes a suggestion, record their version of that item; when they change only part of a line, record the whole line with their change applied.
+A suggestion never states facts about this request that the user did not give (for example who attends or that no public officials come) and never contains placeholders such as "X%".
 Combined questions: the "background" question also asks the impact of delay, so record background and impact_delay from that one answer.
 The software "must_haves" question also asks how success is judged, so record must_haves and acceptance from that one answer. evaluation_priority, supplier_requirements, current_supplier ("None" if new),
 volume, support_needs, data_details (which data and where stored), criticality (what happens if it stops; also set critical_service true if clients or regulated activity are hit),
@@ -1274,7 +1287,7 @@ const CORR_FIELDS=[
   {k:"title",    re:/\b(working title|title)\b/i}
 ];
 const CHANGE_VERB=/\b(change|correct|update|amend|switch|replace|set)\b/i;
-const CHANGE_HINT=/\b(should be|should read|instead|rather than|is wrong|was wrong|i meant|i mean|sorry|actually|my mistake|typo|not\s+[^,.;]{1,30}\s*(?:but|,))/i;
+const CHANGE_HINT=/\b(should be|should read|instead|rather than|is wrong|was wrong|i meant|i mean|sorry|actually|my mistake|typo|is now|are now|now is|has (?:gone up|gone down|risen|dropped|increased|decreased|changed) to|went (?:up|down) to|increased to|reduced to|changed to|not\s+[^,.;]{1,30}\s*(?:but|,))/i;
 // category (and Level 4 entry) named in a piece of text
 function catFromText(t){
   const l=" "+String(t).toLowerCase()+" "; let best=null, score=0;
@@ -1418,6 +1431,85 @@ async function handleUser(text){
   finally{ if(S.cid===cid){ S.busy=false; render(); } }
 }
 // one message, step by step (described in How it works, section 4)
+// a question back instead of an answer (described in How it works): answered, nothing recorded, the same question asked again with its buttons
+const ASK_SUGGEST=/^(?:(?:so|ok(?:ay)?|hmm+|well|no idea|not sure)[,.]?\s+)?(?:what (?:would|do|should|could) you (?:suggest|recommend|propose|advise)|what do you (?:think|recommend)|any (?:suggestions?|ideas|recommendations?)|(?:can|could) you (?:suggest|propose|recommend|help)|(?:you|u) (?:decide|choose|pick|tell me)|(?:it'?s )?up to you|your call|what do (?:other|most) (?:banks|companies|firms|people|teams) (?:usually |typically |normally )?(?:need|do|use|want|have|pick)|what(?:'s| is) (?:typical|usual|normal|common|standard)|give me (?:an? |some )?(?:examples?|suggestions?|ideas?)|suggest (?:something|one))\b/i;
+const DELEGATE=/^(?:(?:you|u) (?:decide|choose|pick)|(?:it'?s )?up to you|your call|whatever you (?:suggest|think)|you know best)[.!]?$/i;
+const ASK_WHY=/^(?:but\s+|and\s+|ok(?:ay)?,?\s+)?(?:why (?:do|does|would|should|is|are|did|must) (?:you|that|this|it|we|i)\b|why (?:that|this)\b|what(?:'s| is) (?:that|this|it) for|what do you need (?:that|this|it|all this) for|is (?:this|that|it) (?:really )?(?:necessary|needed|required|important)|do (?:i|we) (?:really )?(?:have|need) to|why (?:ask|asking))/i;
+const ROUTE_PUSH=/\b(?:(?:no|don'?t want|skip|avoid|without) (?:an? |the )?(?:rfp|tender|competition|three quotes|quotes)|(?:just|directly) (?:book|buy|order|hire|pick|go with|choose)|book (?:it )?directly|why (?:an? |the )?(?:rfp|tender|three quotes|competition)|can'?t we just)\b/i;
+const QUESTION_BACK=/^(?:but\s+|and\s+|so\s+)?(?:what|why|how|who|which|are|is|can|could|would|do|does|should|will|isn'?t|aren'?t)\b[^?]*\?\s*$/i;
+function metaKind(text, k){
+  const t=text.trim();
+  if(k==="confirm_derived") return /\bwhy\b[^?]*\?/i.test(t) && !/\b(?:wrong|incorrect|not right|change|\d+\s+is)\b/i.test(t) ? "whycheck" : null;
+  if(!k || S.pending || words(t)>30) return null;
+  if(ROUTE_PUSH.test(t) && S.det) return "route";
+  if(ASK_WHY.test(t)) return "why";
+  if(ASK_SUGGEST.test(t) || (DELEGATE.test(t) && !isSug(k))) return "suggest";
+  if(!aiReady() && QUESTION_BACK.test(t) && GROUNDED.concat(["background"]).includes(k)) return "question";   // with AI, the AI answers these
+  return null;
+}
+const WHY_ASK={background:"The problem and what a delay would cost are the first things approvers and suppliers read.", current_solution:"Procurement needs to know why the bank can't do this itself before it pays a provider.",
+  audience_fn:"Suppliers size and price the service by who uses it.", value_props:"Approvers weigh the request by its benefits.", scope_in:"Suppliers price exactly what is listed here; anything missing becomes a change request later.",
+  scope_out:"Clear exclusions stop suppliers from pricing work you don't need.", acceptance_pack:"It decides when the work counts as done and can be paid.", qualifications:"Offers are compared on the people the provider puts forward.",
+  kpis_pack:"Success measures are how the provider is judged after the contract starts.", governance:"It sets how problems are raised before they become disputes.", needed_by:"The start date decides how much time sourcing has.",
+  location:"Where the work happens decides site access, offshoring and some legal checks.", supplier:"A named supplier changes how the competition is run.", supplier_reason:"Without a reason, a purchase this size needs competing offers.",
+  personal_data:"Access to data, systems or money decides which risk reviews are needed.", entity:"The legal entity goes on the contract and into the register of third-party arrangements.", deps_pack:"Suppliers price what we must provide into their offer.",
+  must_haves:"Suppliers are scored against the must-haves.", tech_service:"Technology services need an ICT risk review (DORA).", in_house:"This decides whether the outsourcing rules apply."};
+// "why is this outsourcing?" at the check step: the reasons the rules used
+function whyCheck(text){
+  const f=S.f, o=outsourcing(f), t=text.toLowerCase(), out=[];
+  if(/outsourc/.test(t) || !/technolog|ict|dora|critical|important|offshor|entity|access/.test(t)) out.push(`Outsourcing: ${o.result}. ${o.reasons.join(" ")}`);
+  if(/technolog|ict|dora/.test(t)) out.push(yes(f.tech_service) ? `It counts as an ICT service because the provider supplies or runs technology: ${ictType(f)}.` : "No technology service is involved.");
+  if(/critical|important/.test(t)) out.push(isImportant(f) ? "Your answers on impact point to a critical or important function; the review confirms it." : "Nothing points to a critical or important function.");
+  if(/offshor/.test(t)) out.push(isOffshore(f) ? "The work happens outside the country of the entity that signs." : "The work happens in the entity's country.");
+  return out.join(" ")+" These are flags for the reviews, not final decisions. If one of the points is wrong, tell me which.";
+}
+function routeOptions(){
+  const r=S.det&&S.det.route, T=CONFIG.thresholds;
+  return r==="sourcing" ? `Up to ${money(T.quickQuoteMax)} you could collect three quotes yourself. If only one supplier can do it, tell me why, and procurement can approve a single source. If the value or the need is different, just say so.`
+    : r==="quote" ? "Three quotes keep the price fair. If only one supplier can do it, tell me why, and procurement can approve a single source."
+    : r==="contract" ? "Using the existing contract is the quickest way. If you'd rather look wider, just say so." : "";
+}
+// a suggestion for a question that has none of its own: the AI's, or else the question's example
+async function adhocSuggest(k, cid){
+  if(aiReady()){ try{ const out=await callLLM(suggestSystem(k),[{role:"user",content:suggestUser(k)}]); guard(cid); const sg=tidySuggestion(k, out&&out.suggestion||""); if(sg && words(sg)>=3) return sg; }catch(e){ if(e instanceof Stale) throw e; } }
+  return cap1(exampleFor(k));
+}
+async function metaTurn(kind, text, cid, aiAnswer, display, posted){
+  const k=S.lastAsked, F=FACTS[k], f=S.f;
+  if(!posted) S.msgs.push({role:"user",text:display||text}); S.choices=[]; S.busy=true; render();
+  let lead="";
+  if(kind==="why") lead=`Good question. ${F.why?F.why(f):WHY_ASK[k]||"It goes into the service description and the sourcing request, so suppliers can price it and procurement can compare offers."} If you don't know yet, just say so or skip it for now.`;
+  else if(kind==="route") lead=`${S.det.why} ${routeOptions()}`;
+  else if(kind==="whycheck") lead=whyCheck(text);
+  else if(kind==="question") lead=aiAnswer||"Good question. I can't answer that here; the buyer can when they pick this up.";
+  else if(kind==="suggest"){
+    if(isSug(k)) lead="My suggestion is below. Use it as it is, or tell me what to change.";
+    else if(CLOSED.includes(k) || F.choices) lead=`This one depends on your request, so I can't pick it for you. ${WHY_ASK[k]||""} Choose the closest answer, or say "not sure".`.replace(/\s+/g," ");
+    else {
+      const sg=await adhocSuggest(k, cid); guard(cid);
+      if(sg){ S.adhoc={k, sg}; S.adhocShown=sg;
+        S.msgs.push({role:"assistant",text:`Here's a suggestion, based on what you told me and what is typical at a large bank:\n${sg}\n\nUse it as it is, or tell me what to change.`, ask:k});
+        S.choices=["Use this suggestion","Skip for now"]; S.lastAsked=k; S.busy=false; render(); return; }
+      lead="I don't have a good suggestion for this one.";
+    }
+  }
+  S.busy=false;
+  await askNext(k, lead, cid);
+  render();
+}
+// a remark beside the answer ("btw …") or another purchase ("also we need 10 laptops") does not belong in the answer
+function splitAside(text){
+  const parts=String(text).split(/(?<=[.!?;])\s+|\s+(?=\b(?:btw|by the way|fyi)\b)/i), keep=[], notes=[];
+  for(const x of parts){
+    if(/^(?:oh\s+and\s+)?(?:btw|by the way|fyi|side note|unrelated|random(?:ly)?)\b/i.test(x.trim())){ notes.push(`I've kept "${x.trim().replace(/^(?:oh\s+and\s+)?(?:btw|by the way|fyi|side note|unrelated|randomly|random)[,:]?\s*/i,"").replace(/[.!]$/,"")}" out of this answer, as it isn't part of it.`); continue; }
+    const m=x.match(/\b(?:also|and|plus|separately)[,]?\s+(?:we|i)\s+(?:also\s+)?need\s+(.+)$/i) || x.match(/\bwe also need\s+(.+)$/i);
+    const c=m && bestCategory(" "+m[1].toLowerCase()+" ");
+    if(m && c && c.id!==S.f.category){ notes.push(`${cap1(m[1].replace(/[.!]$/,""))} is a separate purchase (${lcFirst(c.name)}). Start a new request for it when we're done; I've kept it out of this one.`);
+      const rest=x.slice(0,m.index).replace(/[\s,.;]+(?:also|and|plus)?\s*$/i,"").trim(); if(rest) keep.push(rest); continue; }
+    keep.push(x);
+  }
+  return {main:keep.join(" ").trim(), notes};
+}
 // "use the example (given)", "the example is fine": the requester takes the example the question showed
 const USE_EXAMPLE=/^(?:(?:please|ok(?:ay)?|yes|just|then)[,]?\s+)?(?:use|take|go with|keep|accept|pick)\s+(?:the\s+|your\s+|that\s+|this\s+|an?\s+)?examples?(?:\s+(?:given|you gave|above|provided|shown|you (?:mentioned|suggested)))?[.!]?$|^(?:the\s+|your\s+|that\s+)?examples?(?:\s+(?:given|above))?\s+(?:is|are|sounds?|looks?)\s+(?:fine|good|right|ok(?:ay)?|perfect)[.!]?$|^(?:same as|like|as in)\s+(?:the|your)\s+example[.!]?$/i;
 // the example in a question, as the requester saw it: "such as processing feeds, providing alerts or reporting", "for example: \"…\""
@@ -1476,6 +1568,16 @@ async function handleTurn(text, cid, opts={}){
       opts.display=text; opts.corrDone=applyChanges(corr.changes); text=corr.rest;
     }
   }
+  // an ad-hoc suggestion the requester accepts becomes the answer; "you decide" on a suggestion accepts it
+  if(S.adhoc){ const a=S.adhoc; S.adhoc=null;
+    if(a.k===S.lastAsked && (ACCEPT.test(text.trim())||USE_EXAMPLE.test(text.trim())||DELEGATE.test(text.trim()))){ opts.display=opts.display||text; text=a.sg; } }
+  if(S.lastAsked && isSug(S.lastAsked) && !S.pending && DELEGATE.test(text.trim())){ opts.display=opts.display||text; text="Use this suggestion"; }
+  if(!opts.display){ const mk=metaKind(text, S.lastAsked); if(mk) return metaTurn(mk, text, cid); }
+  // "btw our CFO loves jazz", "also we need 10 laptops": kept out of this answer, and said so
+  if(S.lastAsked && S.det && !S.pending && S.lastAsked!=="confirm_derived"){
+    const sp=splitAside(text);
+    if(sp.notes.length && words(sp.main)>=1){ opts.display=opts.display||text; opts.asideNotes=sp.notes; text=sp.main; }
+  }
   // "use the example" answers with the example the question showed; a copy of an earlier question's wording answers that question
   if(S.lastAsked && !S.pending && !opts.silent && S.lastAsked!=="confirm_derived"){
     const echo=echoedAsk(text);
@@ -1496,12 +1598,15 @@ async function handleTurn(text, cid, opts={}){
   const asked=S.lastAsked; if(asked) S.asked[asked]=(S.asked[asked]||0)+1;
   const um={role:"user",text:opts.display||text}; if(!opts.silent) S.msgs.push(um); S.choices=[]; S.busy=true;
   if(opts.corrDone&&opts.corrDone.length) S.msgs.push({role:"assistant",kind:"sys",text:`Changed: ${opts.corrDone.join("; ")}.`});
+  (opts.asideNotes||[]).forEach(n=>S.msgs.push({role:"assistant",kind:"sys",text:n}));
   render();
   const before={...S.f};
   // the user is answering a check we raised on an earlier answer
   const pend=S.pending; S.pending=null;
   const t=text.trim().toLowerCase();
-  const keepIt = pend && pend.flip ? /^(no|nope|none|not)\b/.test(t) : pend && pend.kind!=="offtopic" && (/^(yes|yep|yeah|correct|that'?s (right|correct)|right|confirmed?|it is|keep( it)?( as it is)?|as i said|it'?s fixed|fixed|hard deadline|that'?s fine|fine)\b/.test(t) || /is right$/.test(t)) && !/\d/.test(t.replace(/^[^\d]*right/,"")) && words(text)<=6;
+  const keepIt0 = pend && pend.flip ? /^(no|nope|none|not)\b/.test(t) : pend && pend.kind!=="offtopic" && (/^(yes|yep|yeah|correct|that'?s (right|correct)|right|confirmed?|it is|keep( it)?( as it is)?|as i said|it'?s fixed|fixed|hard deadline|that'?s fine|fine)\b/.test(t) || /is right$/.test(t)) && !/\d/.test(t.replace(/^[^\d]*right/,"")) && words(text)<=6;
+  const vagueReply = pend && /vague|thin/.test(pend.issue+" "+pend.kind) && (VAGUE.test(t) || /^(?:k|kk|sure|dunno|fine|nothing more|that'?s it|that'?s all)\.?$/.test(t));   // "ok" keeps "Old system is bad", not "ok"
+  const keepIt = keepIt0 || vagueReply;
   if(pend && !keepIt && pend.kind!=="date") S.f[pend.fact]=null;
   let reply=null, choices=[], complete=false, note=null, aiAsking=null, aiCheck=null, aiSuggestion=null, aiScore=null;
   if(aiReady()){
@@ -1515,7 +1620,17 @@ async function handleTurn(text, cid, opts={}){
         if(done.length && out.answers_question===false){ if(asked) S.asked[asked]=Math.max(0,(S.asked[asked]||1)-1); S.pending=pend; await afterChanges(done, cid); S.busy=false; render(); return; }
         if(done.length) S.msgs.push({role:"assistant",kind:"sys",text:`Changed: ${done.join("; ")}.`});
       }
-      if(!(pend && keepIt)) mergeFacts(out.facts||{}); else { const nf={...(out.facts||{})}; delete nf[pend.fact]; mergeFacts(nf); }
+      // the AI read a question back as "not an answer": answer it and ask the same question again
+      if(out.answers_question===false && !(aiCorr && Object.keys(aiCorr).length) && !pend && asked && asked!=="confirm_derived" && !known((out.facts||{})[asked]) && cleanReply(out.reply||"")){
+        if(S.asked[asked]) S.asked[asked]--; return metaTurn("question", text, cid, cleanReply(out.reply).replace(/\s*[^.!?]*\?\s*$/,"").trim(), null, true);
+      }
+      const nf=screenAIFacts(out.facts, asked, text);
+      if(pend && keepIt) delete nf[pend.fact];
+      const was={value:S.f.value, quantity:S.f.quantity, supplier:S.f.supplier};
+      mergeFacts(nf);
+      // a budget, quantity or supplier changed in passing ("oh and the budget is now 350k") is said out loud
+      const moved=Object.keys(was).filter(k=>k!==asked && known(was[k]) && !isTBD(was[k]) && known(S.f[k]) && String(was[k])!==String(S.f[k]));
+      if(moved.length) S.msgs.push({role:"assistant",kind:"sys",text:`Changed: ${moved.map(k=>`${FACTS[k].label.toLowerCase()} from ${show(k,was[k])} to **${show(k,S.f[k])}**`).join("; ")}.`});
       if(asked && !known(S.f[asked]) && CLOSED.includes(asked)){ const v=readAnswer(asked,text); if(known(v) && v!=="unsure"||/sure|know/i.test(text)) S.f[asked]=v; }
       if(!(pend && keepIt)) offlineRead(text, asked);
       reply=out._raw?null:cleanReply(out.reply||null); if(reply && !/\?/.test(reply) && !out.complete) reply=null; choices=out.choices||[]; complete=!!out.complete; aiAsking=out.asking||null;
@@ -1541,7 +1656,7 @@ async function handleTurn(text, cid, opts={}){
     const free={kpis_pack:"kpis"}[asked]; if(free){ S.f[free]=String(S.f[asked]); } else setFromSuggestion(asked, String(S.f[asked])); }
   // "skip": the point is recorded as to be determined and listed as an open point
   const skipped = asked && !pend && !["need","confirm_derived"].includes(asked) && /^(skip|skip (?:for now|this|it)|pass)[.!]?$/i.test(text.trim());
-  if(skipped){ S.f[asked]="Not given"; if(bundleOf(asked)) bundleOf(asked).forEach(([,k])=>{ if(!known(S.f[k])) S.f[k]="Not given"; }); }
+  if(skipped){ S.f[asked]="Not given"; if(bundleOf(asked)) bundleOf(asked).forEach(([,k])=>{ if(!known(S.f[k]) || JSON.stringify(before[k])!==JSON.stringify(S.f[k])) S.f[k]="Not given"; }); }
   // the check step: confirm what the rules worked out, or correct it in plain words
   if(asked==="confirm_derived" && !pend){
     const tt=text.trim();
@@ -1565,7 +1680,14 @@ async function handleTurn(text, cid, opts={}){
   }
   // close the check: keep, correct or (for dates) mark as flexible
   if(pend){
-    if(pend.kind==="date"){
+    if(pend.issue==="date in the past"){
+      // a new date in the reply (or one the AI applied) replaces it; a start that has passed can't be kept, so the buyer agrees one
+      const ok=d=>d && daysTo(d)>=-1, aiDate=S.f.needed_by!==pend.prev && ok(parseWhen(S.f.needed_by)) ? S.f.needed_by : null;
+      const nd=aiDate || (ok(parseWhen(text)) ? whenOnly(text) : null);
+      if(nd){ S.f.needed_by=cap1(nd); S.flags.push({fact:pend.fact,issue:pend.issue,status:"corrected"}); }
+      else { S.f.needed_by="To be determined"; S.flags.push({fact:pend.fact,issue:pend.issue,status:"unanswered"});
+        S.msgs.push({role:"assistant",kind:"sys",text:`A start of ${String(pend.prev).replace(/^(?:by|from|on|in)\s+/i,"")} has already passed, so I've recorded the start as to be determined. The buyer will agree a date with you.`}); }
+    } else if(pend.kind==="date"){
       // a new date the AI already applied wins; otherwise the date in the reply, without "ok then" around it
       const aiDate = S.f.needed_by!==pend.prev && parseWhen(S.f.needed_by) ? S.f.needed_by : null;
       const nd = aiDate || (parseWhen(text) && !/fixed|can move|flexible|later/.test(t) ? whenOnly(text) : null);
@@ -1610,10 +1732,10 @@ async function handleTurn(text, cid, opts={}){
   if(changed.some(k=>["day_rate","duration","headcount","deliverables","quantity"].includes(k)) && known(S.f.value) && !changed.includes("value")) changed.push("value");
   if(prevRoute && S.det && prevRoute!==S.det.route && known(S.f.needed_by) && !changed.includes("needed_by")) changed.push("needed_by");
   let issue = findIssue(changed);
-  if(issue && issue.kind!=="offtopic" && issue.kind!=="where" && S.challengeCount>=3) issue=null;   // the data location is always asked
+  if(issue && issue.kind!=="offtopic" && issue.kind!=="where" && issue.fact!=="needed_by" && S.challengeCount>=3) issue=null;   // the data location and the timing are always asked
   const aiOff = aiCheck && AI_OFF_RE.test(aiCheck.issue||"");
   // only for the question just asked: an off-topic verdict on another item would say "doesn't answer my question" and ask something else
-  if(!issue && aiOff && aiCheck.fact===asked && FACTS[asked] && !S.offChecked[asked] && asked!==(pend&&pend.fact)) issue=offTopicIssue(asked);
+  if(!issue && aiOff && aiCheck.fact===asked && asked!=="supplier_reason" && FACTS[asked] && !S.offChecked[asked] && asked!==(pend&&pend.fact)) issue=offTopicIssue(asked);
   if(!issue && aiCheck && S.challengeCount<3 && changed.includes(aiCheck.fact) && !S.challenged[aiCheck.fact] && FACTS[aiCheck.fact])
     issue={fact:aiCheck.fact, issue:String(aiCheck.issue||"needs a second look").slice(0,140), message:String(cleanReply(aiCheck.follow_up||"")||reply||"").trim()||`Could you double-check this? ${FACTS[aiCheck.fact].q(S.f)}`};
   const ansScore = skipped ? null : asked==="confirm_derived" ? null : answerScore(asked, text, issue, sugResult, aiScore, pend);
@@ -1621,8 +1743,10 @@ async function handleTurn(text, cid, opts={}){
   if(issue){
     if(issue.kind==="offtopic") S.offChecked[issue.fact]=true; else if(issue.kind==="thin"){ S.thinChecked[issue.fact]=true; S.thinCount++; } else { S.challenged[issue.fact]=true; S.challengeCount++; }
     S.pending={fact:issue.fact, prev:S.f[issue.fact], issue:issue.issue, kind:issue.kind||"", flip:!!issue.flip};
-    S.msgs.push({role:"assistant",text:issue.message, check:true});
-    S.choices=issue.choices||[]; S.lastAsked=issue.fact;
+    const exF=FACTS[issue.fact]&&FACTS[issue.fact].ex(S.f), short=words(issue.message)<14 && exF && !/for example|such as|e\.g\./i.test(issue.message);
+    S.msgs.push({role:"assistant",text:issue.message+(short?" "+exF:""), check:true});
+    const fc=FACTS[issue.fact]&&FACTS[issue.fact].choices, fcs=typeof fc==="function"?fc(S.f):fc;
+    S.choices=issue.choices||(fcs?[...fcs]:(S.det&&NEW_DEMAND(S.det.route)&&!CLOSED.includes(issue.fact)?["Skip for now"]:[])); S.lastAsked=issue.fact;
     S.busy=false; render(); return;
   }
 
@@ -1631,7 +1755,7 @@ async function handleTurn(text, cid, opts={}){
   // the route changed and needs more stages: say why, briefly
   const added=S.stageIds.filter(id=>!prevStages.includes(id)&&id!=="review");
   if(prevStages.length && added.length && S.msgs.filter(m=>m.role==="user").length>1)
-    S.msgs.push({role:"assistant",kind:"sys",text:`This is now ${CHANNELS[S.det.route].name.replace(/^New demand: /,"new demand with ")}, so I've added a few questions on ${added.map(id=>stageById(id).name.toLowerCase()).join(" and ")}.`});
+    S.msgs.push({role:"assistant",kind:"sys",text:`This is now ${CHANNELS[S.det.route].name.replace(/^New demand: /,"new demand with ")}, so I've added a few questions on ${listJoin(added.map(id=>stageById(id).name.toLowerCase()))}.`});
 
   if(!S.missing.length){
     const lead = S.completed ? "Updated. Here are the revised service description and route." : S.improveRound ? "Thanks, that makes it stronger. I'm updating the service description now." : `${complete && reply && !aiCheck ? reply.replace(/\s*$/,"") : wrapUp()} I'm writing the service description now. Below it you'll find the route I recommend and the full document. Please check them before you submit.`;
@@ -1645,9 +1769,10 @@ async function handleTurn(text, cid, opts={}){
     let msg;
     if(next==="confirm_derived"){ msg=checkMessage(); }
     else if(isSug(next)){
-      const sg = aiAskedOk && aiSuggestion ? tidySuggestion(next, aiSuggestion) : "";
+      let sg = aiAskedOk && aiSuggestion ? tidySuggestion(next, aiSuggestion) : "";
+      if(sg && bundleOf(next) && !bundleOf(next).every(([L])=>new RegExp(`(?:^|\\n)\\s*${L.replace(/[/]/g,"\\/").replace(/[()]/g,"\\$&")}\\s*:`,"i").test(sg))) sg="";   // every line, as "Label: text"
       if(sg && words(sg)>=3){ S.suggest[next]=sg;
-        const ack=(String(reply||"").split(/(?<=[.!?])\s+/)[0]||"").trim(), useAck=ack && !/suggest|\?/i.test(ack) && words(ack)<=25;
+        const ack=(String(reply||"").split(/(?<=[.!?])\s+(?=[A-Z])/)[0]||"").trim(), useAck=ack && /[.!]$/.test(ack) && !/suggest|template|e\.g\.|:|\?/i.test(ack) && words(ack)<=25;
         msg=`${useAck?ack+" ":""}${FACTS[next].q(S.f)}\n\nMy suggestion, based on what you told me:\n${bundleOf(next)?sg:sg.replace(/\.?$/,".")}\n\nUse it as it is, or tell me what to change.`; }
       else { delete S.suggest[next]; const ai=await aiSuggest(next, cid); if(ai) S.suggest[next]=ai; msg=offlineQuestion(next, prevRoute, stageChanged); }
     } else msg = aiAskedOk ? reply : offlineQuestion(next, prevRoute, stageChanged);
@@ -1681,7 +1806,8 @@ function offerImprovement(){
   if(S.improveRound){ S.msgs.push({role:"assistant",text:`It's now rated **${q.rating} (${q.score}/100)**. The remaining points are listed in the quality check; the buyer will see them too.`}); return; }
   const keys=improvementTargets(); if(!keys.length) return;
   S.offerImprove=keys;
-  S.msgs.push({role:"assistant",text:`This would be rated **${q.rating} (${q.score}/100)**, below the ${min} a strong sourcing request needs. ${keys.length===1?"One point":`${keys.length} points`} would strengthen it:\n${keys.map(k=>"• "+FACTS[k].label).join("\n")}\n\nShall we go through ${keys.length===1?"it":"them"}? ${keys.length>4?"It takes a few minutes.":"It only takes a minute."}`});
+  const open=q.points.filter(x=>x.lvl==="warn").length;
+  S.msgs.push({role:"assistant",text:`This would be rated **${q.rating} (${q.score}/100)**, below the ${min} a strong sourcing request needs.${open>keys.length?` The quality check lists ${open} open points; I can help with ${keys.length===1?"this one":"these"} now:`:` ${keys.length===1?"One point":`${keys.length} points`} would strengthen it:`}\n${keys.map(k=>"• "+FACTS[k].label).join("\n")}\n\nShall we go through ${keys.length===1?"it":"them"}? ${keys.length>4?"It takes a few minutes.":"It only takes a minute."}`});
   S.choices=["Yes, let's improve it","Submit anyway"];
 }
 async function startImprovement(text){
@@ -1734,7 +1860,31 @@ function normFact(k,v){
     if(k==="value"){ const m=parseMoney(v); if(m!=null) return m; }   // "€400k" is 400,000, not 400
     const n=parseFloat(String(v).replace(/[^\d.]/g,"")); return isNaN(n)?String(v):n; }
   if(k==="budget_approved" && typeof v==="boolean") return v?"yes":"no";
+  if(k==="budget_approved" && /not sure|unsure|unknown|no idea|don.?t know/i.test(String(v))) return "unsure";
+  if(k==="supplier" && typeof v==="string") return cleanSupplier(v)||v;
   return typeof v==="string"?v:String(v);
+}
+// what the AI may record (described in How it works): what the requester said, in their words or by accepting a suggestion.
+// Gaps filled with "unknown" or "none", classification flags and details nobody gave are dropped; the rules work those out.
+const PLACEHOLDER=/^(?:unknown|unsure|not sure|n\/?a|none|null|nil|tbd|tbc|to be (?:determined|confirmed|defined)|not (?:specified|provided|given|stated|known|mentioned|applicable|defined)|skip(?:ped)?|-+|\?+)\.?$/i;
+const AI_FLAGS=["important_fn","critical_service","in_house","ongoing","offshore","ict_outsourcing","wants_renewal","decline_contract"];
+const GROUNDED=["background","impact_delay","users","functions","benefits","usp","reg_benefits","current_solution","must_haves","deliverables","scope_in","scope_out","acceptance","acc_review","qualifications","kpis","service_levels","other_risks","data_details","our_deps","prov_assumptions","support_model","service_hours","tools","gov_meetings","reporting","change_mgmt","escalation","supplier_reason","skills","role","volume","criticality"];
+const stem = w => w.replace(/(?:ies|es|s|ing|ed)$/,"").slice(0,5);
+function screenAIFacts(nf, asked, text){
+  const out={}, own=new Set([asked, ...((asked&&bundleOf(asked))||[]).map(([,x])=>x)]), first=!S.det;
+  const heard=[userText(), text, ...S.msgs.filter(m=>m.role==="assistant"&&typeof m.text==="string").slice(-2).map(m=>m.text), asked&&S.suggest[asked]||"", S.adhocShown||""].join(" ");
+  const said=new Set(contentWords(heard).map(stem));
+  for(const [k,v] of Object.entries(nf||{})){
+    if(v===null||v===undefined||v==="") continue;
+    const sv=Array.isArray(v)?v.join(" "):v&&typeof v==="object"?Object.values(v).join(" "):String(v);
+    if(bundleOf(k) || k==="confirm_derived" || k==="need") continue;                         // a bundle question is answered by its lines, which the app sets
+    if(["category","demand_type","l4","l4_match","l4_reason"].includes(k) && !first && asked!=="confirm_derived") continue;   // later changes come as corrections
+    if(PLACEHOLDER.test(sv.trim()) && !own.has(k)) continue;                                  // never a gap filled with "unknown" or "none"
+    if(AI_FLAGS.includes(k) && asked!=="confirm_derived" && !own.has(k)) continue;           // classification: the rules, or the requester at the check step
+    if(GROUNDED.includes(k)){ const w=contentWords(sv); if(w.length && w.filter(x=>said.has(stem(x))).length/w.length<0.5) continue; }   // free text comes from what was said
+    out[k]=v;
+  }
+  return out;
 }
 function mergeFacts(nf){
   for(const k of Object.keys(BLANK_FACTS)){
@@ -1938,7 +2088,7 @@ const DOMAINS=[
    important:null, deps:"Access to the finance system and invoice inbox; approval workflows; a named Finance contact",
    notes:"Usually run from a finance shared-service centre; bank details make fraud controls important."},
   {ops:true, id:"hrops", name:"HR operations and payroll",
-   re:/\b(payroll|hr operations|hr system|hris|recruitment process|employee records|benefits administration|onboarding of (?:staff|employees))\b/i,
+   re:/\b(payroll|hr operations|recruitment process|benefits administration|onboarding of (?:staff|employees))\b/i,
    aud:"HR operations and payroll teams, and all employees in the countries covered", fun:"HR (process owner), Finance for payroll accounting, and Information Security",
    ben:"accurate and on-time pay; less manual work; better employee experience", kpi:"payroll accuracy; payroll delivered on time; employee queries closed on time",
    sl:"Payroll 100% on time; accuracy of at least 99.9%; employee queries answered within 2 working days",
@@ -2002,8 +2152,11 @@ const DOMAINS=[
    important:null, deps:"Site plans and security procedures; access to the access-control system; a named site security contact",
    notes:"When the provider changes, guards may transfer to the new provider by law; allow for this in the timeline and costs."}
 ];
+// "AML has nothing to do with this", "it's not payroll": a negated mention is no signal
+const unsaid = t => String(t||"").replace(/\b[\w-]+(?:\s+[\w-]+)?\s+(?:has|have|is|are)\s+nothing to do with\b/gi," ")
+  .replace(/\b(?:nothing to do with|not about|not related to|unrelated to|isn'?t|aren'?t|is not|are not|not|no|without)\s+(?:(?:a|an|the|any|our)\s+)?[\w-]+(?:\s+(?:and|or)\s+[\w-]+)?/gi," ");
 function bankDomain(f){
-  const t=[userText(), f.item, f.summary, f.background, f.scope_in].filter(x=>typeof x==="string").join(" ");
+  const t=unsaid([userText(), f.item, f.summary, f.background, f.scope_in].filter(x=>typeof x==="string").join(" "));
   return DOMAINS.find(d=>d.re.test(t)) || null;
 }
 // notes passed to the AI for the current request
@@ -2023,7 +2176,7 @@ function domainNotes(f){
 function suggestSystem(k){
   const f=S.f, lines=bundleOf(k)?bundleOf(k).map(([L])=>L):null;
   return `${BANK_CONTEXT}\n\nYou write ONE suggested answer for a question in a procurement intake chat. The user will accept it or change it.\n${domainNotes(f)}\n
-Rules: specific to this request and to a large bank; plain words; no abbreviations without writing them out; no invented figures about this organisation (typical service levels are fine as suggestions); short points separated by semicolons.
+Rules: specific to this request and to a large bank; plain words; no abbreviations without writing them out; no invented figures about this organisation (typical service levels are fine as suggestions); never placeholders such as "X%"; never facts about this request the user did not give; short points separated by semicolons.
 Keep it short: at most 4 points per line and at most 45 words per line. Pick the most important points; do not list everything.
 ${lines?`Write exactly these lines, each "Label: text" on its own line, in this order: ${lines.join(" | ")}.`:"Write one short paragraph or a few points separated by semicolons."}
 Return JSON only: {"suggestion":"..."}; "suggestion" is one plain string, never an object or a list.`;
@@ -2159,7 +2312,8 @@ function normSuggestion(v, k){
 }
 // a suggestion as the user sees it: one label per line, short, no formatting, no invented dates
 function tidySuggestion(k, v){
-  let sg=normSuggestion(v, k).replace(/\*\*|__/g,"").replace(/\[object Object\]/g,"").trim();
+  let sg=normSuggestion(v, k).replace(/\*\*|__/g,"").replace(/\[object Object\]/g,"").trim()
+    .replace(/\s*(?:by|of|to|at least|within|under|over|above|below)?\s*\b(?:[XYZN]|x{1,3})\s*(?:%|percent\b|days?\b|weeks?\b|months?\b|hours?\b)/g,"").replace(/\s*\[[^\]]*\]/g,"").replace(/\s*<[^>]*>/g,"");
   const lines=bundleOf(k)?bundleOf(k).map(([L])=>L):null;
   if(lines) lines.slice(1).forEach(L=>{ sg=sg.replace(new RegExp(`[;.]?\\s*(${L.replace(/[/]/g,"\\/")})\\s*:`,"i"),"\n$1:"); });
   const MON="(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\b";
@@ -2190,7 +2344,7 @@ function setFromSuggestion(k, v){
   }
   f[k]=String(v).replace(/\.$/,"");
 }
-const ACCEPT=/^(?:use (?:this|the|that|your) suggestion|yes|yep|yeah|looks (?:good|right|fine|great)|that fits|fits|fine|ok(?:ay)?|perfect|agreed?|correct|sounds (?:good|right)|great|good|accept(?:ed)?|that'?s (?:right|fine|good))\b[\s.!]*$/i;
+const ACCEPT=/^(?:use (?:this|the|that|your) suggestion|yes|yes please|yep|yup|yeah|sure|k|kk|alright|go ahead|good to go|looks (?:good|right|fine|great|ok)|that fits|fits|fine|ok(?:ay)?|perfect|agreed?|correct|sounds (?:good|right|fine)|great|good|accept(?:ed)?|that'?s (?:right|fine|good))\b[\s.!]*$/i;
 // returns "accepted", "extended" or false
 function applySuggestion(k, text){
   const sg=S.suggest[k]; if(!sg) return false;
@@ -2206,13 +2360,14 @@ function applySuggestion(k, text){
 function offlineRead(text, asked){
   const f=S.f, t=text.toLowerCase(), all=userText();
   if((!asked || asked==="need") && known(f.category) && f.demand_type!=="contingent_labour"){ f.summary=f.summary||firstSentence(text); if(!known(f.item)) f.item=itemFrom(text); }
-  if(!known(f.category) || asked==="need"){
+  const firstTurn=!S.det;   // the AI's category on the first message gives way to a clear keyword match (it called KYC "legal")
+  if(!known(f.category) || asked==="need" || firstTurn){
     const first=S.msgs.find(m=>m.role==="user");
     let best=bestCategory(all, " "+(first?first.text:"").toLowerCase());
     if(/contractor|freelance|temporary staff|interim|day rate|\ba day\b|per day/.test(all) && /developer|engineer|analyst|manager|designer|tester|contractor|freelance|interim/.test(all)) best=catById("contingent");
     if(best && best.id==="cloud" && /\b(hr|payroll|crm|erp|finance|accounting|procurement|ticketing)\b[^.]*\b(system|tool|platform|software|application)\b/.test(all)) best=catById("software");
-    if(best){ f.category=best.id; f.demand_type=best.type; S.catGuess=null; }
-    else if(asked==="need" || text.split(/\s+/).length>3){ f.category="consulting"; f.demand_type="services"; S.catGuess="consulting"; }   // no keyword: a guess
+    if(best){ if(f.category!==best.id){ f.category=best.id; f.demand_type=best.type; if(f.l4 && (l4ByCode(f.l4)||{}).cat!==best.id){ f.l4=null; f.l4_match=null; f.l4_reason=null; } } S.catGuess=null; }
+    else if((!known(f.category) || !firstTurn) && (asked==="need" || text.split(/\s+/).length>3)){ f.category="consulting"; f.demand_type="services"; S.catGuess="consulting"; }   // no keyword: a guess
     if(known(f.category)){
       f.summary=f.summary||firstSentence(text);
       if(f.demand_type!=="contingent_labour" && !known(f.item)) f.item=itemFrom(text);
@@ -2260,7 +2415,8 @@ const WHERE_STORED=new RegExp(`\\b(?:stor\\w*|host\\w*|held|kept|servers?|cloud|
 const WHERE_UNKNOWN=/\b(?:storage|location|where)\b[^.;]{0,30}\b(?:unknown|unclear|not (?:known|given|specified|stated|clear|sure)|tbd|tbc|to be (?:confirmed|determined))\b|\b(?:unknown|unclear|not sure|don'?t know)\b[^.;]{0,20}\b(?:storage|location|where)\b/i;
 // answers about who uses it, what it does or which data: a place there is never where the provider works
 const LOC_FREE_Q=["audience_fn","users","functions","quantity","volume","must_haves","value_props","benefits","personal_data","data_details"];
-const saysWhere = v => WHERE_STORED.test(String(v||"")) && !WHERE_UNKNOWN.test(String(v||""));
+// "in the cloud" says nothing about where: only a place, our own systems or on-premise count
+const saysWhere = v => { const s=String(v||"").replace(/\b(?:(?:stored|hosted|kept|held|processed)\s+)?(?:(?:in|on)\s+)?(?:the\s+|a\s+)?(?:public\s+|private\s+)?cloud\b/gi," "); return WHERE_STORED.test(s) && !WHERE_UNKNOWN.test(s); };
 // the data part of an answer without its storage clause: "client names; stored in the EU" → "client names"
 const dataOnly = v => String(v||"").replace(/[;,]?\s*\(?\s*\b(?:stored|hosted|held|kept|storage|location)\b.*$/i,"").trim();
 const MONTH="(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
@@ -2427,7 +2583,7 @@ function readAnswer(k, text){
     if(/\bnever\b|always (?:buy|bought)|(?:buy|bought) (?:this|it) in|(?:don.?t|do not|didn.?t|did not) (?:do|have|run|handle)\b|not today/.test(t)) return "unsure";
     if(/^yes|our (?:own )?teams?\b|normally do|in[- ]house|we do (?:it|this)/.test(t)) return true;
     return /^no\b/.test(t) ? false : null; }
-  if(k==="entity"){ const e=ENTITIES.find(x=>t.includes(x.name.toLowerCase())||x.re.test(text)||(x.abbr&&x.abbr.test(text))); return e?e.id:/another|other/.test(t)?null:"Not given"; }
+  if(k==="entity"){ const e=ENTITIES.find(x=>t.includes(x.name.toLowerCase())||x.re.test(text)||(x.abbr&&x.abbr.test(text))); return e?e.id:/not sure|don.?t know|no idea|unsure/.test(t)?"Not given":null; }   // an answer naming no entity is asked again
   if(k==="supplier_terms") return /^no\b|none/.test(t)?"No":/not sure|unsure/.test(t)?"Not sure":text.trim();
   if(k==="value"){ const v=parseMoney(text); if(v!=null){S.f.value_is_estimate=false;return v;} if(/know|sure|idea|estimate/.test(t)){S.f.value_is_estimate=true;return defaultEstimate();} return null; }
   if(k==="quantity"||k==="headcount"){ const n=t.replace(/(\d),(\d{3})/g,"$1$2").match(/\d+/); return n?+n[0]:/not sure|don.?t know|unknown|no idea|tbc|to be confirmed/.test(t)?"unsure":(/more/.test(t)?"4+":null); }
@@ -2437,10 +2593,10 @@ function readAnswer(k, text){
     if(/^(no|nope|not|look|rather)/.test(t)){ S.f.decline_contract=true; const named=ALL_SUPPLIERS.find(x=>t.includes(x.toLowerCase())); if(named) S.f.supplier=named; return false; } return null; }
   if(["tech_service","personal_data","ict_outsourcing","system_access","subcontracting"].includes(k) && /not sure|unsure|don.?t know|no idea|maybe|possibly|perhaps|unclear|tbc|to be confirmed/.test(t)) return "unsure";
   if(["tech_service","personal_data","ict_outsourcing","system_access","subcontracting"].includes(k)) return /^(y|yes|yeah|they will|it will)/.test(t)||/\bwill\b(?!.*\bnot\b)/.test(t)?true:/^(n|no|none|nope)\b|not /.test(t)?false:"unsure";
-  if(k==="budget_approved") return /^y|approved|signed off|confirmed/.test(t)&&!/not|pending|awaiting/.test(t)?"yes":/part/.test(t)?"partly":"no";
+  if(k==="budget_approved") return /not sure|no idea|don.?t know|unsure|unknown/.test(t)?"unsure":/^y|approved|signed off|confirmed/.test(t)&&!/not|pending|awaiting/.test(t)?"yes":/part/.test(t)?"partly":"no";
   if(k==="supplier"){
     if(S.det&&S.det.route==="contract"&&S.det.contract){ if(/^(y|yes|sure|ok|happy|fine)/.test(t)) return S.det.contract.supplier; if(/^(no|nope|not)/.test(t)){ S.f.decline_contract=true; const named=ALL_SUPPLIERS.find(x=>t.includes(x.toLowerCase())); return named||null; } }
-    return /^(no|none|nope|not really|no preference|any)/.test(t)?"None":text.trim();
+    return /^(no|none|nope|not really|no preference|any)/.test(t)?"None":cleanSupplier(text.trim());
   }
   return text.trim();
 }
@@ -2473,8 +2629,8 @@ function offlineQuestion(k, prevRoute, stageChanged){
     const n=catById(f.category).name; intro = S.catGuess ? "" : `This sounds like ${/^[A-Z]{2}/.test(n)?n:n.charAt(0).toLowerCase()+n.slice(1)}. `;
     if(S.det.contract && hasSupplier(f)) intro += `We have the ${S.det.contract.title} with ${S.det.contract.supplier}, which makes this quicker. `;
     if(S.det.route==="catalogue") intro += `Good news: ${S.det.catalogue.map(i=>i.name).join(" and ")} ${S.det.catalogue.length>1?"are":"is"} in our catalogue. `;
-    const req=requiredFor(S.det.route,f), got=req.filter(k=>known(f[k]));
-    if(got.length>=3) intro += `Thanks for the detail, I've already noted the ${listJoin(got.slice(0,6).map(k=>FACTS[k].label.toLowerCase()))}${got.length>6?" and more":""}. ${S.missing.length===1?"Just one more thing.":`Just ${S.missing.length} more things.`} `;
+    const req=requiredFor(S.det.route,f), got=req.filter(k=>known(f[k]) && !(k in S.derived) && f[k]!=="Not given");
+    if(got.length>=3) intro += `Thanks for the detail, I've already noted the ${listJoin(got.slice(0,6).map(k=>FACTS[k].label.toLowerCase()))}${got.length>6?" and more":""}. ${S.missing.length===1?"Just one more thing.":S.missing.length<=6?`Just ${S.missing.length} more things.`:""} `;
   } else {
     const acks=["Thanks.","Okay, noted.","That helps.","Understood."]; intro=stageChanged?"":acks[Object.values(S.asked).reduce((a,b)=>a+b,0)%acks.length]+" ";
     if(k==="value" && known(f.duration)) intro="";
@@ -2585,6 +2741,7 @@ function clampWords(t, max){
   for(const p of paras){ const kept=[]; for(const sen of p.split(/(?<=[.!?])\s+/)){ const w=words(sen); if(n+w>max) break; kept.push(sen); n+=w; } if(kept.length) out.push(kept.join(" ")); if(n>=max) break; }
   return out.join("\n\n");
 }
+const NO_BENEFIT=/^(?:no specific|none\b|no\b|n\/?a\b|not applicable|nothing\b|no regulatory)/i;
 function offlineExec(lead){
   const f=S.f, c=catById(f.category), cont=f.demand_type==="contingent_labour";
   const g=k=>known(f[k])&&!["Not given","unsure","None","Confirmed"].includes(f[k])&&typeof f[k]==="string"?f[k].trim().replace(/\.$/,""):null;
@@ -2592,7 +2749,7 @@ function offlineExec(lead){
   const sc=x=>scrubText(x||"",false), scl=a=>a.map(x=>scrubText(x,true)).filter(Boolean);
   const t={audience:sc(g("users")), functions:sc(g("functions")), problem:sc(g("background")),
     capabilities:scl(split(g("must_haves")||(cont?g("skills"):g("deliverables"))||g("item"))), benefits:scl(split(g("benefits"))), usp:sc(g("usp")),
-    kpis:scl(split(g("acceptance"))), regulatory:/^no specific/i.test(g("reg_benefits")||"")?"":sc(g("reg_benefits"))};
+    kpis:scl(split(g("acceptance"))), regulatory:NO_BENEFIT.test(g("reg_benefits")||"")?"":sc(g("reg_benefits"))};
   const L=execLimits(), what=lf(String(lead||c.name).replace(/\.$/,"")), nd=x=>String(x).replace(/\.$/,"");
   // a noun phrase ("a process orchestration platform") becomes a sentence; a problem phrased as a goal ("providing a single entry") is not "today"
   const needs=/^(?:an?|the|some|new|one|\d)\b/i.test(what) ? `The organisation needs ${what}.` : cap1(what)+".", goal=/^(?:to\s+[a-z]+|[a-z]+ing)\b/i.test(t.problem||"");
@@ -2618,7 +2775,7 @@ function mergeExec(base, ai){
     let v=ai[k];
     if(EXEC_LISTS.includes(k)) v=(Array.isArray(v)?v:typeof v==="string"?v.split(/\n|;\s*/):[]).map(x=>scrubText(String(x).replace(/^[-•*]\s*/,""),k==="kpis")).filter(x=>x&&words(x)>=1).slice(0,10);
     else v=typeof v==="string"?scrubText(v,false):"";
-    if(k==="regulatory" && /^no specific/i.test(v||"")) v="";
+    if(k==="regulatory" && NO_BENEFIT.test(v||"")) v="";
     if(v && v.length) out[k]=v;
   }
   const tg=typeof ai.tagline==="string"?scrubText(ai.tagline,false).replace(/\.$/,""):""; if(tg && words(tg)<=12) out.tagline=tg;
@@ -3623,8 +3780,11 @@ function specModel(withCurrent){
     ol(["A reply still typing out is shown in full, and the message is added to the chat.",
       "**Open offers come first:** an answer to “improve it?” or to a correction the chat asked about.",
       "**Corrections in words** (“sorry, the budget is 80k not 30k”, “it's not software, it's consulting”) are applied by the rules; the route is checked again and the chat returns to the open question.",
+      "**A question back instead of an answer** is answered and nothing is recorded; the same question comes back with its answer buttons. “Why do you need that?” gets the reason; “what would you suggest?” or “you decide” gets a suggestion that can be accepted in one tap; pushback on the route (“can't we just book directly?”) gets the route's reason and the options. With AI, other questions (“are they any good?”) are answered by call A.",
+      "**Side remarks and other purchases** (“btw our CFO loves jazz”, “also we need 10 laptops”) are kept out of the answer, and the chat says so; a budget change mentioned in passing is applied and shown as “Changed: …”.",
+      "**“Use the example”** takes the example the question showed; a message that repeats an earlier question's wording corrects that question.",
       "**Requests to change the documents** go to call D once a description exists.",
-      "**Reading the answer:** with AI, call A; its facts are merged (amounts through the money reader) and its corrections applied. The rules then read the same answer as a backup (closed questions, dates, amounts, places) and fill only what is still unknown. Without AI, only the rules read it.",
+      "**Reading the answer:** with AI, call A. Its facts are screened before they are merged: placeholders (“unknown”, “none”) count only for the question just asked; classification flags (critical function, done in-house, ongoing) only at the check step; free text only when at least half of its words were said by the requester or are in the suggestion they accepted; on the first message a clear keyword category wins over the AI's. Its corrections are applied. The rules then read the same answer as a backup (closed questions, dates, amounts, places) and fill only what is still unknown. Without AI, only the rules read it.",
       "**Suggestions:** “Use this suggestion” or “yes, but add …” stores the suggested lines; “skip” records “Not given”.",
       "**The check step and follow-up checks** are resolved: a date fixed or flexible, a thin answer extended, a data location added, an off-topic answer recorded as not given.",
       "**After two tries** a question is given up: a value becomes an estimate, a yes/no becomes “not sure”, anything else “Not given”.",
@@ -3664,7 +3824,8 @@ function specModel(withCurrent){
 
   B.push(h(2,"7. The prompts"),
     h(3,"A. Chat turn"),
-    ul(["**The app checks the reply:** sentences naming internal fields or values are removed; a reply without a question is dropped; the AI's question is used only for the next item.",
+    ul(["**The app checks the reply:** sentences naming internal fields or values are removed; a reply without a question is dropped; the AI's question is used only for the next item. A suggestion inside the reply must have every line as “Label: text”, otherwise call B writes it.",
+      "**The app screens the facts:** only what the requester said or accepted is kept (see section 4, reading the answer). A reply marked “answers_question: false” with no correction is a question back: it is shown, nothing is recorded, and the same question is asked again.",
       "**The rules keep control:** the route, the check-step text and the order of questions always come from the rules.",
       "**Guards on facts:** a place the AI takes from an answer about users or data is not used as the work location; an off-topic verdict only counts for the question just asked; a storage place counts only when the requester said it."]),
     prompt(`A. Chat turn: system prompt (example: “${main}”)`, ex.chatSys),

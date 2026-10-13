@@ -25,9 +25,13 @@ test.describe("with motion", () => {
     await openApp(page, { motion: true });
     await page.fill("#inp", "A new HR system to replace our payroll tool.");
     await page.press("#inp", "Enter");
-    await page.locator("#msgs [data-typing]").click();
+    // click as soon as it starts typing (a short reply would otherwise finish first), and note how much was shown
+    await page.waitForSelector("#msgs [data-typing]");
+    const partial = await page.evaluate(() => { const el = document.querySelector("#msgs [data-typing]"); if (!el) return null; const n = el.innerText.length; el.click(); return n; });
+    expect(partial).not.toBeNull();
     await expect(page.locator("#msgs [data-typing]")).toHaveCount(0);
     await expect(lastAssistant(page)).toContainText("cost in total");
+    expect(partial).toBeLessThan((await lastAssistant(page).innerText()).length);
   });
 
   test("answer chips wait until the text is complete", async ({ page }) => {
