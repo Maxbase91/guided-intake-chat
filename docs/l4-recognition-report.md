@@ -58,8 +58,9 @@ not the descriptions or search terms. 32 of them are hard cases with a near neig
   - "move 15 years of loan history onto the new core platform" (data migration);
   - "chatbot on top of GPT" (generative AI software).
 
-  These four are the 7% missing from the shortlist. With AI, the model names the item in a category list's words
-  (`l4_terms`, for example "courier delivery"), and the app looks those up in the whole list.
+  These four are the 7% missing from the shortlist. With AI, the model may name the item in a category list's words
+  (`l4_terms`, for example "courier delivery"), and the app looks those up in the whole list. In the live run below,
+  the models didn't use this.
 
 ## Recognition with AI (live, 13 October 2026)
 
