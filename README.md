@@ -96,6 +96,7 @@ The end-to-end tests start three local servers: offline (no key), AI (mock provi
 | `tests/e2e/live-ai-run.spec.js` | Defects found in live AI conversations: check-step corrections, work location and offshoring, Level 4 consistency, single source, date scrubbing, object-shaped AI suggestions |
 | `tests/e2e/access-and-layout.spec.js` | Access-code gate and the phone layout |
 | `tests/e2e/typing.spec.js` | Replies typing out: speed, chips after the text, click to finish, "reduce motion" (the other tests run with reduce motion through `openApp`) |
+| `tests/e2e/question-fit.spec.js` | Questions by kind of work: consulting, legal and events asked as projects (sponsor, outcomes, steering; no selling points, service levels or support desk; one-off under paragraph 26), KYC as an ongoing service, market data as a product; the wording and lines sent to the AI; categories for app builds, security testing, audit and tax, recruitment, print and mail; the review flags |
 | `tests/e2e/how-it-works.spec.js` | The How it works panel: opens at desktop and phone width, Escape closes it, the prompts shown are the ones the app sends, thresholds follow the Rules, the Markdown download never contains the requester's words, opening it mid-conversation changes nothing |
 | `tests/e2e/known-issues.spec.js` | Defects found in the assessment (see `ASSESSMENT.md`), marked `test.fail()`: they turn red ("unexpectedly passed") once fixed, then the marker can be removed |
 
@@ -139,14 +140,14 @@ The side panel keeps only the step being asked open. Finished steps fold to one 
 
 New demand gets the format of an executive service description: a headline (name, tagline and 50–100 words), an executive description of 150–250 words and a service summary table (service name, target audience, supported functions, business problem solved, key capabilities, key benefits, unique selling points, KPIs / success measures, regulatory / governance benefits). Business-led demand gets the same parts, shorter. Catalogue orders and call-offs keep a short description.
 
-For the profile points (audience, functions, benefits, unique selling points, KPIs, regulatory benefits) the chat suggests an answer tailored to the request; the user accepts it in one tap or changes it. Above the threshold each point is a separate question, below it they are bundled into one. Each answer gets a small score (for example "Answer quality 9/10").
+For the profile points (audience, functions, benefits, unique selling points, KPIs, regulatory benefits) the chat suggests an answer tailored to the request; the user accepts it in one tap or changes it. Above the threshold each point is a separate question, below it they are bundled into one. The points are worded for the kind of work (see below): a project is asked about its sponsor, expected outcomes and success measures, never selling points; the "Unique selling points" row only appears for software and data products.
 
 ## New demand: guided service description (front door + sourcing intake)
 
 New demand combines the front door with a tiered version of a detailed service-description intake:
 
 1. **Your need**: what, value, duration, and whether technology is involved (only if the rules can't tell). The first message is classified against a Level 4 category list (mock) with match % and reasoning. Software is not asked "how many users or licences" up front: the chat asks who will use it and roughly how many people together with the audience ("not sure yet" is fine), and the licence count and pricing model are listed as points to confirm with suppliers. Catalogue orders still ask the count first.
-2. **Purpose and profile**: problem and impact of delay, audience and functions (suggested), today's solution and why external, unique selling points, benefits and regulatory benefits (suggested).
+2. **Purpose and profile**: problem and impact of delay, who it is for (suggested), today's solution and why external, benefits (and selling points for products) and regulatory benefits (suggested).
 3. **Scope and deliverables**: what the provider does (played back as "The Service Provider shall…"), out of scope (suggested), acceptance and sign-off (suggested), staff qualifications, volumes.
 4. **Running the service** (ongoing services): service levels and KPIs, support model and tools (technology only), governance, reporting, change and escalation (suggested standard pack).
 5. **Timing and delivery**, 6. **Budget and supplier** (plus supplier standard terms if a supplier is named).
@@ -154,6 +155,19 @@ New demand combines the front door with a tiered version of a detailed service-d
 8. **Check**: everything the rules worked out (category, entity, ongoing or one-off, done in-house, technology, possible critical or important function, access, offshoring) is shown in plain words with what it means. The user confirms or corrects it in their own words.
 
 Below the threshold (business-led) the same flow is lighter. Any question can be skipped ("To be determined").
+
+**Questions by kind of work.** The flow and the captured facts are the same for every request, but the wording, the suggested answers and a few questions follow the kind of work (`kindOf()`):
+
+| Kind | Categories | What changes |
+|---|---|---|
+| Product | Software and SaaS, market data | Users and how many; must-haves; what makes it better than today (selling points). Market data asks how the data is used: on screens, in applications or models, or passed on to clients. |
+| Project | Consulting, legal, marketing and events, training, IT services and development, audit and tax (unless an ongoing service is described); recruitment and other services without an ongoing service | Sponsor and teams involved (events: guests and public officials; training: participants); why an external provider; expected outcomes; success measures instead of service levels; project steering (status meetings, steering committee, change requests) when it runs 6 months or more. No support-desk, service-level or selling-point questions. Staff qualifications are not asked for events. |
+| Ongoing service | Business process services, facilities, cloud, telecom, managed IT, and any service described as ongoing | Who relies on it and who owns it; who does the work today; volumes; service levels and KPIs; service governance; support model for technology. |
+| External workers, goods | | Unchanged: role profile, or item and quantity. |
+
+A project with set deliverables is one-off whatever its length; only words such as "ongoing", "managed service", "run our…", "service desk" or "maintain" make it an ongoing service (EBA/GL/2019/02 paragraph 26 needs recurrent or ongoing performance). The check step still lets the user correct "ongoing or one-off".
+
+Some categories get a review flag instead of an extra question: **auditor independence** (consulting, audit and tax), **instructed through Legal** with a conflict check (legal), **gifts and hospitality approval** (client events; a warning when public officials may attend), **data licence** (market data) and **record keeping** (trading voice and call recording).
 
 **Outsourcing** is determined with one group standard for every provisioning legal entity: **EBA/GL/2019/02** (EBA Guidelines on outsourcing arrangements), the primary classification source. The test runs in order: exclusions under paragraph 28 (for example statutory audit, market information, global network infrastructures, clearing and settlement, correspondent banking, goods, and services a bank would not perform itself such as legal representation, cleaning or catering) → recurrent or ongoing performance (paragraph 26) → work the bank would or could realistically perform itself (paragraph 26) → result with reasons. Critical or important functions (paragraphs 29 to 31) are a separate flag. ICT services are assessed separately under DORA. **EBA/GL/2026/09** (non-ICT third-party risk; finalised 18 September 2026, not yet applicable) is shown as a future rule set, versioned separately, with an indicative result; it does not change the result until it applies. The provisioning legal entity is still captured for the contract and the register, but no longer decides the rule set. Results are flags for the outsourcing review, never final determinations; local requirements may add to the group standard.
 

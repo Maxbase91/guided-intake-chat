@@ -12,10 +12,12 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await page.click("#howBtn");
     await expect(panel(page)).toBeVisible();
     await expect(page.locator('[data-spec="close"]')).toBeFocused();
-    for (const heading of ["When an AI model is called", "One message, step by step", "Routes and reviews", "What is asked, and when", "The prompts", "Quality"])
+    for (const heading of ["When an AI model is called", "One message, step by step", "Routes and reviews", "What is asked, and when", "Kinds of work", "The prompts", "Quality"])
       await expect(panel(page)).toContainText(heading);
     await expect(panel(page)).toContainText("€50,000");
     await expect(panel(page)).toContainText("30–60");
+    await expect(panel(page)).toContainText("Sponsor and stakeholders / Teams involved");   // the project lines, read from the code
+    await expect(panel(page)).toContainText("Bank checks by category");
     expect(await page.evaluate(() => document.querySelector(".docwrap").scrollWidth - document.querySelector(".docwrap").clientWidth)).toBeLessThanOrEqual(0);
     await page.keyboard.press("Escape");
     await expect(panel(page)).toHaveCount(0);
