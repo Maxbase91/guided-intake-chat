@@ -86,6 +86,20 @@ test("a delivery date in the past gets a quick check and can be corrected", asyn
   expect((await sideFacts(page))["Start / delivery"]).toMatch(/1 December 2026/);
 });
 
+test("periods and two-digit years are read as dates: 'mid 26' in October 2026 is in the past, 'Q4 2026' is not", async ({ page }) => {
+  await openApp(page);   // today is 12 Oct 2026 (helpers.js)
+  const got = await page.evaluate(() => Object.fromEntries(["mid 26", "mid-2026", "Q2 26", "Q4 2026", "Q1", "H2 2026", "end of 2026", "early 2027", "summer 2026", "start 15 March"]
+    .map((t) => [t, fmtDate(parseWhen(t))])));
+  expect(got).toEqual({ "mid 26": "31 Aug 2026", "mid-2026": "31 Aug 2026", "Q2 26": "30 Jun 2026", "Q4 2026": "31 Dec 2026", "Q1": "31 Mar 2027",
+    "H2 2026": "31 Dec 2026", "end of 2026": "31 Dec 2026", "early 2027": "31 Mar 2027", "summer 2026": "31 Aug 2026", "start 15 March": "15 Mar 2027" });
+  // the case from a real run: a consulting start "mid 26", asked in October 2026
+  await say(page, "We need 15 laptops for new joiners in Frankfurt.");
+  await say(page, "mid 26");
+  await expect(lastAssistant(page)).toContainText("mid 26 seems to be in the past");
+  // the AI is told today's date, so it can spot past dates too
+  expect(await page.evaluate(() => chatSystem())).toContain("Today is 12 Oct 2026.");
+});
+
 test("a new date given in reply to the timeline check is stored without the words around it", async ({ page }) => {
   await openApp(page);
   await say(page, "We need 15 laptops for new joiners in Frankfurt.");

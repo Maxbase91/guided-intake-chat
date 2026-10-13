@@ -155,3 +155,23 @@ test("a second off-topic answer is recorded as not given when the AI flags it ag
   await say(page, "pitch golf with the management team");
   expect(await page.evaluate((key) => S.f[key], k)).toBe("Not given");
 });
+
+test("'No, look wider' leaves the framework even when the AI records the answer as the text 'no' and names the framework's supplier", async ({ page, request }) => {
+  const errors = await openApp(page, { kind: "ai" });
+  // the case from a real run: three business consultants, the Lakeshore framework declined
+  await say(page, "I need three business consultants for a target operating transformation in procurement for 9 months");
+  for (let i = 0; i < 6 && (await page.evaluate(() => S.lastAsked)) !== "contract_ok"; i++) {
+    const q = await lastAssistant(page).innerText();
+    await say(page, /cost/i.test(q) ? "80k" : /When/i.test(q) ? "1 March 2027" : "A target operating model and a rollout plan");
+  }
+  expect(await page.evaluate(() => [S.det.route, S.det.contract && S.det.contract.supplier])).toEqual(["contract", "Lakeshore Advisory"]);
+  await mock(request, { nextChat: { facts: { contract_ok: "no", supplier: "Lakeshore Advisory" } } });
+  await choose(page, "No, look wider");
+  const got = await page.evaluate(() => ({ route: S.det.route, contract: S.det.contract, supplier: S.f.supplier, declined: S.f.decline_contract }));
+  expect(got.route).not.toBe("contract");
+  expect(got.contract).toBeNull();
+  expect(got.supplier).not.toBe("Lakeshore Advisory");
+  expect(got.declined).toBe(true);
+  await expect(page.locator("#side .route")).not.toContainText("Contract call-off");
+  expect(errors).toEqual([]);
+});

@@ -654,7 +654,7 @@ const catalogueFits = (f, items) => {
 const daysTo = d => (new Date(d) - new Date())/864e5;
 
 function contractFor(f){
-  if(f.decline_contract) return null;
+  if(f.decline_contract || f.contract_ok===false) return null;   // "No, look wider"
   if(S.catGuess && S.catGuess===f.category) return null;   // "translation of our annual report" is not a call-off on the consulting framework
   const today=new Date(), list=CONTRACTS.filter(c=>c.category===f.category && new Date(c.expires)>today);
   if(!hasSupplier(f)) return list[0]||null;
@@ -972,10 +972,14 @@ function parseWhen(str){
   if(/next year/.test(t)) return new Date(now.getFullYear()+1,0,1);
   let m=t.match(/(\d{4})-(\d{2})-(\d{2})/); if(m) return new Date(+m[1],+m[2]-1,+m[3]);
   m=t.match(/\b(\d{1,2})[./](\d{1,2})[./](\d{2,4})\b/); if(m) return new Date(+m[3]<100?2000+ +m[3]:+m[3],+m[2]-1,+m[1]);
-  m=t.match(/\bq([1-4])(?:\s*(\d{4}))?/); if(m){ let y=m[2]?+m[2]:now.getFullYear(); let d=new Date(y,(+m[1]-1)*3,1); if(!m[2]&&d<d0) d=new Date(y+1,(+m[1]-1)*3,1); return d; }
+  // a period ("Q4 2026", "mid 26", "H2 2026") counts as the latest date it can mean: it is in the past only once all of it has passed
+  const yr=x=>x.length===2?2000+ +x:+x, endOf=(y,mo)=>new Date(y,mo+1,0);
+  m=t.match(/\bq([1-4])(?:\s*'?(\d{4}|[2-3]\d)\b)?/); if(m){ const y=m[2]?yr(m[2]):now.getFullYear(); let d=endOf(y,+m[1]*3-1); if(!m[2]&&d<d0) d=endOf(y+1,+m[1]*3-1); return d; }
   m=t.match(/\b(?:(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?)?(?:(end|mid|early|beginning)\s+(?:of\s+)?)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(?:\s+(\d{1,2})(?:st|nd|rd|th)?)?(?:\s+(\d{4}))?/);
   if(m){ const mi=MONTHS.indexOf(m[3]); let day=+(m[1]||m[4]||1); if(m[2]==="end") day=28; if(m[2]==="mid") day=15;
     let y=m[5]?+m[5]:now.getFullYear(); let d=new Date(y,mi,day); if(!m[5] && d < new Date(+d0-20*864e5)) d=new Date(y+1,mi,day); return d; }
+  m=t.match(/\b(mid(?:dle)?|end|late|early|beginning|start|h1|h2|first half|second half|spring|summer|autumn|fall|winter)(?:[\s-]+(?:of\s+)?(?:the\s+)?(?:year\s+)?)?'?(\d{4}|[2-3]\d)\b/);
+  if(m){ const LAST={mid:7,middle:7,end:11,late:11,early:2,beginning:1,start:1,h1:5,"first half":5,h2:11,"second half":11,spring:4,summer:7,autumn:10,fall:10,winter:11}; return endOf(yr(m[2]), LAST[m[1]]); }
   return null;
 }
 // the answer to "a day rate or a total budget?": €5,000 or more is the total, so it is never printed as a day rate
@@ -1142,6 +1146,7 @@ function parseJSON(t){ t=String(t||"").trim().replace(/^```(?:json)?/i,"").repla
 /* ---------- conversation prompt ---------- */
 function chatSystem(){
   return `You are the intake assistant of a corporate procurement team. You talk with business colleagues who want to buy something.
+Today is ${fmtDate(new Date())}. A start or delivery date before today is in the past.
 You only have a conversation. Fixed rules decide the buying route and which facts are needed. Each turn you get the current state, including the ordered list "still_needed".
 ${BANK_CONTEXT}
 ${S.f&&S.f.category?`Domain notes for this request (typical at a large bank; use them for suggestions, examples and sensible follow-ups):\n${domainNotes(S.f)}\n`:""}
@@ -1746,7 +1751,10 @@ function mergeFacts(nf){
   if(S.f.category && !S.f.demand_type) S.f.demand_type=catById(S.f.category).type;
   if(S.f.demand_type==="contingent_labour") S.f.category="contingent";
   if(S.f.category==="cloud" && /\b(hr|payroll|crm|erp|finance|accounting|procurement|ticketing|learning management)\b[^.]*\b(system|tool|platform|software|application|suite)\b/i.test(userText())){ S.f.category="software"; S.f.demand_type="software"; }
-  if(nf.contract_ok===false) S.f.decline_contract=true;
+  // "No, look wider" declines the framework whatever form the AI's answer took ("no", false); its supplier is then no longer assumed
+  if(S.f.contract_ok===false && !S.f.decline_contract){ S.f.decline_contract=true;
+    const c=S.det&&S.det.contract;
+    if(c && hasSupplier(S.f) && String(S.f.supplier).toLowerCase()===c.supplier.toLowerCase() && !userText().includes(c.supplier.toLowerCase().split(" ")[0])) S.f.supplier=null; }
   if(nf.contract_ok===true && S.det && S.det.contract && !hasSupplier(S.f)) S.f.supplier=S.det.contract.supplier;
 }
 function initialL4(){
@@ -2905,6 +2913,7 @@ const execSpec = () => { const L=execLimits(); return `1. "description": the EXE
    the buying route, contracts or frameworks, or the risk answers about this purchase (personal data, system access, whether it is outsourcing, criticality, subcontracting). These are captured separately.
    Never copy the user's raw wording such as "I don't know" or typos. Never invent facts: do not add capabilities, integrations, technologies, benefits or outcomes the user did not state or confirm.`; };
 const DOC_SYSTEM = () => `You write two things for a corporate procurement request, based on the conversation and the facts.
+Today is ${fmtDate(new Date())}.
 ${S.det&&NEW_DEMAND(S.det.route)?execSpec():`1. "description": the SERVICE DESCRIPTION, for review by senior stakeholders. It says WHAT is being bought and WHY. Professional, concise, business-focused, third person.
    Fields (plain strings unless stated):
    name: short name of the service or product, at most 8 words.

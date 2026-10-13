@@ -114,7 +114,7 @@ An answer that has nothing to do with the question (a recipe, a joke) is caught 
 
 "Use the example" (or "the example is fine") answers with the example the question showed, in the words the requester saw; for a suggestion it accepts the suggestion. A message that mostly repeats an earlier question's own wording is read as a correction of that question, not as the answer to the current one. "See above" or "as discussed" are too vague to record and are asked again.
 
-If the answer to the data question doesn't say where the data is stored, the chat asks once more. A short reply such as "in the EU" is added to the answer. "Not sure" leaves an open point in the quality check. A relative start ("next week", "ASAP", "next month") is stored as the date it stood for, for example "19 Oct 2026 (next week)", so the buyer reads a real date later.
+If the answer to the data question doesn't say where the data is stored, the chat asks once more. A short reply such as "in the EU" is added to the answer. "Not sure" leaves an open point in the quality check. A relative start ("next week", "ASAP", "next month") is stored as the date it stood for, for example "19 Oct 2026 (next week)", so the buyer reads a real date later. Periods such as "mid 26", "Q4 2026", "H2 2026" or "end of 2026" count as their last day, so a start is flagged as in the past only once the whole period has passed. The AI is told today's date with every turn.
 
 ## Quality thresholds and improvement round
 
