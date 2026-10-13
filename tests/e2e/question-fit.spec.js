@@ -143,6 +143,8 @@ test("bank categories: app builds, security testing, audit and tax, recruitment,
     ["Executive search for a chief risk officer, around 150k.", "hr-services", "project"],
     ["A SaaS app to track travel expenses, around 40k.", "software", "product"],
     ["Statement printing and mailing for our retail clients for 3 years, around 900k.", "bpo", "service"],
+    ["Screening lists data for onboarding, 120k per year.", "market-data", "product"],
+    ["A third-party risk data provider for supplier screening, around 300k.", "market-data", "product"],
   ];
   const got = [];
   for (const [first] of CASES) {
