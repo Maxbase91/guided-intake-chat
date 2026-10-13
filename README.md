@@ -27,6 +27,21 @@ The welcome screen offers examples to start from. Six are new demand, each showi
 - `index.html` is the whole front end. No build step.
 - `api/llm.js` is a Vercel serverless function. It holds the API keys and forwards calls to Gemini, Groq or Mistral. Keys never reach the browser.
 - The buying channel is decided in the browser by deterministic rules. The AI never picks the channel.
+- **How it works** (link in the header) opens the specification of the app: when each AI call happens, the exact prompts, the order of questions per route, the checks and the quality score. See below.
+
+## How it works panel
+
+The **How it works** link in the header opens a specification written for someone who wants to understand or rebuild the app. It covers: what the rules decide and what the AI does, the five AI calls (chat turn, suggestion, documents, document change, connection test) with what each gets, returns and does when it fails, one message step by step, routes and reviews, what is asked and when for each welcome example, classification (DORA, outsourcing per EBA/GL/2019/02, offshoring), the quality score, the outputs, the settings and a rebuild checklist.
+
+The panel is built from the code when it opens, so it never goes out of date:
+
+- The prompts are the exact texts the app sends, built for a welcome example ("A new HR system to replace our payroll tool.") in a copy of the state. They sit behind "Show full prompt" toggles. The real conversation is left untouched.
+- Thresholds, routes, lead times, quality weights and rating bands are read from the current Rules and constants.
+- Once a request has started, a "Your current request" block shows the prompt for the next message in this conversation. It appears only in the panel.
+
+**Download (.md)** saves the same content as Markdown (`guided-intake-how-it-works.md`) without the "Your current request" block, so the file never contains what a requester typed. **Print** prints it with every prompt expanded.
+
+The explanations in plain words sit in `specModel()` (section 11 of the script). When route, check or quality logic changes, update that text too; the functions it describes carry a `described in How it works` comment.
 
 ## Deploy on Vercel
 
@@ -81,6 +96,7 @@ The end-to-end tests start three local servers: offline (no key), AI (mock provi
 | `tests/e2e/live-ai-run.spec.js` | Defects found in live AI conversations: check-step corrections, work location and offshoring, Level 4 consistency, single source, date scrubbing, object-shaped AI suggestions |
 | `tests/e2e/access-and-layout.spec.js` | Access-code gate and the phone layout |
 | `tests/e2e/typing.spec.js` | Replies typing out: speed, chips after the text, click to finish, "reduce motion" (the other tests run with reduce motion through `openApp`) |
+| `tests/e2e/how-it-works.spec.js` | The How it works panel: opens at desktop and phone width, Escape closes it, the prompts shown are the ones the app sends, thresholds follow the Rules, the Markdown download never contains the requester's words, opening it mid-conversation changes nothing |
 | `tests/e2e/known-issues.spec.js` | Defects found in the assessment (see `ASSESSMENT.md`), marked `test.fail()`: they turn red ("unexpectedly passed") once fixed, then the marker can be removed |
 
 `scripts/mock-providers.js` answers in the shapes the app asks for. To exercise failures, the AI server accepts `POST /__mock` with `{"gemini":"429","groq":"500","coldStart":true}` (mock mode only).

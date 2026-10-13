@@ -48,6 +48,14 @@ button,input,select,textarea{font:inherit;color:inherit}
 .tb:hover{background:rgba(255,255,255,.18)}
 .only-m{display:none}
 @media(max-width:900px){.only-m{display:inline-flex}.brand span,.pill{display:none}}
+.howlink{background:none;border:0;padding:0;margin-left:8px;font:inherit;font-size:12px;color:#ffd36b;text-decoration:underline;cursor:pointer}
+.howlink:hover,.howlink:focus-visible{color:#fff}
+@media(max-width:900px){.howlink{display:block;margin:2px 0 0}}
+@media(max-width:600px){.top-in{gap:8px;padding:10px 12px}.brand b{white-space:nowrap;font-size:15px}.howlink{white-space:nowrap}.tb{padding:7px 10px}}
+.spec details{border:1px solid var(--line);border-radius:8px;background:#fafbfd;margin:8px 0}
+.spec summary{cursor:pointer;padding:8px 12px;font-size:13px;font-weight:600;color:var(--navy-3)}
+.spec pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.5 ui-monospace,Menlo,monospace;padding:12px;margin:0;border-top:1px solid var(--line)}
+.spec .tw{overflow-x:auto}.spec td{overflow-wrap:anywhere}.spec code{font:12px ui-monospace,Menlo,monospace;background:#f1f3f8;padding:1px 4px;border-radius:4px}
 
 /* layout */
 .app{flex:1;min-height:0;max-width:1280px;width:100%;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:20px;padding:18px}
@@ -192,7 +200,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .sec.chips span{background:var(--line-2);border-radius:99px;padding:3px 10px;font-size:12.5px;color:var(--ink-2)}
 .sec.brdlink{display:flex;gap:12px;align-items:center;justify-content:space-between;background:#f6f8fd}
 .docwrap{position:fixed;inset:0;z-index:50;background:rgba(10,18,40,.55);overflow:auto;padding:0 12px 40px}
-.doctools{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:900px;margin:0 auto;padding:12px 4px;color:#fff}
+.doctools{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:900px;margin:0 auto;padding:10px 12px;color:#fff;background:var(--navy);border-radius:0 0 10px 10px}   /* solid, so text never scrolls visibly under the buttons */
 .doctools .muted{color:#c9d3ea}.doctools .sp{flex:1}
 .paper{max-width:860px;margin:0 auto;background:#fff;border-radius:6px;padding:48px 56px;box-shadow:0 20px 50px rgba(0,0,0,.3);outline:none}
 @media(max-width:700px){.paper{padding:24px 18px}.hide-sm{display:none}.brd .two{grid-template-columns:1fr}}
@@ -260,7 +268,7 @@ body.doc-open{overflow:hidden}
 <header class="top">
   <div class="top-in">
     <div class="logo">G</div>
-    <div class="brand"><b>Guided Intake</b><span>Tell us what you need. We find the right way to buy it.</span></div>
+    <div class="brand"><b>Guided Intake</b><span>Tell us what you need. We find the right way to buy it.</span><button type="button" class="howlink" id="howBtn" aria-haspopup="dialog">How it works</button></div>
     <div class="sp"></div>
     <span class="pill"><span class="dot" id="aiDot"></span><span id="aiLabel">Offline</span></span>
     <button class="tb only-m" id="sumBtn">Summary</button>
@@ -615,6 +623,7 @@ function contractFor(f){
   return list.find(c=>c.supplier.toLowerCase().includes(s)||s.includes(c.supplier.toLowerCase()))||null;
 }
 
+// described in How it works (specModel): update its prose when the route rules change
 function determine(){
   const f=S.f, T=CONFIG.thresholds, v=known(f.value)?Number(f.value):null;
   const cat = catalogueMatches(f), ctr = contractFor(f);
@@ -628,6 +637,7 @@ function determine(){
   return {route, why, contract:ctr, catalogue:cat, controls:controlsFor(route,ctr), steps:nextSteps(route,cat,ctr)};
 }
 
+// described in How it works (specModel)
 function controlsFor(route, ctr){
   const f=S.f, T=CONFIG.thresholds, v=known(f.value)?Number(f.value):null, out=[];
   if(route==="sourcing") out.push(["i","Approval to source","Budget owner confirms need and budget before the RFP starts."]);
@@ -931,7 +941,7 @@ function offTopicIssue(k){
   return {fact:k, kind:"offtopic", issue:"answer doesn't relate to the request", message:`That doesn't seem to answer my question. ${F.q(S.f)}${ex?" "+ex:""}`};
 }
 
-// returns {fact, issue, message, choices} for the first real problem in what changed this turn, or null
+// returns {fact, issue, message, choices} for the first real problem in what changed this turn, or null (described in How it works)
 function findIssue(changed){
   const f=S.f, route=S.det&&S.det.route, ctx=userText();
   for(const k of changed) if(!S.offChecked[k] && offTopic(k, f[k])) return offTopicIssue(k);   // nonsense first, regardless of other checks
@@ -984,7 +994,9 @@ function findIssue(changed){
   return null;
 }
 
-// overall assessment of the intake: completeness, clarity, consistency
+// overall assessment of the intake: completeness, clarity, consistency (described in How it works)
+// score = 100 − warn·warnings − info·notes − incomplete·(100 − % of needed details) − section penalty (capped), never below floor
+const QUALITY={warn:15, info:5, incomplete:0.5, partialSection:3, riskSection:8, sectionCap:30, floor:35, bands:[[90,"Strong"],[75,"Good"],[55,"Fair"],[0,"Needs work"]]};
 function computeQuality(aiRemarks){
   const f=S.f, route=S.det.route, req=S.req||[], pts=[];
   const label=k=>FACTS[k]?FACTS[k].label:k;
@@ -1006,9 +1018,9 @@ function computeQuality(aiRemarks){
   let secPen=0;
   // a missing section only costs points when this route asks for it, so the requester can always lift the score in the chat; a risk always counts
   const askable=sec=>{ const m=SEC2KEY[sec], k=typeof m==="function"?m(f):m; return !!k && (req.includes(k) || (k==="data_details"&&yes(f.personal_data))); };
-  if(S.sd&&S.sd.detail){ const R=sectionQuality().filter(r=>r.status==="Risk"||askable(r.sec)); secPen=Math.min(30, 3*R.filter(r=>r.status==="Partial"||r.status==="To be determined").length + 8*R.filter(r=>r.status==="Risk").length); }
-  const score=Math.max(35,Math.min(100,100-15*warn-5*info-Math.round((100-complete)/2)-secPen));
-  const rating=score>=90?"Strong":score>=75?"Good":score>=55?"Fair":"Needs work";
+  if(S.sd&&S.sd.detail){ const R=sectionQuality().filter(r=>r.status==="Risk"||askable(r.sec)); secPen=Math.min(QUALITY.sectionCap, QUALITY.partialSection*R.filter(r=>r.status==="Partial"||r.status==="To be determined").length + QUALITY.riskSection*R.filter(r=>r.status==="Risk").length); }
+  const score=Math.max(QUALITY.floor,Math.min(100,100-QUALITY.warn*warn-QUALITY.info*info-Math.round((100-complete)*QUALITY.incomplete)-secPen));
+  const rating=QUALITY.bands.find(([min])=>score>=min)[1];
   return {score,rating,complete,points:pts};
 }
 
@@ -1031,16 +1043,19 @@ function resolveProvider(){
   if(CONFIG.provider!=="auto") return;
   CONFIG.provider = SERVER ? "server" : CONFIG.keys.gemini ? "gemini" : CONFIG.keys.groq ? "groq" : "offline";
 }
+// the browser's side of every AI call (also shown in How it works)
+const LLM_CLIENT={timeoutMs:58000, retries:2, retryMaxS:20, fastMs:15000};
+const TEST_PROMPT={system:'Return JSON {"ok":true}', user:"ping, reply in json"};   // the connection test under Rules (key in the page only)
 async function callLLM(system, history, retried){
   const p=CONFIG.provider, key=CONFIG.keys[p], model=CONFIG.models[p];
   if(p==="server"){
     const t0=Date.now();
-    const r=await fetch("/api/llm",{method:"POST",signal:AbortSignal.timeout(58000),headers:{"Content-Type":"application/json","x-access-code":CONFIG.accessCode||"",...(CONFIG.forceProvider?{"x-force-provider":CONFIG.forceProvider}:{})},body:JSON.stringify({system,history})});
+    const r=await fetch("/api/llm",{method:"POST",signal:AbortSignal.timeout(LLM_CLIENT.timeoutMs),headers:{"Content-Type":"application/json","x-access-code":CONFIG.accessCode||"",...(CONFIG.forceProvider?{"x-force-provider":CONFIG.forceProvider}:{})},body:JSON.stringify({system,history})});
     const d=await r.json().catch(()=>({}));
     if(r.status===401) throw new Error("Access code missing or wrong. Enter it under Rules.");
     // short per-minute limit: wait the few seconds the provider asks for, then try once more.
     // Not after a slow 429: the server has then already spent its time trying every provider.
-    if(r.status===429 && (retried||0)<2 && d.retryAfter && d.retryAfter<=20 && Date.now()-t0<15000){ await new Promise(res=>setTimeout(res,(d.retryAfter+1)*1000)); return callLLM(system, history, (retried||0)+1); }
+    if(r.status===429 && (retried||0)<LLM_CLIENT.retries && d.retryAfter && d.retryAfter<=LLM_CLIENT.retryMaxS && Date.now()-t0<LLM_CLIENT.fastMs){ await new Promise(res=>setTimeout(res,(d.retryAfter+1)*1000)); return callLLM(system, history, (retried||0)+1); }
     if(!r.ok){ const e=new Error(d.error||`Server error ${r.status}`); e.quota=r.status===429||!!d.quota; throw e; }
     if(SERVER && d.provider) SERVER.last=d.provider;
     return parseJSON(d.text);
@@ -1141,6 +1156,8 @@ function contextLines(){
     (pref.length?`\nPreferred suppliers: ${pref.join(", ")}.`:"")+
     (cat.length?`\nCatalogue: ${cat.map(x=>`${x.name} ${money(x.price)}`).join("; ")}.`:"");
 }
+// the message sent with each chat turn: recent conversation, the latest answer and the app's state (also shown in How it works)
+const chatUser = (transcript, text, pend) => `${transcript?`Conversation so far:\n${transcript}\n\n`:""}Latest user message:\n${text}${stateBlock(pend)}\n\nAnswer with the JSON object only.`;
 function stateBlock(pend){
   const f=S.f, still=S.missing.map((k,i)=>i<3?{key:k,label:FACTS[k].label,stage:STAGES[stageOf(k)].name,ask:FACTS[k].q(f),example:(FACTS[k].ex(f)||""),...(isSug(k)?{suggest:true}:{}),...(BUNDLES[k]?{lines:BUNDLES[k].map(([L])=>L)}:{})}:{key:k,label:FACTS[k].label});
   return `\n\n[STATE]\nknown_facts: ${JSON.stringify(Object.fromEntries(Object.entries(f).filter(([k,v])=>known(v)&&v!==false)))}\n`+
@@ -1331,6 +1348,7 @@ async function handleUser(text){
   catch(e){ if(e instanceof Stale) return; console.error(e); if(S.cid===cid) S.msgs.push({role:"assistant",kind:"sys",text:"Something went wrong on my side. Please send that again."}); }
   finally{ if(S.cid===cid){ S.busy=false; render(); } }
 }
+// one message, step by step (described in How it works, section 4)
 async function handleTurn(text, cid, opts={}){
   // answer to the offer to improve a below-threshold description
   if(S.offerImprove){
@@ -1386,7 +1404,7 @@ async function handleTurn(text, cid, opts={}){
   if(aiReady()){
     try{
       const transcript=S.msgs.filter(m=>!m.kind).slice(0,-1).slice(-8).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
-      const out = await callLLM(chatSystem(), [{role:"user",content:`${transcript?`Conversation so far:\n${transcript}\n\n`:""}Latest user message:\n${text}${stateBlock(pend)}\n\nAnswer with the JSON object only.`}]);
+      const out = await callLLM(chatSystem(), [{role:"user",content:chatUser(transcript, text, pend)}]);
       guard(cid);
       const aiCorr=normCorr(out.corrections);
       if(aiCorr && !opts.corrDone){
@@ -1866,17 +1884,25 @@ function domainNotes(f){
   return `${base}\nThis request looks like ${d.name}. At a large bank, typically: audience ${d.aud}; functions ${d.fun}; benefits ${d.ben}; KPIs ${d.kpi}; service levels ${d.sl}; regulatory angle ${d.reg}; out of scope ${d.out}; qualifications ${d.qual}; dependencies ${d.deps}.${d.personal?` Data usually involved: ${d.personal}.`:""} ${d.notes}`;
 }
 // a suggestion written by the AI for one question, grounded in the request and in typical bank practice
-async function aiSuggest(k, cid){
-  if(!aiReady()) return null;
-  const f=S.f, lines=BUNDLES[k]?BUNDLES[k].map(([L])=>L):null, draft=offlineSuggest(k);
-  const known_=Object.fromEntries(["item","summary","background","impact_delay","users","functions","current_solution","must_haves","scope_in","value","duration","location","quantity","needed_by"].filter(x=>givenText(f[x])).map(x=>[x,givenText(f[x])]));
-  const system=`${BANK_CONTEXT}\n\nYou write ONE suggested answer for a question in a procurement intake chat. The user will accept it or change it.\n${domainNotes(f)}\n
+// the suggestion prompt: one tailored answer the requester can accept or change (also shown in How it works)
+function suggestSystem(k){
+  const f=S.f, lines=BUNDLES[k]?BUNDLES[k].map(([L])=>L):null;
+  return `${BANK_CONTEXT}\n\nYou write ONE suggested answer for a question in a procurement intake chat. The user will accept it or change it.\n${domainNotes(f)}\n
 Rules: specific to this request and to a large bank; plain words; no abbreviations without writing them out; no invented figures about this organisation (typical service levels are fine as suggestions); short points separated by semicolons.
 Keep it short: at most 4 points per line and at most 45 words per line. Pick the most important points; do not list everything.
 ${lines?`Write exactly these lines, each "Label: text" on its own line, in this order: ${lines.join(" | ")}.`:"Write one short paragraph or a few points separated by semicolons."}
 Return JSON only: {"suggestion":"..."}; "suggestion" is one plain string, never an object or a list.`;
+}
+function suggestUser(k){
+  const f=S.f, draft=offlineSuggest(k);
+  const known_=Object.fromEntries(["item","summary","background","impact_delay","users","functions","current_solution","must_haves","scope_in","value","duration","location","quantity","needed_by"].filter(x=>givenText(f[x])).map(x=>[x,givenText(f[x])]));
+  return `Question: ${FACTS[k].q(f)}\nWhat we know: ${JSON.stringify(known_)}\nA generic draft to improve on (make it specific; keep its line labels): ${draft}\n\nJSON only.`;
+}
+async function aiSuggest(k, cid){
+  if(!aiReady()) return null;
+  const lines=BUNDLES[k]?BUNDLES[k].map(([L])=>L):null;
   try{
-    const out=await callLLM(system,[{role:"user",content:`Question: ${FACTS[k].q(f)}\nWhat we know: ${JSON.stringify(known_)}\nA generic draft to improve on (make it specific; keep its line labels): ${draft}\n\nJSON only.`}]);
+    const out=await callLLM(suggestSystem(k),[{role:"user",content:suggestUser(k)}]);
     guard(cid);
     const sg=tidySuggestion(k, out&&out.suggestion||"");
     if(!sg || words(sg)<4) return null;
@@ -2767,12 +2793,7 @@ async function buildDoc(cid=S.cid){
   let ai=null;
   if(aiReady()){
     try{
-      const convo=S.msgs.filter(m=>!m.kind).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
-      const docMsg=[{role:"user",content:`Conversation:\n${convo}\n\nFacts: ${JSON.stringify({...cleanFacts(), value_display: known(S.f.value)?money(Number(S.f.value))+(S.f.value_is_estimate?" (estimate)":""):"unknown"})}\nCategory: ${catById(S.f.category).name}\n`+
-        `ICT service (DORA): ${cl.ict?cl.ict.text:"not assessed"}\nOutsourcing: ${cl.out?cl.out.text:"not assessed"}\n`+
-        (NEW_DEMAND(S.det.route)?`Critical or important function: ${isImportant(S.f)?"may apply (flag only)":"no indication"}\nProvisioning legal entity: ${(entityById(S.f.entity)||{}).name||"to be determined"}\nDerived facts checked by the requester: ${known(S.f.confirm_derived)&&!isTBD(S.f.confirm_derived)?S.f.confirm_derived:"no"}\n`+
-          `Initial Level 4 classification: ${(S.l4Initial||[]).map(x=>`${x.code} ${x.name} (${x.match}%)`).join("; ")}\nLevel 4 list: ${L4.map(e=>`${e.code} ${e.name}: ${e.desc}`).join(" | ")}\n`:"")+
-        `Recommended route: ${CHANNELS[S.det.route].name}. ${S.det.why}\nChecks triggered: ${S.det.controls.map(c=>c[1]).join(", ")||"none"}\nExisting contract: ${S.det.contract?`${S.det.contract.title} with ${S.det.contract.supplier}`:"none"}\nPreferred suppliers: ${(PREFERRED[S.f.category]||[]).join(", ")||"none"}`}];
+      const docMsg=[{role:"user",content:docUser()}];
       for(let attempt=0; attempt<2; attempt++){
         try{ ai=await callLLM(DOC_SYSTEM(),docMsg); } catch(e){ if(attempt || e.quota) throw e; ai=null; }   // every provider at its limit: build from the answers now
         guard(cid);
@@ -2795,10 +2816,21 @@ async function buildDoc(cid=S.cid){
 }
 const cleanFacts = () => Object.fromEntries(Object.entries(S.f).filter(([k,v])=>known(v)&&k!=="decline_contract").map(([k,v])=>[k,v===true?"yes":v===false?"no":v]));
 
+// the message sent to write the documents: the whole conversation, the facts and what the rules decided (also shown in How it works)
+function docUser(){
+  const cl=classify(S.f), convo=S.msgs.filter(m=>!m.kind).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n");
+  return `Conversation:\n${convo}\n\nFacts: ${JSON.stringify({...cleanFacts(), value_display: known(S.f.value)?money(Number(S.f.value))+(S.f.value_is_estimate?" (estimate)":""):"unknown"})}\nCategory: ${catById(S.f.category).name}\n`+
+        `ICT service (DORA): ${cl.ict?cl.ict.text:"not assessed"}\nOutsourcing: ${cl.out?cl.out.text:"not assessed"}\n`+
+        (NEW_DEMAND(S.det.route)?`Critical or important function: ${isImportant(S.f)?"may apply (flag only)":"no indication"}\nProvisioning legal entity: ${(entityById(S.f.entity)||{}).name||"to be determined"}\nDerived facts checked by the requester: ${known(S.f.confirm_derived)&&!isTBD(S.f.confirm_derived)?S.f.confirm_derived:"no"}\n`+
+          `Initial Level 4 classification: ${(S.l4Initial||[]).map(x=>`${x.code} ${x.name} (${x.match}%)`).join("; ")}\nLevel 4 list: ${L4.map(e=>`${e.code} ${e.name}: ${e.desc}`).join(" | ")}\n`:"")+
+        `Recommended route: ${CHANNELS[S.det.route].name}. ${S.det.why}\nChecks triggered: ${S.det.controls.map(c=>c[1]).join(", ")||"none"}\nExisting contract: ${S.det.contract?`${S.det.contract.title} with ${S.det.contract.supplier}`:"none"}\nPreferred suppliers: ${(PREFERRED[S.f.category]||[]).join(", ")||"none"}`;
+}
+// the message sent to change the documents on request
+const refineUser = (current, text) => `Current service description and requirements document: ${JSON.stringify(current)}\nChange request: ${text}\nReturn the full updated JSON in the same shape. The description rules still apply.`;
 async function refineSD(text){
   const cid=S.cid;
   S.msgs.push({role:"user",text}); S.busy=true; render();
-  try{ const d=await callLLM(DOC_SYSTEM(),[{role:"user",content:`Current service description and requirements document: ${JSON.stringify({description:{name:S.sd.title,...S.sd.desc},brd:S.sd.brd})}\nChange request: ${text}\nReturn the full updated JSON in the same shape. The description rules still apply.`}]);
+  try{ const d=await callLLM(DOC_SYSTEM(),[{role:"user",content:refineUser({description:{name:S.sd.title,...S.sd.desc},brd:S.sd.brd}, text)}]);
        if(S.cid!==cid) return;
        const nm=d.description&&scrubText(String(d.description.name||"")).replace(/\.$/,"");
        S.sd={...S.sd,title:nm||S.sd.title,desc:mergeDesc(S.sd.desc,d.description),brd:mergeBRD(S.sd.brd,d.brd)}; S.brdEdited=null;
@@ -3164,7 +3196,7 @@ function openBRD(){
   $("#paper").addEventListener("input",()=>S.brdEdited=$("#paper").innerHTML);
   document.querySelectorAll("[data-doc]").forEach(b=>b.onclick=()=>{
     const a=b.dataset.doc;
-    if(a==="close"){ $("#docRoot").innerHTML=""; document.body.classList.remove("doc-open"); }
+    if(a==="close") closeDoc();
     if(a==="print") window.print();
     if(a==="json") download();
     if(a==="word") downloadWord();
@@ -3293,7 +3325,7 @@ function openSettings(){
       if(p==="offline"||p==="auto"){ $("#pf").innerHTML=`<div class="alert info">Standard questions with examples. Nothing leaves the browser.</div>`; return; }
       $("#pf").innerHTML=`<label>${names[p]} API key</label><input class="inp" type="password" id="key" value="${esc(CONFIG.keys[p])}"><label>Model</label><input class="inp" id="model" value="${esc(CONFIG.models[p])}"><button class="btn btn-g" id="tbtn" style="margin-top:12px">Test connection</button>`;
       $("#key").oninput=e=>{CONFIG.keys[p]=e.target.value.trim();render();}; $("#model").oninput=e=>CONFIG.models[p]=e.target.value.trim();
-      $("#tbtn").onclick=async()=>{$("#test").innerHTML=`<div class="alert info">Testing…</div>`;try{await callLLM('Return JSON {"ok":true}',[{role:"user",content:"ping, reply in json"}]);$("#test").innerHTML=`<div class="alert info">Connected.</div>`;}catch(e){$("#test").innerHTML=`<div class="alert err">${esc(e.message)}</div>`;}};
+      $("#tbtn").onclick=async()=>{$("#test").innerHTML=`<div class="alert info">Testing…</div>`;try{await callLLM(TEST_PROMPT.system,[{role:"user",content:TEST_PROMPT.user}]);$("#test").innerHTML=`<div class="alert info">Connected.</div>`;}catch(e){$("#test").innerHTML=`<div class="alert err">${esc(e.message)}</div>`;}};
     };
     pf();
     document.querySelectorAll("#prov button").forEach(b=>b.onclick=()=>{CONFIG.provider=b.dataset.p;document.querySelectorAll("#prov button").forEach(x=>x.classList.toggle("on",x===b));pf();render();});
@@ -3304,7 +3336,241 @@ function openSettings(){
 }
 
 /* =========================================================
-   11. WIRING
+   11. HOW IT WORKS (a specification generated from this code)
+   ========================================================= */
+// One block model feeds the panel and the Markdown download. Values, question lists and prompts are read from the code,
+// so they stay current; the prose describes determine, controlsFor, findIssue, computeQuality and handleTurn —
+// update it when you change them.
+const SB={ h:(n,text)=>({t:"h",n,text}), p:text=>({t:"p",text}), ul:items=>({t:"ul",items}), ol:items=>({t:"ol",items}),
+  table:(head,rows)=>({t:"table",head,rows}), prompt:(label,text)=>({t:"prompt",label,text}) };
+const specInline = s => esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`([^`]+)`/g,"<code>$1</code>");
+function specHtml(blocks){
+  return blocks.map(b=>
+    b.t==="h" ? `<h${b.n}${b.n===1?' id="specH1"':""}>${specInline(b.text)}</h${b.n}>` :
+    b.t==="p" ? `<p>${specInline(b.text)}</p>` :
+    b.t==="ul"||b.t==="ol" ? `<${b.t}>${b.items.map(x=>`<li>${specInline(x)}</li>`).join("")}</${b.t}>` :
+    b.t==="table" ? `<div class="tw"><table><tr>${b.head.map(x=>`<th>${specInline(x)}</th>`).join("")}</tr>${b.rows.map(r=>`<tr>${r.map(x=>`<td>${specInline(String(x))}</td>`).join("")}</tr>`).join("")}</table></div>` :
+    b.t==="prompt" ? `<details class="prompt"><summary>Show full prompt: ${esc(b.label)}</summary><pre>${esc(b.text)}</pre></details>` : "").join("\n");
+}
+function specMd(blocks){
+  const cell=x=>String(x).replace(/\|/g,"\\|").replace(/\n+/g," ");
+  return blocks.map(b=>
+    b.t==="h" ? `${"#".repeat(b.n)} ${b.text}` :
+    b.t==="p" ? b.text :
+    b.t==="ul" ? b.items.map(x=>`- ${x}`).join("\n") :
+    b.t==="ol" ? b.items.map((x,i)=>`${i+1}. ${x}`).join("\n") :
+    b.t==="table" ? [`| ${b.head.map(cell).join(" | ")} |`, `| ${b.head.map(()=>"---").join(" | ")} |`, ...b.rows.map(r=>`| ${r.map(cell).join(" | ")} |`)].join("\n") :
+    b.t==="prompt" ? (()=>{ const fence="`".repeat(Math.max(2,...(b.text.match(/`+/g)||[]).map(x=>x.length))+1); return `**${b.label}**\n\n${fence}text\n${b.text}\n${fence}`; })() : "").join("\n\n")+"\n";
+}
+// runs fn on a fresh copy of the app started with one example message, then puts the user's conversation back exactly
+// (synchronous: nothing else can run in between; never renders)
+function withExampleState(text, fn){
+  const saved={...S}, seq=CONV_SEQ;
+  try{
+    Object.keys(S).forEach(k=>delete S[k]); Object.assign(S, fresh());
+    S.msgs.push({role:"user",text}); offlineRead(text, null); refresh();
+    if(S.det) S.l4Initial=initialL4();
+    return fn();
+  } finally { Object.keys(S).forEach(k=>delete S[k]); Object.assign(S, saved); CONV_SEQ=seq; }
+}
+const specTry = (fn, fallback="(could not be generated)") => { try{ return fn(); }catch(e){ return `${fallback}: ${e.message}`; } };
+const specOrder = keys => [...keys].sort((a,b)=>(stageOf(a)-stageOf(b))||(posIn(a)-posIn(b)));
+const specLabel = k => k==="confirm_derived" ? "Check step" : FACTS[k] ? FACTS[k].label : k;
+const specExample = label => (TRIES.find(x=>x[1]===label)||TRIES[0])[2];
+
+function specModel(withCurrent){
+  const {h,p,ul,ol,table,prompt}=SB, T=CONFIG.thresholds, eur=v=>money(v), R=RULESETS, B=[];
+  const main=specExample("Software, RFP"), cat=specExample("Catalogue"), quote=specExample("Under €50k");
+  // the user's own conversation, read only (panel only, never in the download)
+  const current = withCurrent && S.det ? {
+    system: specTry(()=>chatSystem()),
+    user: specTry(()=>chatUser(S.msgs.filter(m=>!m.kind).slice(-8).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n"), "(your next message)", S.pending)),
+    route: CHANNELS[S.det.route].name } : null;
+  // everything that depends on a request, taken from the real code run on the welcome examples
+  const ex = withExampleState(main, ()=>{
+    const req=specOrder(S.req||[]), sug=req.find(k=>BUNDLES[k]&&isSug(k))||req.find(k=>isSug(k));
+    return { route:CHANNELS[S.det.route].name, limits:execLimits(),
+      rows:req.map(k=>{ const F=FACTS[k]||{}, ch=typeof F.choices==="function"?F.choices(S.f):F.choices;
+        return k==="confirm_derived" ? ["Check step","The list of what the rules worked out (see below)","","",'"Yes, that\'s right", "Something\'s wrong"',""]
+          : [F.label, specTry(()=>F.q(S.f)), specTry(()=>F.ex?F.ex(S.f):""), isSug(k)?"Yes":"", (ch||[]).join(", "), known(S.f[k])?"✓ not asked":""]; }),
+      chatSys:specTry(()=>chatSystem()), chatMsg:specTry(()=>chatUser("", main, null)),
+      sugKey:sug, sugSys:sug?specTry(()=>suggestSystem(sug)):"", sugMsg:sug?specTry(()=>suggestUser(sug)):"",
+      docSys:specTry(()=>DOC_SYSTEM()), docMsg:specTry(()=>docUser()),
+      payloadKeys:specTry(()=>Object.keys(payload()).join(", "), "created, facts, conversation, decision, quality, …") };
+  });
+  const exCat = withExampleState(cat, ()=>({ route:CHANNELS[S.det.route].name, docSys:specTry(()=>DOC_SYSTEM()) }));
+  const exQuote = withExampleState(quote, ()=>({ limits:execLimits() }));
+  const flows = TRIES.map(([g,lab,text])=>withExampleState(text, ()=>[`${lab} (${g.toLowerCase()})`, `“${text}”`, S.det?CHANNELS[S.det.route].name:"–", specOrder(S.req||[]).map(k=>(known(S.f[k])?"✓ ":"")+specLabel(k)).join(" → ")]));
+  const frameworks = CONTRACTS.filter(c=>new Date(c.expires)>new Date());
+
+  B.push(h(1,"How Guided Intake works"),
+    p(`Generated ${new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})} from the code of this page. Outsourcing group standard: **${R.current.id}**. Thresholds as currently set under Rules. Prompts are shown exactly as the app sends them, for a welcome-screen example.`));
+  if(current) B.push(h(2,"Your current request"),
+    p(`So far: **${current.route}**. This is the prompt the AI gets with your next message. It is shown here only and is not part of the download.`),
+    prompt("Chat prompt for your request", current.system), prompt("Message sent with your next answer", current.user));
+
+  B.push(h(2,"1. What it is"),
+    p("Guided Intake turns a request in plain words into a procurement-ready request: the buying route, the details that route needs, a service description and the documents."),
+    ul(["**Fixed rules decide:** the category, the route, which questions are asked and in which order, what is worked out from the answers (technology, outsourcing, entity, offshoring), the check step, the reviews and the quality score.",
+      "**The AI (when available) does:** read facts from free text, phrase the next question with an example, suggest answers, judge answers and write the documents.",
+      "**The AI never decides:** the route, which questions are asked, the outsourcing or ICT classification, or the quality score.",
+      "**Without AI** the same rules ask standard questions with examples and build the documents from the answers."]));
+
+  B.push(h(2,"2. How it is built"),
+    ul(["**One page** (`index.html`): the screen, the rules, the prompts and the fallback without AI, in numbered script sections (configuration, reference data, …, how it works, wiring).",
+      "**A small server function** (`api/llm.js`, on Vercel) holds the AI keys, tries the AI providers in order and returns the answer as text.",
+      "**Three modes**, chosen at start: **server** (the function answers), **key in the page** (a Gemini or Groq key pasted under Rules, for running from a file) and **offline** (no AI). The AI can be switched off under Rules at any time."]),
+    table(["Order","Provider","Notes"],[["1","Gemini (main model)","gemini-2.5-flash by default"],["2","Gemini (fallback model)","gemini-2.5-flash-lite by default"],["3","Groq","rotates through up to 6 models"],["4","Mistral","rotates through its small models"]]),
+    ul([`**Time limits:** 25 s per provider call; 55 s per request in total (no new provider is started after 30 s once something failed); the page waits up to ${LLM_CLIENT.timeoutMs/1000} s.`,
+      `**Usage limits:** a provider at its limit is skipped for the time it asks for. When all are at their limit the server answers 429 with a retry time. The page retries at most ${LLM_CLIENT.retries} times, and only when the retry time is at most ${LLM_CLIENT.retryMaxS} s and the 429 came back within ${LLM_CLIENT.fastMs/1000} s; otherwise that message is handled by the rules.`,
+      "**Access code:** with `ACCESS_CODE` set, the page asks for it (checked at `/api/llm?verify`) and sends it with every AI call as the header `x-access-code`. `GET /api/llm` reports which providers are configured.",
+      ...(SERVER?[`**On this deployment:** ${["gemini","groq","mistral"].filter(x=>SERVER.providers[x]).map(x=>PNAMES[x]).join(", ")||"no provider"} configured${SERVER.accessRequired?", access code required":""}.`]:[])]));
+
+  B.push(h(2,"3. When an AI model is called"),
+    table(["Call","When","What it gets","What it returns","If it fails"],[
+      ["A. Chat turn","Every message while the AI is on (not for corrections the rules already understood, nor for a request to change the documents)","The chat prompt; the last 8 messages; the latest message; the app's state: known facts, route so far, items already checked, a pending check, the next items still needed with their question and example","JSON: facts, reply, asking, choices, complete, suggestion, corrections, answers_question, assessment (fact, ok, issue, follow-up, score 1–10)","A short note in the chat; the rules read the answer and ask the standard question"],
+      ["B. Suggestion","The next question is a suggestion item and the chat turn gave no usable suggestion; also when the chat resumes (after a correction, the improvement round or Add)","The suggestion prompt; the question; what is known; the rules' own draft","One plain string; for bundles one “Label: text” line per label","The rules' draft is shown"],
+      ["C. Documents","Once every needed detail is there (rebuilt only when the facts change)","The documents prompt; the whole conversation; the facts; category; ICT and outsourcing result; route and why; reviews; contract; preferred suppliers. New demand also: critical-function flag, entity, check-step result, the Level 4 list","JSON: description, brd; new demand also detail, compact, l4_final, quality_remarks","One retry (none at a usage limit); the documents are built from the answers"],
+      ["D. Document change","“Make it shorter”, “rewrite the summary” … once a description exists","The documents prompt; the current description and requirements; the request","The same JSON; description and requirements are merged","A note; the text can be edited directly"],
+      ["E. Connection test","Rules → Test (key in the page only)","“Return JSON {\"ok\":true}”","{\"ok\":true}","The error is shown"]]));
+
+  B.push(h(2,"4. One message, step by step"),
+    ol(["A reply still typing out is shown in full, and the message is added to the chat.",
+      "**Open offers come first:** an answer to “improve it?” or to a correction the chat asked about.",
+      "**Corrections in words** (“sorry, the budget is 80k not 30k”, “it's not software, it's consulting”) are applied by the rules; the route is checked again and the chat returns to the open question.",
+      "**Requests to change the documents** go to call D once a description exists.",
+      "**Reading the answer:** with AI, call A; its facts are merged (amounts through the money reader) and its corrections applied. The rules then read the same answer as a backup (closed questions, dates, amounts, places) and fill only what is still unknown. Without AI, only the rules read it.",
+      "**Suggestions:** “Use this suggestion” or “yes, but add …” stores the suggested lines; “skip” records “Not given”.",
+      "**The check step and follow-up checks** are resolved: a date fixed or flexible, a thin answer extended, a data location added, an off-topic answer recorded as not given.",
+      "**After two tries** a question is given up: a value becomes an estimate, a yes/no becomes “not sure”, anything else “Not given”.",
+      "**Recompute:** relative dates become dates (“next week” → “19 Oct 2026 (next week)”); facts are worked out (technology, users, entity, could the bank do it itself, offshoring, Level 4); then the route, the questions needed, the stages and what is still missing.",
+      "**First route:** the initial Level 4 classification card is shown.",
+      "**Answer checks** (section 9) may ask one follow-up instead of the next question.",
+      "**Next:** the next missing item is asked. The AI's wording is used only when it asks one of the next two items in the same stage; a new stage shows a recap card and a step marker. When nothing is missing: documents (call C) → route card → quality check, and below the threshold an improvement round."]));
+
+  B.push(h(2,"5. Routes and reviews"),
+    p("The rules check in this order; the first that fits wins:"),
+    ol([`**Catalogue order**: a catalogue item of the request's type is named (whole word) and the value fits its price: at most twice price × quantity, or without a quantity at most ${eur(T.quickQuoteMax)}.`,
+      "**Contract call-off**: an active framework contract covers the category, unless the requester declines it or the category is only a guess.",
+      `**New demand: business-led sourcing**: value up to ${eur(T.quickQuoteMax)}; the business collects three quotes.`,
+      "**New demand: procurement-led sourcing**: everything else, including an unknown value; procurement runs an RFP."]),
+    table(["Route","Typical working days","A start date counts as tight under"], Object.entries(CHANNELS).map(([k,c])=>[c.name, c.days, `${LEAD_DAYS[k]} days`])),
+    table(["Category with a framework contract","Contract","Supplier","Ends"], frameworks.map(c=>[catById(c.category).name, c.title, c.supplier, fmtDate(c.expires)])),
+    p(`**Reviews added to the result:** data protection review (personal or client data); ICT review under DORA (a technology service, for new demand or external workers); outsourcing assessment (outsourcing likely or to be determined); critical or important function check; access review (money or privileged access); offshoring check; subcontractor check; site access; material spend review (value from ${eur(T.materialityMin)}); non-preferred supplier; single-source justification (a named supplier with a reason, unless it is to be included in a competition); risk questionnaire.`));
+
+  B.push(h(2,"6. What is asked, and when"),
+    p("Questions come in stages; only stages with open questions for the route appear. The order within a stage is fixed, and anything already said is never asked again."),
+    table(["Step","Stage","What the chat says"], STAGES.map((st,i)=>[String(i+1), st.name, st.intro||""])),
+    h(3,"Questions for each welcome example"),
+    table(["Example","First message","Route","Details the route needs, in order (✓ already given or worked out from the first message, so not asked)"], flows),
+    h(3,`The new-demand example in detail: “${main}”`),
+    p(`Route: **${ex.route}**. Items marked as suggestion get a tailored proposal (call B, or the rules' draft) that can be accepted in one tap; bundles fill several lines at once.`),
+    table(["Item","Question","Example given","Suggestion","Quick answers","From the first message"], ex.rows),
+    p("**The check step (new demand):** a numbered list of what the rules worked out (working title, Level 4, entity, ongoing or one-off, could the bank do it itself, technology, critical function, access, offshoring) and what it means (outsourcing result, reviews needed). “Yes” confirms. Corrections in words or “point 9 is wrong” change it. A reply that changes nothing is asked again."));
+
+  B.push(h(2,"7. The prompts"),
+    h(3,"A. Chat turn"),
+    ul(["**The app checks the reply:** sentences naming internal fields or values are removed; a reply without a question is dropped; the AI's question is used only for the next item.",
+      "**The rules keep control:** the route, the check-step text and the order of questions always come from the rules.",
+      "**Guards on facts:** a place the AI takes from an answer about users or data is not used as the work location; an off-topic verdict only counts for the question just asked; a storage place counts only when the requester said it."]),
+    prompt(`A. Chat turn: system prompt (example: “${main}”)`, ex.chatSys),
+    prompt("A. Chat turn: message sent with the first answer", ex.chatMsg),
+    h(3,"B. Suggestion"),
+    ul(["**Cleaned:** no internal keys, no dates, at most 4 points per line.",
+      "**Checked:** for bundles every line label must be there, otherwise the rules' draft is used. Accepted lines are stored by the app, never by the AI."]),
+    ...(ex.sugKey?[prompt(`B. Suggestion: system prompt (for “${specLabel(ex.sugKey)}”)`, ex.sugSys), prompt("B. Suggestion: message sent", ex.sugMsg)]:[]),
+    h(3,"C. Documents"),
+    ul(["**Scrubbed:** the description loses amounts, dates, places, supplier names, the route and risk answers, and must meet its word limits.",
+      "**Merged with the rules:** the requirements keep the rules' risk lines; the Level 4 confirmed at the check step stays (the AI's pick only adds a note); up to 2 AI remarks join the quality check."]),
+    prompt("C. Documents: system prompt for new demand", ex.docSys),
+    prompt("C. Documents: message sent (example, right after the first message)", ex.docMsg),
+    prompt(`C. Documents: system prompt for other routes (example route: ${exCat.route})`, exCat.docSys),
+    h(3,"D. Document change"),
+    prompt("D. Document change: message sent (with the documents prompt above)", refineUser({description:{name:"(current service description)"},brd:"(current requirements)"}, "Make the summary shorter")),
+    h(3,"E. Connection test"),
+    prompt("E. Connection test", `System: ${TEST_PROMPT.system}\nMessage: ${TEST_PROMPT.user}`));
+
+  B.push(h(2,"8. Classification"),
+    ul(["**Category:** keywords as whole words (plurals count; `*` marks a stem such as `consult*`). The category with most keywords wins; on a tie the one named last before “for”, “to”, “with”, “that” or a comma. A goods word after “to”, “trading”, “service”, “help” … does not count. With no keyword, management consulting is a guess, never a framework call-off. With AI, the AI's category is used.",
+      "**Level 4:** scored within the category (keywords, overlap with name and description). The AI may propose one with the first message. The value confirmed at the check step is final.",
+      "**ICT service (DORA):** whether technology is involved comes from the rules or the answer; for software the type follows Level 4 (SaaS or licensing), otherwise keywords.",
+      `**Outsourcing, group standard ${R.current.id}** (the legal entity does not change the result): 1. excluded under paragraph 28 (goods, statutory audit, card schemes, clearing, SWIFT, correspondent banking, legal, facilities, market data, telecom, training, marketing, external workers) → not outsourcing; 2. not performed on a recurrent or ongoing basis (paragraph 26) → not outsourcing (likely); 3. work the bank does or could realistically do itself (paragraph 26) → outsourcing (likely); otherwise not outsourcing (likely), or to be determined when unclear. A critical or important function (paragraphs 29–31) is a flag for review, never a decision.`,
+      `**Future rule set ${R.future.id}** (${R.future.status}): shown as a preview only.`,
+      "**Critical or important function:** from the answer on impact (clients, payments, regulatory, trading, outage, audit) or a known bank domain (KYC, payments, payroll, contact centre, regulatory reporting, service desk); never for events, training, office or hardware.",
+      "**Offshoring:** the provider works from a country other than the entity's. An explicit “no” wins; where users or data are does not count."]));
+
+  B.push(h(2,"9. Quality"),
+    h(3,"Checks on each answer"),
+    ul(["**Off-topic:** nothing to do with the request; asked again once, then recorded as “Not given”.",
+      "**Too vague:** “tbd”, “stuff”, one or two words for a free-text item.",
+      "**Data without a storage place:** asked once (always).",
+      "**Implausible amounts:** a day-rate mismatch over 50%, project work under €5,000, months of work under €3,000, over €20 million.",
+      "**Contradictions:** “no personal data” or “no technology” against the request; “no impact” despite audit or regulatory context.",
+      "**Dates:** in the past, or tighter than the route usually takes."]),
+    p(`At most one follow-up per item and three per conversation (off-topic and data location are always asked). With AI, the AI's own judgement adds checks after the rules. A hidden 1–10 rating of each answer gives one tip for a thin new-demand answer when it is ${T.answerTip} or lower (at most three tips; 0 under Rules switches tips off).`),
+    h(3,"The overall score"),
+    p(`Score = 100 − ${QUALITY.warn} × warnings − ${QUALITY.info} × notes − ${QUALITY.incomplete} × (100 − % of needed details given) − a section penalty (at most ${QUALITY.sectionCap}: ${QUALITY.partialSection} per partial section the route asks for, ${QUALITY.riskSection} per risk), never below ${QUALITY.floor}.`),
+    table(["Score","Rating"], QUALITY.bands.map(([min,name],i)=>[`${Math.max(min,QUALITY.floor)}–${i?QUALITY.bands[i-1][0]-1:100}`, name])),
+    ul(["**Warnings:** an answer confirmed despite a check, no usable answer, a needed detail still open, data without a storage place, budget not approved for an RFP.",
+      "**Notes:** a flexible start date, an estimated budget, a tight timeline, up to 2 remarks from the AI."]),
+    p(`**Improvement round:** for new demand scoring below ${T.qualityMin} (set under Rules), the chat offers to go through up to 8 points that would lift it; “Submit anyway” stays possible and is recorded as submitted below the threshold.`),
+    p("**To improve** lists gaps in what the route asked, and risks. **Optional for this request** lists sections the route did not ask, only when they matter for this demand (for example governance for long or critical services, change management for software), each with its reason and, where the chat has a question, an Add button."));
+
+  B.push(h(2,"10. What comes out"),
+    ul([`**Service description:** for new demand a headline (${ex.limits.headMin}–${ex.limits.head} words for an RFP, ${exQuote.limits.headMin}–${exQuote.limits.head} for three quotes), an executive description (${ex.limits.execMin}–${ex.limits.exec} words; ${exQuote.limits.execMin}–${exQuote.limits.exec}) and a summary table (${EXEC_ROWS.map(r=>r[1]).join(", ")}). Other routes get a short description. It never contains amounts, dates, places, suppliers, the route or risk answers.`,
+      "**Captured for procurement:** the record table with the route, Level 4, budget, timing, supplier, entity, data access, outsourcing, ICT, critical function, materiality and the check-step result.",
+      "**Sourcing request text:** one paragraph for the RFP.",
+      `**Detailed document (new demand):** ${DETAIL_SECTIONS.length} sections (${DETAIL_SECTIONS.map(s=>s[1]).join(", ")}), obligations as “The Service Provider shall …”, sourcing attributes, materiality inputs, quality by section, the Level 4 check, and appendices with the facts and the conversation.`,
+      "**Business requirements document (other routes):** requirements with priority, milestones, evaluation, stakeholders, risk and compliance.",
+      `**JSON on submit:** ${ex.payloadKeys}.`]));
+
+  B.push(h(2,"11. Settings and reference data"),
+    table(["Setting (Rules)","Value","Effect"],[
+      ["Business-led sourcing up to", eur(T.quickQuoteMax), "Three quotes up to it, RFP above; also the most a catalogue order can be without a quantity"],
+      ["Material spend review from", eur(T.materialityMin), "Adds the material spend review"],
+      ["Quality needed before submitting", String(T.qualityMin), "Below it the chat offers an improvement round"],
+      ["Tips for thin answers", String(T.answerTip), "One tip when a new-demand answer rates this or lower (0 = off)"]]),
+    table(["Category","Type","Keywords (first five)","Framework contract"], CATEGORIES.map(c=>[c.name, DEMAND_TYPES[c.type]||c.type, c.kw.slice(0,5).join(", "), (frameworks.find(x=>x.category===c.id)||{}).supplier||"–"])),
+    table(["Level 4","Name","Category"], L4.map(e=>[e.code, e.name, catById(e.cat).name])),
+    p("All reference data (catalogue, contracts, preferred suppliers, entities) is mock data; replace it with your own."));
+
+  B.push(h(2,"12. To rebuild it"),
+    ol(["**Reference data:** categories with keywords, the Level 4 list, catalogue, framework contracts, preferred suppliers, legal entities.",
+      "**Rules:** category and Level 4, the route (section 5), the questions per route and their order (section 6), facts worked out from answers, reviews, outsourcing per the group standard (section 8), answer checks and the quality score (section 9).",
+      "**The conversation loop** in section 4, with a rule-based reader as a backup for every AI step.",
+      "**Prompts A–E** (section 7) with their JSON shapes. Always validate and override the AI's output as described.",
+      "**A server function** with provider fallback, time and usage limits and an access code; keys only on the server.",
+      "**Outputs and quality** (sections 9–10), and tests for each route and check (see `tests/e2e`)."]));
+  return B;
+}
+// the panel: built on click, read-only, printable, downloadable; Escape or Close returns to the chat
+function openSpec(){
+  const trigger=document.activeElement, model=specModel(true);
+  $("#docRoot").innerHTML=`<div class="docwrap" role="dialog" aria-modal="true" aria-labelledby="specTitle"><div class="doctools">
+      <b id="specTitle">How it works</b><span class="sp"></span>
+      <button class="btn btn-g" data-spec="md">Download (.md)</button><button class="btn btn-g hide-sm" data-spec="print">Print</button><button class="btn btn-p" data-spec="close">Close</button></div>
+    <div class="paper spec" id="specPaper" tabindex="-1"><div class="brd">${specHtml(model)}</div></div></div>`;
+  document.body.classList.add("doc-open");
+  document.querySelectorAll(".top,.app").forEach(x=>x.inert=true);
+  S.specBack=trigger;
+  document.querySelectorAll("[data-spec]").forEach(b=>b.onclick=()=>{
+    const a=b.dataset.spec;
+    if(a==="close") closeDoc();
+    if(a==="md"){ const blob=new Blob([specMd(specModel(false))],{type:"text/markdown"}), l=document.createElement("a"); l.href=URL.createObjectURL(blob); l.download="guided-intake-how-it-works.md"; l.click(); }
+    if(a==="print"){ const shut=[...document.querySelectorAll("#specPaper details:not([open])")]; shut.forEach(d=>d.open=true);
+      window.addEventListener("afterprint",()=>shut.forEach(d=>d.open=false),{once:true}); window.print(); }
+  });
+  $('[data-spec="close"]').focus();
+}
+// closes the document or How-it-works overlay and gives the page back
+function closeDoc(){
+  $("#docRoot").innerHTML=""; document.body.classList.remove("doc-open");
+  document.querySelectorAll(".top,.app").forEach(x=>x.inert=false);
+  const back=S.specBack; S.specBack=null; if(back&&back.focus) back.focus();
+}
+
+/* =========================================================
+   12. WIRING
    ========================================================= */
 function reset(){ typeFlush(); Object.keys(S).forEach(k=>delete S[k]); Object.assign(S,fresh()); render(); $("#inp").focus(); }
 const inp=$("#inp");
@@ -3312,7 +3578,10 @@ inp.addEventListener("input",()=>{typeFlush();inp.style.height="auto";inp.style.
 inp.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("#comp").requestSubmit();}});
 $("#comp").onsubmit=e=>{e.preventDefault();const t=inp.value;inp.value="";inp.style.height="auto";handleUser(t);};
 $("#doccss").textContent=DOC_CSS;
-$("#cfgBtn").onclick=openSettings; $("#newBtn").onclick=reset; $("#sumBtn").onclick=()=>$("#side").classList.toggle("open");
+$("#cfgBtn").onclick=openSettings; $("#howBtn").onclick=openSpec;
+// Escape closes How it works
+document.addEventListener("keydown",e=>{ if(e.key==="Escape" && $("#specPaper")) closeDoc(); });
+$("#newBtn").onclick=reset; $("#sumBtn").onclick=()=>$("#side").classList.toggle("open");
 // access gate: the page stays locked until the server confirms the code
 async function verifyCode(c){
   try{ const r=await fetch("/api/llm?verify=1",{headers:{"x-access-code":c}}); return r.ok; }catch(e){ return null; }
