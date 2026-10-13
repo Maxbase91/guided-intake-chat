@@ -255,3 +255,32 @@ test("an accepted AI suggestion for a question without its own is stored as give
   await say(page, "sounds good");
   expect(await page.evaluate(() => S.f.current_solution)).toBe(sg);
 });
+
+test("from the repeated live run: 'skip' is skipped, an accepted suggestion is not challenged, unasked facts need the requester's words, 'keep it' invents no date", async ({ page, request }) => {
+  await openApp(page, { kind: "ai" });
+  await say(page, HR);
+  await say(page, "About 400k");
+  await say(page, "Our payroll tool is end of life and payroll runs on spreadsheets; if delayed we miss the reporting deadline");
+  expect(await page.evaluate(() => S.lastAsked)).toBe("audience_fn");
+  // the AI calls "skip" not an answer: it is still a skip
+  await mock(request, { nextChat: { answers_question: false, facts: {}, reply: "Got it, we'll skip that for now. Let's move on." } });
+  await say(page, "skip");
+  expect(await page.evaluate(() => [S.f.audience_fn, S.lastAsked !== "audience_fn"])).toEqual(["Not given", true]);
+  for (let i = 0; i < 3 && (await page.evaluate(() => S.lastAsked)) !== "value_props"; i++) await say(page, "Spreadsheets and email; we have no team to build this");
+  expect(await page.evaluate(() => S.lastAsked)).toBe("value_props");
+  // "k" accepts the suggestion; the AI's check on it and a must-have built from the suggestion's words are ignored
+  const sgWords = await page.evaluate(() => S.suggest.value_props.split(/\n/)[0].replace(/^[^:]+:\s*/, ""));
+  await mock(request, { nextChat: { assessment: { fact: "value_props", ok: false, issue: "too vague", follow_up: "Please confirm or provide more details.", score: 3 }, facts: { must_haves: sgWords } } });
+  await say(page, "k");
+  expect(await page.evaluate(() => [S.sugAccepted.value_props, S.f.must_haves, S.lastAsked])).toEqual([true, null, "must_haves"]);
+});
+
+test("'it's fine, keep it' on a past start does not take a date the AI made up", async ({ page, request }) => {
+  await openApp(page, { kind: "ai" });
+  await say(page, "We need 15 laptops for new joiners in Frankfurt.");
+  await say(page, "mid 26");
+  await expect(lastAssistant(page)).toContainText("seems to be in the past");
+  await mock(request, { nextChat: { facts: { needed_by: "mid 2027" } } });
+  await say(page, "it's fine, keep it");
+  expect(await page.evaluate(() => S.f.needed_by)).toBe("To be determined");
+});

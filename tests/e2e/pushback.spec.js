@@ -23,7 +23,7 @@ test("'what would you suggest?' gets a suggestion that can be accepted in one ta
   await openApp(page);
   await say(page, DINNER);
   await say(page, "what would you suggest?");
-  await expect(lastAssistant(page)).toContainText("Here's a suggestion, based on what you told me");
+  await expect(lastAssistant(page)).toContainText("Here's a common answer you can start from");   // offline: the question's example
   expect(await choices(page).allInnerTexts()).toContain("Use this suggestion");
   expect(await page.evaluate(() => S.f.background)).toBeNull();
   await choose(page, "Use this suggestion");
@@ -172,7 +172,7 @@ test("while a check is open, a question back still works and the check stays ope
   await say(page, "slow");
   await expect(lastAssistant(page)).toContainText("Could you say a little more?");
   await say(page, "what would you suggest?");
-  await expect(lastAssistant(page)).toContainText("Here's a suggestion");
+  await expect(lastAssistant(page)).toContainText("Here's a common answer you can start from");
   expect(await page.evaluate(() => S.f.background)).not.toMatch(/suggest/);
   await choose(page, "Use this suggestion");
   expect(await page.evaluate(() => S.f.background)).toMatch(/client event keeps key relationships warm/);
@@ -186,4 +186,33 @@ test("while a check is open, a question back still works and the check stays ope
   expect(await choices(page).allInnerTexts()).toEqual(["Yes, use it", "No, look wider"]);
   await choose(page, "No, look wider");
   expect(await page.evaluate(() => S.det.why)).toMatch(/^This is new demand \(you chose to look wider than the existing framework\)\./);
+});
+
+test("from the repeated live run: skip during a check, invented figures, supplier and data wording, offshoring phrases", async ({ page }) => {
+  await openApp(page);
+  await say(page, DINNER);
+  await say(page, "slow");
+  await expect(lastAssistant(page)).toContainText("Could you say a little more?");
+  await say(page, "skip");
+  expect(await page.evaluate(() => S.f.background)).toMatch(/^slow$/i);   // "skip" keeps the first answer, it is not the answer
+  const got = await page.evaluate(() => {
+    const r = {};
+    r.offshore = (() => { const f = { ...BLANK_FACTS, entity: "UK", location: "Mostly remote, with occasional on-site work in Frankfurt. The team sits in London and Singapore." }; deriveFacts(f); return f.offshore; })();
+    r.supplier = cleanSupplier("Lakeshore Advisory and Blue Yonder Partners (competition)");
+    r.terms = normFact("supplier_terms", false);
+    r.data = normFact("data_details", "Some spend data probably");
+    r.reply = cleanReply("Here's a typical setup: **Operations hub in a low-cost country; trained staff.");
+    S.f.demand_type = "software"; S.f.category = "software";
+    r.sg = tidySuggestion("value_props", "Unique selling points: One platform for 12,000+ users across 50+ countries\nKey benefits: 80% reduction in manual data entry; call volumes cut by 40%; fewer errors\nRegulatory / governance benefits: Audit trails for every change");
+    r.long = words(tidySuggestion("scope_out", Array.from({ length: 6 }, (_, i) => `exclusion number ${i} with several more words to make it long enough`).join("; ")));
+    return r;
+  });
+  expect(got.offshore).toBeNull();
+  expect(got.supplier).toBe("Lakeshore Advisory and Blue Yonder Partners");
+  expect(got.terms).toBe("No");
+  expect(got.data).toBe("Some spend data");
+  expect(got.reply).not.toContain("**");
+  expect(got.sg).not.toMatch(/\d/);
+  expect(got.sg).toMatch(/^Unique selling points: One platform for users across countries\nKey benefits: reduction in manual data entry; call volumes cut; fewer errors\nRegulatory/);
+  expect(got.long).toBeLessThanOrEqual(50);
 });

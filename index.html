@@ -738,7 +738,7 @@ const SOLE_RE=/\b(?:only|solely|exclusively|directly|sole[- ]source\w*|single[- 
 const INCLUDE_RE=/\b(?:include|including|invite|shortlist|as one of|alongside|among others|in the (?:competition|tender|rfp)|also (?:ask|invite|consider)|compare|comparison|benchmark|open to (?:others|alternatives)|other options|look at others)\b/i;
 const supplierNames = s => String(s||"").split(/\s*(?:,|;|\/|&|\band\b|\bor\b|\bplus\b)\s*/i).map(x=>x.trim()).filter(x=>x && !/^(?:others?|etc\.?|similar)$/i.test(x));
 // "Workday maybe" is Workday
-const cleanSupplier = v => String(v).replace(/\s*\b(?:maybe|perhaps|probably|possibly|i guess|i think|i suppose|or similar|or so)\b[?.!]?\s*/gi," ").replace(/\s+/g," ").trim();
+const cleanSupplier = v => String(v).replace(/\s*\([^)]*\)/g,"").replace(/\s*\b(?:maybe|perhaps|probably|possibly|i guess|i think|i suppose|or similar|or so)\b[?.!]?\s*/gi," ").replace(/\s+/g," ").trim();
 function soleSupplier(f){
   if(!hasSupplier(f)) return false;
   const key=String(f.supplier).toLowerCase().split(/\s+/)[0];
@@ -924,7 +924,7 @@ function deriveFacts(f){
   derive("quantity", usersFromAudience);
   derive("entity", entityFrom);
   derive("in_house", inHouseFromText);
-  derive("offshore", ff=>{ const e=entityById(ff.entity), loc=String(ff.location||"").replace(/\b(?:on[- ]?site|on our premises|at our (?:office|premises|site)s?|visits?)\s+(?:in|at|to)\s+[\w-]+/gi," "); if(!e||!loc.trim()) return null;   // visits to our sites are not offshoring
+  derive("offshore", ff=>{ const e=entityById(ff.entity), loc=String(ff.location||"").replace(/\b(?:on[- ]?site|on our premises|at our (?:office|premises|site)s?|visits?|visiting)(?:\s+[\w-]+){0,2}?\s+(?:in|at|to)\s+[\w-]+/gi," ").replace(/\b(?:our|the) (?:team|teams|people|colleagues|staff)\s+(?:sits?|is|are|works?|(?:is |are )?based|(?:is |are )?located)\s+in\s+[^.;]+/gi," "); if(!e||!loc.trim()) return null;   // visits to our sites and where our team sits are not offshoring
     if(/offshore|another country|other country/i.test(loc)) return true;
     const places=PLACES.split("|").filter(p=>p.length>2 && new RegExp(`\\b${p}\\b`,"i").test(loc));
     return places.length && places.some(p=>!e.re.test(p) && !(e.abbr&&e.abbr.test(p))) ? true : null; });
@@ -1270,6 +1270,7 @@ const INTERNAL_KEYS=new RegExp(`\\b(?:${Object.keys(BLANK_FACTS).filter(k=>k.inc
 const INTERNAL_VALS=/\b(?:set|setting|recorded|marked|flagged|updated|stored)\b[^.?!]{0,40}\b(?:to|as)\s+(?:true|false|null|unsure)\b|(?:\b(?:is|as|to|equals)\s+|[=:]\s*)(?:true|false|null)\b/i;
 function cleanReply(t){
   if(!t || typeof t!=="string") return t;
+  if((t.match(/\*\*/g)||[]).length%2) t=t.replace(/\*\*/g,"");   // an unmatched "**" would show as is
   const sents=t.split(/(?<=[.!?])\s+/), kept=sents.filter(x=>!INTERNAL_KEYS.test(x) && !INTERNAL_VALS.test(x)).map(x=>x.replace(/\b[a-z]+(?:_[a-z]+)+\b/g,"").trim()).filter(Boolean);
   return kept.length===sents.length ? t : (kept.join(" ").trim() || null);
 }
@@ -1462,7 +1463,7 @@ function whyCheck(text){
   if(/outsourc/.test(t) || !/technolog|ict|dora|critical|important|offshor|entity|access/.test(t)) out.push(`Outsourcing: ${o.result}. ${o.reasons.join(" ")}`);
   if(/technolog|ict|dora/.test(t)) out.push(yes(f.tech_service) ? `It counts as an ICT service because the provider supplies or runs technology: ${ictType(f)}.` : "No technology service is involved.");
   if(/critical|important/.test(t)) out.push(isImportant(f) ? "Your answers on impact point to a critical or important function; the review confirms it." : "Nothing points to a critical or important function.");
-  if(/offshor/.test(t)) out.push(isOffshore(f) ? "The work happens outside the country of the entity that signs." : "The work happens in the entity's country.");
+  if(/offshor/.test(t)) out.push(isOffshore(f) ? `The work happens outside the country of the entity that signs${f.location?` (where the work is done: ${String(f.location).replace(/\.$/,"")})`:""}.` : "The work happens in the entity's country.");
   return out.join(" ")+" These are flags for the reviews, not final decisions. If one of the points is wrong, tell me which.";
 }
 function routeOptions(){
@@ -1480,17 +1481,17 @@ async function metaTurn(kind, text, cid, aiAnswer, display, posted){
   const k=S.lastAsked, F=FACTS[k], f=S.f;
   if(!posted) S.msgs.push({role:"user",text:display||text}); S.choices=[]; S.busy=true; render();
   let lead="";
-  if(kind==="why") lead=`Good question. ${F.why?F.why(f):WHY_ASK[k]||"It goes into the service description and the sourcing request, so suppliers can price it and procurement can compare offers."}${CLOSED.includes(k)||F.choices?"":" If you don't know yet, just say so or skip it for now."}`;
+  if(kind==="why") lead=`Good question.${F.why?"":" "+(WHY_ASK[k]||"It goes into the service description and the sourcing request, so suppliers can price it and procurement can compare offers.")}${CLOSED.includes(k)||F.choices?"":" If you don't know yet, just say so or skip it for now."}`;   // the question below carries its own reason
   else if(kind==="route") lead=`${S.det.why} ${routeOptions()}`;
   else if(kind==="whycheck") lead=whyCheck(text);
   else if(kind==="question") lead=aiAnswer||"Good question. I can't answer that here; the buyer can when they pick this up.";
   else if(kind==="suggest"){
-    if(isSug(k)) lead="My suggestion is below. Use it as it is, or tell me what to change.";
+    if(isSug(k)) lead="My suggestion below is what is typical for a request like yours.";
     else if(CLOSED.includes(k) || F.choices) lead=`This one depends on your request, so I can't pick it for you. ${WHY_ASK[k]||""} Choose the closest answer, or say "not sure".`.replace(/\s+/g," ");
     else {
       const sg=await adhocSuggest(k, cid); guard(cid);
-      if(sg){ S.adhoc={k, sg}; S.adhocShown=sg;
-        S.msgs.push({role:"assistant",text:`Here's a suggestion, based on what you told me and what is typical at a large bank:\n${sg}\n\nUse it as it is, or tell me what to change.`, ask:k});
+      if(sg){ S.adhoc={k, sg}; S.adhocShown=sg; const generic=sg===cap1(exampleFor(k));
+        S.msgs.push({role:"assistant",text:`${generic?"Here's a common answer you can start from":"Here's a suggestion, based on what you told me and what is typical at a large bank"}:\n${sg}\n\nUse it as it is, or tell me what to change.`, ask:k});
         S.choices=["Use this suggestion","Skip for now"]; S.lastAsked=k; S.busy=false; render(); return; }
       lead="I don't have a good suggestion for this one.";
     }
@@ -1498,7 +1499,7 @@ async function metaTurn(kind, text, cid, aiAnswer, display, posted){
   S.busy=false;
   if(S.pending){   // a check is still open: say it again, with the question's buttons, and keep waiting for its answer
     const ex=F.ex(f), fc=F.choices, fcs=typeof fc==="function"?fc(f):fc;
-    S.msgs.push({role:"assistant",text:`${lead}\n\n${F.q(f)}${ex?" "+ex:""}`, check:true});
+    S.msgs.push({role:"assistant",text:`${lead}\n\n${F.q(f)}${kind==="why"&&F.why?" "+F.why(f):""}${ex?" "+ex:""}`, check:true});
     S.choices=fcs?[...fcs]:(S.det&&NEW_DEMAND(S.det.route)&&!CLOSED.includes(k)?["Skip for now"]:[]); render(); return;
   }
   await askNext(k, lead, cid);
@@ -1612,7 +1613,7 @@ async function handleTurn(text, cid, opts={}){
   const pend=S.pending; S.pending=null;
   const t=text.trim().toLowerCase();
   const keepIt0 = pend && pend.flip ? /^(no|nope|none|not)\b/.test(t) : pend && pend.kind!=="offtopic" && (/^(yes|yep|yeah|correct|that'?s (right|correct)|right|confirmed?|it is|keep( it)?( as it is)?|as i said|it'?s fixed|fixed|hard deadline|that'?s fine|fine)\b/.test(t) || /is right$/.test(t)) && !/\d/.test(t.replace(/^[^\d]*right/,"")) && words(text)<=6;
-  const vagueReply = pend && /vague|thin/.test(pend.issue+" "+pend.kind) && (VAGUE.test(t) || /^(?:k|kk|sure|dunno|fine|nothing more|that'?s it|that'?s all)\.?$/.test(t));   // "ok" keeps "Old system is bad", not "ok"
+  const vagueReply = pend && pend.issue!=="date in the past" && ((/vague|thin/.test(pend.issue+" "+pend.kind) && (VAGUE.test(t) || /^(?:k|kk|sure|dunno|fine|nothing more|that'?s it|that'?s all)\.?$/.test(t))) || /^(?:skip|skip (?:for now|this|it)|pass)[.!]?$/.test(t));   // "ok" or "skip" keeps "Old system is bad"   // "ok" keeps "Old system is bad", not "ok"
   const keepIt = keepIt0 || vagueReply;
   if(pend && !keepIt && pend.kind!=="date") S.f[pend.fact]=null;
   let reply=null, choices=[], complete=false, note=null, aiAsking=null, aiCheck=null, aiSuggestion=null, aiScore=null;
@@ -1628,7 +1629,7 @@ async function handleTurn(text, cid, opts={}){
         if(done.length) S.msgs.push({role:"assistant",kind:"sys",text:`Changed: ${done.join("; ")}.`});
       }
       // the AI read a question back as "not an answer": answer it and ask the same question again
-      if(out.answers_question===false && !(aiCorr && Object.keys(aiCorr).length) && !pend && asked && asked!=="confirm_derived" && !known((out.facts||{})[asked]) && cleanReply(out.reply||"")){
+      if(out.answers_question===false && /\?\s*$|^(?:but\s+|and\s+|so\s+)?(?:what|why|how|who|which|are|is|can|could|would|do|does|should|will|isn'?t|aren'?t)\b/i.test(text.trim()) && !(aiCorr && Object.keys(aiCorr).length) && !pend && asked && asked!=="confirm_derived" && !known((out.facts||{})[asked]) && cleanReply(out.reply||"")){
         if(S.asked[asked]) S.asked[asked]--; return metaTurn("question", text, cid, cleanReply(out.reply).replace(/\s*[^.!?]*\?\s*$/,"").trim(), null, true);
       }
       const nf=screenAIFacts(out.facts, asked, text);
@@ -1689,7 +1690,8 @@ async function handleTurn(text, cid, opts={}){
   if(pend){
     if(pend.issue==="date in the past"){
       // a new date in the reply (or one the AI applied) replaces it; a start that has passed can't be kept, so the buyer agrees one
-      const ok=d=>d && daysTo(d)>=-1, aiDate=S.f.needed_by!==pend.prev && ok(parseWhen(S.f.needed_by)) ? S.f.needed_by : null;
+      const gaveDate=/\d|asap|soon|immediately|next (?:week|month|quarter|year)|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|\bq[1-4]\b|\b(?:mid|end|early|late)\b/i.test(text);
+      const ok=d=>d && daysTo(d)>=-1, aiDate=gaveDate && S.f.needed_by!==pend.prev && ok(parseWhen(S.f.needed_by)) ? S.f.needed_by : null;
       const nd=aiDate || (ok(parseWhen(text)) ? whenOnly(text) : null);
       if(nd){ S.f.needed_by=cap1(nd); S.flags.push({fact:pend.fact,issue:pend.issue,status:"corrected"}); }
       else { S.f.needed_by="To be determined"; S.flags.push({fact:pend.fact,issue:pend.issue,status:"unanswered"});
@@ -1744,7 +1746,7 @@ async function handleTurn(text, cid, opts={}){
   // only for the question just asked: an off-topic verdict on another item would say "doesn't answer my question" and ask something else
   const bizWords=v=>BIZ.test(String(v||"")) || contentWords(v).length<4;   // "too slow and expensive" is thin, not off-topic
   if(!issue && aiOff && aiCheck.fact===asked && asked!=="supplier_reason" && !bizWords(S.f[asked]||text) && FACTS[asked] && !S.offChecked[asked] && asked!==(pend&&pend.fact)) issue=offTopicIssue(asked);
-  if(!issue && aiCheck && S.challengeCount<3 && changed.includes(aiCheck.fact) && !S.challenged[aiCheck.fact] && FACTS[aiCheck.fact])
+  if(!issue && aiCheck && !(sugResult && aiCheck.fact===asked) && S.challengeCount<3 && changed.includes(aiCheck.fact) && !S.challenged[aiCheck.fact] && FACTS[aiCheck.fact])
     issue={fact:aiCheck.fact, issue:String(aiCheck.issue||"needs a second look").slice(0,140), message:String(cleanReply(aiCheck.follow_up||"")||reply||"").trim()||`Could you double-check this? ${FACTS[aiCheck.fact].q(S.f)}`};
   const ansScore = skipped ? null : asked==="confirm_derived" ? null : answerScore(asked, text, issue, sugResult, aiScore, pend);
   if(!issue && !pend && !skipped && asked && TIPS[asked] && ansScore!=null && ansScore<=CONFIG.thresholds.answerTip && !S.thinChecked[asked] && S.thinCount<3 && S.det && NEW_DEMAND(S.det.route) && givenText(S.f[asked])) issue=thinIssue(asked);
@@ -1870,6 +1872,8 @@ function normFact(k,v){
   if(k==="budget_approved" && typeof v==="boolean") return v?"yes":"no";
   if(k==="budget_approved" && /not sure|unsure|unknown|no idea|don.?t know/i.test(String(v))) return "unsure";
   if(k==="supplier" && typeof v==="string") return cleanSupplier(v)||v;
+  if(k==="supplier_terms" && typeof v==="boolean") return v?"Yes":"No";
+  if(k==="data_details" && typeof v==="string") return v.replace(/\s+\b(?:probably|maybe|perhaps|i think|i guess)\b\.?$/i,"").trim()||v;
   return typeof v==="string"?v:String(v);
 }
 // what the AI may record (described in How it works): what the requester said, in their words or by accepting a suggestion.
@@ -1881,7 +1885,7 @@ const stem = w => w.replace(/(?:ies|es|s|ing|ed)$/,"").slice(0,5);
 function screenAIFacts(nf, asked, text){
   const out={}, own=new Set([asked, ...((asked&&bundleOf(asked))||[]).map(([,x])=>x)]), first=!S.det;
   const heard=[userText(), text, ...S.msgs.filter(m=>m.role==="assistant"&&typeof m.text==="string").slice(-2).map(m=>m.text), asked&&S.suggest[asked]||"", S.adhocShown||""].join(" ");
-  const said=new Set(contentWords(heard).map(stem));
+  const said=new Set(contentWords(heard).map(stem)), own_=new Set(contentWords(userText()+" "+text).map(stem));   // unasked facts: only the requester's words
   for(const [k,v] of Object.entries(nf||{})){
     if(v===null||v===undefined||v==="") continue;
     const sv=Array.isArray(v)?v.join(" "):v&&typeof v==="object"?Object.values(v).join(" "):String(v);
@@ -1889,7 +1893,7 @@ function screenAIFacts(nf, asked, text){
     if(["category","demand_type","l4","l4_match","l4_reason"].includes(k) && !first && asked!=="confirm_derived") continue;   // later changes come as corrections
     if(PLACEHOLDER.test(sv.trim()) && !own.has(k)) continue;                                  // never a gap filled with "unknown" or "none"
     if(AI_FLAGS.includes(k) && asked!=="confirm_derived" && !own.has(k)) continue;           // classification: the rules, or the requester at the check step
-    if(GROUNDED.includes(k)){ const w=contentWords(sv); if(w.length && w.filter(x=>said.has(stem(x))).length/w.length<0.5) continue; }   // free text comes from what was said
+    if(GROUNDED.includes(k)){ const w=contentWords(sv), src=own.has(k)?said:own_; if(w.length && w.filter(x=>src.has(stem(x))).length/w.length<0.5) continue; }   // free text comes from what was said
     out[k]=v;
   }
   return out;
@@ -2318,6 +2322,15 @@ function normSuggestion(v, k){
   const nk=x=>String(x).toLowerCase().replace(/[_\s]+/g," ").trim();
   return Object.entries(v).map(([kk,x])=>{ const hit=bundleOf(k).find(([L,fk])=>nk(L)===nk(kk)||fk===kk||nk(kk).startsWith(nk(L).split(/[ /]/)[0])); return hit?`${hit[0]}: ${vals(x)}`:vals(x); }).filter(Boolean).join("\n");
 }
+// a line of a suggestion: about 45 words, whole points only; benefits, selling points and audience lose invented figures ("80% fewer", "12,000+ users")
+const INVENTED=/\s*(?:by\s+|of\s+|to\s+)?(?:<|>|~|up to\s+|over\s+|around\s+)?\d[\d,.]*\s*\+?\s*(?:%|percent)|\s*\b\d[\d,.]*\s*\+?\s+(?=(?:users|employees|staff|people|countries|line managers|managers|leaders|colleagues)\b)/gi;
+function fitLine(line){
+  const m=line.match(/^([^:]{3,45}:)\s*(.*)$/), head=m?m[1]+" ":"", body0=m?m[2]:line;
+  const body=/^(?:Key benefits|Expected outcomes|Unique selling points|Target audience|Sponsor and stakeholders|Guests|Participants|Regulatory)/i.test(head) ? body0.replace(INVENTED," ").replace(/\s{2,}/g," ").replace(/\s+([;,.])/g,"$1").trim() : body0;
+  const pts=body.split(/;\s*/), out=[]; let n=0;
+  for(const x of pts){ const w=words(x); if(out.length && n+w>45) break; out.push(x); n+=w; }
+  return head+out.join("; ");
+}
 // a suggestion as the user sees it: one label per line, short, no formatting, no invented dates
 function tidySuggestion(k, v){
   let sg=normSuggestion(v, k).replace(/\*\*|__/g,"").replace(/\[object Object\]/g,"").trim()
@@ -2333,7 +2346,7 @@ function tidySuggestion(k, v){
     const head=keep?m[1]+" ":"", body=(m?m[2]:line).replace(PAREN,"").replace(DATE,"").replace(/^(?:[a-z][a-z_ ]*:\s*)+/,"");
     const pts=body.split(/;\s*/).map(x=>x.trim().replace(/[.,]$/,"")).filter(Boolean).map(x=>x.replace(/^[a-z][a-z_]*(?: [a-z_]+){0,3}:\s+/,"")).slice(0,4).map(shortPt);
     return head+pts.join("; "); };
-  sg=sg.split(/\n+/).map(x=>x.trim()).filter(Boolean).map(cap).join(lines?"\n":"; ");
+  sg=sg.split(/\n+/).map(x=>x.trim().replace(/\s*\|\s*$/,"")).filter(Boolean).map(cap).map(fitLine).join(lines?"\n":"; ");
   return sg;
 }
 function setFromSuggestion(k, v){
