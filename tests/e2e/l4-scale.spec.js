@@ -68,6 +68,23 @@ test("category and Level 4 never disagree: the AI's pick sets the category, a ca
   expect(got.d.cat).toBe("travel");
 });
 
+// from the live benchmark (October 2026): the AI chose right, and a category word at the start of the request overruled it
+test("the AI's Level 4 stands against a category word at the start, unless it fits the words far worse", async ({ page, request }) => {
+  await openApp(page, { kind: "ai" });
+  const cases = [
+    ["Annual support and maintenance renewal for our database licences with the original vendor, due end of November, around 220k.", { l4: "L4-1247", category: "software" }, "L4-1247"],
+    ["Analyst research seats for the CIO office, the kind with vendor rankings, market guides and inquiry calls.", { l4: "L4-1620", category: "market-data" }, "L4-1620"],
+    // the subject is the trading system; the AI's KYC operations fit only the part after "including"
+    ["We need to transform our front office trading system, including the client onboarding and KYC process. Budget around 4 million over 3 years", { l4: "L4-2802", category: "bpo" }, "L4-1217"],
+  ];
+  for (const [text, facts, want] of cases) {
+    await page.click("#newBtn");
+    await mock(request, { nextChat: { facts } });
+    await say(page, text);
+    expect(await page.evaluate(() => [S.f.l4, S.f.category === l4ByCode(S.f.l4).cat])).toEqual([want, true]);
+  }
+});
+
 test("when no candidate fits, the AI's words for what is bought find the entry in the whole list", async ({ page, request }) => {
   await openApp(page, { kind: "ai" });
   await mock(request, { nextChat: { facts: { l4: "", l4_terms: "courier delivery" } } });

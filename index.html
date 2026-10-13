@@ -3224,9 +3224,12 @@ function offlineRead(text, asked){
     let best=bestCategory(all, " "+(first?first.text:"").toLowerCase()); const headHit=bestCategory.inHead;
     if(/contractor|freelance|temporary staff|interim|day rate|\ba day\b|per day/.test(all) && /developer|engineer|analyst|manager|designer|tester|contractor|freelance|interim/.test(all)) best=catById("contingent");
     if(best && best.id==="cloud" && /\b(hr|payroll|crm|erp|finance|accounting|procurement|ticketing)\b[^.]*\b(system|tool|platform|software|application)\b/.test(all)) best=catById("software");
-    // the AI picks the Level 4 from a shortlist; its pick, and so its category, stands unless a category is named in the head
+    // the AI picks the Level 4 from a shortlist; its pick, and so its category, stands. A category named at the start of the request
+    // overrules it only when the AI's entry fits the words far worse ("trading system, including KYC" is not KYC operations);
+    // "support and maintenance renewal for our database licences" names "maintenance", but the AI's software maintenance stands.
     const aiL4=firstTurn && f.l4 && S.derived.l4!==f.l4 && l4ByCode(f.l4);
-    if(aiL4 && best && best.id!==aiL4.cat && !headHit) best=catById(aiL4.cat);
+    if(aiL4 && best && best.id!==aiL4.cat){ const G=scoreL4(all), sAI=(G.find(x=>x.e.code===aiL4.code)||{score:0}).score, sHead=(G.find(x=>x.e.cat===best.id)||{score:0}).score;
+      if(!headHit || sAI>=0.5*sHead) best=catById(aiL4.cat); }
     // no category keyword at all: the category of the AI's Level 4, or of the best-scoring Level 4 when it is clear enough
     if(!best){ const top=scoreL4(all)[0], e=aiL4 || (top && top.score>=L4_WEAK ? top.e : null); if(e) best=catById(e.cat); }
     // a keyword can point to the wrong category ("agency" in "temps through an agency", "desk" in "dealer boards on the FX desk"):
