@@ -157,3 +157,64 @@ test("bank categories: app builds, security testing, audit and tax, recruitment,
   }
   expect(got).toEqual(CASES.map(([, cat, kind]) => [cat, kind]));
 });
+
+// answers until the given question is next; suggestions are accepted
+async function until(page, key) {
+  for (let i = 0; i < 20; i++) {
+    await idle(page);
+    if ((await page.evaluate(() => S.missing[0])) === key && (await page.evaluate(() => S.lastAsked)) === key) return;
+    const text = await lastAssistant(page).innerText(), chips = await choices(page).allInnerTexts();
+    const pick = ["Use this suggestion", "No, look wider"].find((c) => chips.includes(c));
+    if (pick) { await choose(page, pick); continue; }
+    const g = GENERIC.find(([re]) => re.test(text));
+    if (g) await say(page, g[1]); else await choose(page, chips[0]);
+  }
+  throw new Error(`Never asked ${key}`);
+}
+const CONSULTING = "Consultancy support to fill a procurement knowledge gap, about 200k for 6-12 months, no technology involved.";
+
+test("'use example given' answers with the example the question showed, never the words themselves", async ({ page }) => {
+  const errors = await openApp(page);
+  await say(page, CONSULTING);
+  await until(page, "scope_in");
+  await say(page, "use example given");
+  const got = await page.evaluate(() => ({ scope: S.f.scope_in, shown: S.msgs.filter((m) => m.role === "user").pop().text, obligations: S.msgs.filter((m) => /written this as obligations/.test(m.text || "")).pop().text }));
+  expect(got.scope).toMatch(/current-state process map/i);
+  expect(got.shown).toBe("use example given");   // the chat shows what was typed
+  expect(got.obligations).not.toMatch(/use example/i);
+  expect(got.obligations).toMatch(/The Service Provider shall/);
+  // the example in the AI's own wording is found too
+  expect(await page.evaluate(() => exampleIn("Next, could you tell me what exactly the provider must do and what they need to deliver, such as processing feeds, providing alerts or reporting?")))
+    .toBe("processing feeds, providing alerts or reporting");
+  expect(errors).toEqual([]);
+});
+
+test("a message that copies an earlier question's wording corrects that question, and the current one is asked again", async ({ page }) => {
+  await openApp(page);
+  await say(page, CONSULTING);
+  await until(page, "scope_in");
+  await say(page, "Assess the current model");
+  await idle(page);
+  expect(await page.evaluate(() => S.lastAsked)).toBe("scope_out");
+  // the case from a real run: the requester pastes the earlier question's example to fix the obligations
+  await say(page, "what exactly must the provider do and deliver, for example a current-state process map and a rollout plan");
+  const got = await page.evaluate(() => ({ scope: S.f.scope_in, out: S.f.scope_out, asked: S.lastAsked, msgs: S.msgs.slice(-3).map((m) => m.text || "").join("\n") }));
+  expect(got.scope).toBe("A current-state process map and a rollout plan");
+  expect(got.out).toBeFalsy();
+  expect(got.asked).toBe("scope_out");
+  expect(got.msgs).toMatch(/Changed: what the provider does/);
+  expect(got.msgs).toMatch(/What is not part of the service/);
+});
+
+test("'see above' is not an answer, and 'use your example' accepts a suggestion", async ({ page }) => {
+  await openApp(page);
+  await say(page, CONSULTING);
+  await until(page, "background");
+  await say(page, "see above");
+  await expect(lastAssistant(page)).toContainText("Could you say a little more?");
+  await say(page, "Buyers lack category expertise; if delayed we miss our delivery timelines");
+  expect(await page.evaluate(() => S.f.background)).toMatch(/category expertise/);
+  await until(page, "audience_fn");
+  await say(page, "use your example");
+  expect(await page.evaluate(() => [S.sugAccepted.audience_fn, givenText(S.f.users) !== ""])).toEqual([true, true]);
+});

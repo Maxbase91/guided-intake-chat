@@ -983,7 +983,7 @@ const rateIsTotal = r => (parseMoney(r)||0) >= 5000;
 const LEAD_DAYS={catalogue:3,contract:7,quote:14,sourcing:45};
 const NEW_DEMAND = r => r==="quote"||r==="sourcing";
 const words = v => String(v||"").trim().split(/\s+/).filter(Boolean).length;
-const VAGUE=/^(tbd|tbc|n\/?a|not sure|don'?t know|idk|stuff|things|everything|various|whatever|same|as usual|-|\?+|ok|okay|yes|no)\.?$/i;
+const VAGUE=/^(tbd|tbc|n\/?a|not sure|don'?t know|idk|stuff|things|everything|various|whatever|same|as usual|-|\?+|ok|okay|yes|no|see above|as above|same as (?:above|before)|as (?:discussed|mentioned|said)(?: before| above)?|use (?:the |your )?examples?(?: given)?)\.?$/i;
 
 // does a free-text answer relate to the request at all? (catches a recipe or a joke given as "the problem to solve")
 const TEXT_FACTS=["other_risks","background","users","functions","benefits","usp","reg_benefits","current_solution","impact_delay","must_haves","deliverables","acceptance","skills","role","item","data_details","renewal_change","supplier_reason","criticality","volume"];
@@ -1012,8 +1012,8 @@ function findIssue(changed){
   for(const k of changed){
     if(S.challenged[k]) continue;
     const v=f[k];
-    if(["deliverables","acceptance","background","users","current_solution","impact_delay","must_haves","data_details","skills","supplier_reason","renewal_change","item"].includes(k) && typeof v==="string"){
-      const tooShort = ["deliverables","acceptance","background","users","current_solution","must_haves"].includes(k) ? words(v)<2 : k==="supplier_reason" ? words(v)<3 : false;
+    if(["deliverables","scope_in","acceptance","background","users","current_solution","impact_delay","must_haves","data_details","skills","supplier_reason","renewal_change","item"].includes(k) && typeof v==="string"){
+      const tooShort = ["deliverables","scope_in","acceptance","background","users","current_solution","must_haves"].includes(k) ? words(v)<2 : k==="supplier_reason" ? words(v)<3 : false;
       if((VAGUE.test(v.trim()) && !((k==="renewal_change"||k==="impact_delay")&&/no/i.test(v))) || tooShort)
         return {fact:k, issue:"too vague to act on", message:`Could you say a little more? "${v}" is hard for ${k==="supplier_reason"?"procurement to accept as a reason":"a supplier to work with"}. ${FACTS[k].ex(f)||FACTS[k].q(f)}`.trim()};
     }
@@ -1413,6 +1413,24 @@ async function handleUser(text){
   finally{ if(S.cid===cid){ S.busy=false; render(); } }
 }
 // one message, step by step (described in How it works, section 4)
+// "use the example (given)", "the example is fine": the requester takes the example the question showed
+const USE_EXAMPLE=/^(?:(?:please|ok(?:ay)?|yes|just|then)[,]?\s+)?(?:use|take|go with|keep|accept|pick)\s+(?:the\s+|your\s+|that\s+|this\s+|an?\s+)?examples?(?:\s+(?:given|you gave|above|provided|shown|you (?:mentioned|suggested)))?[.!]?$|^(?:the\s+|your\s+|that\s+)?examples?(?:\s+(?:given|above))?\s+(?:is|are|sounds?|looks?)\s+(?:fine|good|right|ok(?:ay)?|perfect)[.!]?$|^(?:same as|like|as in)\s+(?:the|your)\s+example[.!]?$/i;
+// the example in a question, as the requester saw it: "such as processing feeds, providing alerts or reporting", "for example: \"…\""
+function exampleIn(t){
+  const m=String(t||"").match(/\b(?:for example|for instance|such as|e\.g\.)[:,]?\s*["“]?([^"”?\n]+?)["”]?\s*(?:[.?!](?:\s|$)|$)/i);
+  return m ? m[1].trim().replace(/[.,;:]$/,"") : "";
+}
+const askedMessage = k => [...S.msgs].reverse().find(m=>m.role==="assistant" && m.ask===k);
+const exampleFor = k => exampleIn((askedMessage(k)||{}).text) || exampleIn(FACTS[k] ? FACTS[k].ex(S.f) : "");
+// a message made mostly of one of the last questions' own words is a copy of that question, not a new answer
+function echoedAsk(text){
+  const w=[...new Set(contentWords(text))]; if(w.length<5) return null;
+  for(const m of S.msgs.filter(x=>x.role==="assistant" && x.ask).slice(-3).reverse()){
+    const q=new Set(contentWords(m.text));
+    if(w.filter(x=>q.has(x)).length/w.length>=0.75) return {k:m.ask, msg:m};
+  }
+  return null;
+}
 async function handleTurn(text, cid, opts={}){
   // answer to the offer to improve a below-threshold description
   if(S.offerImprove){
@@ -1451,6 +1469,22 @@ async function handleTurn(text, cid, opts={}){
       }
       // answer and correction in one message: apply the change, read the rest as the answer
       opts.display=text; opts.corrDone=applyChanges(corr.changes); text=corr.rest;
+    }
+  }
+  // "use the example" answers with the example the question showed; a copy of an earlier question's wording answers that question
+  if(S.lastAsked && !S.pending && !opts.silent && S.lastAsked!=="confirm_derived"){
+    const echo=echoedAsk(text);
+    if(USE_EXAMPLE.test(text.trim()) || (echo && echo.k===S.lastAsked)){
+      const ex=isSug(S.lastAsked) ? "Use this suggestion" : exampleFor(S.lastAsked);
+      if(ex){ opts.display=opts.display||text; text=ex; }
+    } else if(echo && FACTS[echo.k] && !CLOSED.includes(echo.k)){
+      const ex=exampleIn(text) || exampleFor(echo.k);
+      if(ex){
+        S.msgs.push({role:"user",text}); S.choices=[];
+        const done=applyChanges({[echo.k]:cap1(ex)});
+        if(done.length) await afterChanges(done, cid); else await askNext(S.lastAsked, "That's already what I have.\n\nBack to where we were:", cid);
+        render(); return;
+      }
     }
   }
   if(S.sd && /^(make it|shorten|shorter|add more|rewrite|reword)|\b(summary|description|document)\b/i.test(text) && aiReady()) return refineSD(text);
@@ -1612,7 +1646,7 @@ async function handleTurn(text, cid, opts={}){
         msg=`${useAck?ack+" ":""}${FACTS[next].q(S.f)}\n\nMy suggestion, based on what you told me:\n${bundleOf(next)?sg:sg.replace(/\.?$/,".")}\n\nUse it as it is, or tell me what to change.`; }
       else { delete S.suggest[next]; const ai=await aiSuggest(next, cid); if(ai) S.suggest[next]=ai; msg=offlineQuestion(next, prevRoute, stageChanged); }
     } else msg = aiAskedOk ? reply : offlineQuestion(next, prevRoute, stageChanged);
-    S.msgs.push({role:"assistant",text:msg});
+    S.msgs.push({role:"assistant",text:msg, ask:next});
     const fc=FACTS[next].choices; const fcs=typeof fc==="function"?fc(S.f):fc;
     const canSkip = S.det && NEW_DEMAND(S.det.route) && !["confirm_derived","value","item","need"].includes(next);
     S.choices = next==="confirm_derived" ? ["Yes, that's right","Something's wrong"] : isSug(next) ? ["Use this suggestion", ...(canSkip?["Skip for now"]:[])]
@@ -1671,7 +1705,7 @@ async function askNext(next, lead, cid){
   if(isSug(next) && !S.suggest[next] && aiReady()){ S.busy=true; render(); const ai=await aiSuggest(next, cid||S.cid); if(ai) S.suggest[next]=ai; S.busy=false; }
   stageTransition(STAGES[stageOf(next)].id);
   const msg = next==="confirm_derived" ? checkMessage() : offlineQuestion(next, S.det.route, true);
-  S.msgs.push({role:"assistant",text:(lead?lead+"\n\n":"")+msg});
+  S.msgs.push({role:"assistant",text:(lead?lead+"\n\n":"")+msg, ask:next});
   const fc=FACTS[next].choices, fcs=typeof fc==="function"?fc(S.f):fc, canSkip=!["confirm_derived","value","item","need"].includes(next);
   S.choices = next==="confirm_derived" ? ["Yes, that's right","Something's wrong"] : isSug(next) ? ["Use this suggestion","Skip for now"] : fcs ? fcs : (canSkip&&!CLOSED.includes(next)?["Skip for now"]:[]);
   S.lastAsked=next;

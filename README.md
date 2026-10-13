@@ -96,7 +96,7 @@ The end-to-end tests start three local servers: offline (no key), AI (mock provi
 | `tests/e2e/live-ai-run.spec.js` | Defects found in live AI conversations: check-step corrections, work location and offshoring, Level 4 consistency, single source, date scrubbing, object-shaped AI suggestions |
 | `tests/e2e/access-and-layout.spec.js` | Access-code gate and the phone layout |
 | `tests/e2e/typing.spec.js` | Replies typing out: speed, chips after the text, click to finish, "reduce motion" (the other tests run with reduce motion through `openApp`) |
-| `tests/e2e/question-fit.spec.js` | Questions by kind of work: consulting, legal and events asked as projects (sponsor, outcomes, steering; no selling points, service levels or support desk; one-off under paragraph 26), KYC as an ongoing service, market data as a product; the wording and lines sent to the AI; categories for app builds, security testing, audit and tax, recruitment, print and mail; the review flags |
+| `tests/e2e/question-fit.spec.js` | Questions by kind of work: consulting, legal and events asked as projects (sponsor, outcomes, steering; no selling points, service levels or support desk; one-off under paragraph 26), KYC as an ongoing service, market data as a product; the wording and lines sent to the AI; categories for app builds, security testing, audit and tax, recruitment, print and mail; the review flags; "use the example" takes the question's example, a copy of an earlier question corrects that question, "see above" is asked again |
 | `tests/e2e/how-it-works.spec.js` | The How it works panel: opens at desktop and phone width, Escape closes it, the prompts shown are the ones the app sends, thresholds follow the Rules, the Markdown download never contains the requester's words, opening it mid-conversation changes nothing |
 | `tests/e2e/known-issues.spec.js` | Defects found in the assessment (see `ASSESSMENT.md`), marked `test.fail()`: they turn red ("unexpectedly passed") once fixed, then the marker can be removed |
 
@@ -111,6 +111,8 @@ Category and catalogue keywords match whole words, plurals included ("monitor" m
 ## Answer checks against nonsense and repeats
 
 An answer that has nothing to do with the question (a recipe, a joke) is caught by rules and by the AI, and the question is asked again once. If the second answer is still unrelated, the detail is recorded as not given and listed as an open point; it never reaches the description. One answer can fill several details (for example the problem, who it is for, today's solution and the impact of delay), and nothing the user already said is asked again. Chat replies never show internal field names or values.
+
+"Use the example" (or "the example is fine") answers with the example the question showed, in the words the requester saw; for a suggestion it accepts the suggestion. A message that mostly repeats an earlier question's own wording is read as a correction of that question, not as the answer to the current one. "See above" or "as discussed" are too vague to record and are asked again.
 
 If the answer to the data question doesn't say where the data is stored, the chat asks once more. A short reply such as "in the EU" is added to the answer. "Not sure" leaves an open point in the quality check. A relative start ("next week", "ASAP", "next month") is stored as the date it stood for, for example "19 Oct 2026 (next week)", so the buyer reads a real date later.
 
