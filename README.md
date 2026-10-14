@@ -5,7 +5,8 @@ plain words, and the chat:
 - finds the buying route with fixed rules (catalogue, contract call-off, low-value purchase, or new demand with three
   quotes or an RFP);
 - asks only what that route needs, one question at a time;
-- classifies the request (Level 4 category, ICT service under DORA, outsourcing under EBA/GL/2019/02);
+- lets the requester choose the Level 4 category from 2–3 candidates, then classifies the request (ICT service under
+  DORA, outsourcing under EBA/GL/2019/02);
 - hands procurement a service description, or a short purchase request, plus a record of everything captured.
 
 The AI holds the conversation. It never decides the route or the classification.
@@ -59,3 +60,4 @@ cannot be changed by requesters:
 | Business-led sourcing limit | €50,000 |
 | Material spend review | €1,000,000 |
 | Quality minimum | 75 |
+| Level 4 candidates shown from | 75% match (2–3 shown, the requester chooses) |

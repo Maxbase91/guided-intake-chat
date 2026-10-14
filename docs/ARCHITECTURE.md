@@ -84,7 +84,7 @@ A change of category, value or supplier therefore re-routes on the spot.
 
 | Call | When | Gets | Returns |
 |---|---|---|---|
-| A. Chat turn | A typed answer that the rules can't read alone | System prompt (role, rules, fact keys, about 20 Level 4 candidates on the first message and at the check step, catalogue entries of the category), last 6 messages cut to 400 characters, state block | JSON: facts, reply, asking, choices, suggestion, corrections, answers_question, assessment |
+| A. Chat turn | A typed answer that the rules can't read alone | System prompt (role, rules, fact keys, about 20 Level 4 candidates on the first message, after "None of these" and at the check step, catalogue entries of the category), last 6 messages cut to 400 characters, state block | JSON: facts (on the first message also `l4`, `l4_terms`, `l4_alt`), reply, asking, choices, suggestion, corrections, answers_question, assessment |
 | B. Suggestion | A suggestion item with no usable suggestion from A | The question, known facts, the rules' standard draft | One suggestion string, one "Label: …" line per bundle line |
 | C. Documents | New demand or call-off, once all details are in | Conversation, facts, category, ICT and outsourcing results, route, up to 5 Level 4 candidates | Description fields (hard word limits), the Level 4 re-check (new demand), up to 2 quality remarks |
 | D. Document change | "Make it shorter" once a description exists | The current description and the request | The updated description |
@@ -130,6 +130,19 @@ the Level 4 list.
    by the rules and change the category, the Level 4 and the questions. In answer to an open question the app asks
    first. A category change the model files among the facts is applied only when the requester's own words name that
    category; otherwise it is dropped and the model's reply is not shown.
+8. **The requester chooses the Level 4 first** (`l4Candidates`, `selectL4`, `askL4Pick`, `readL4Pick`). After the first
+   message, every route asks `l4_pick` before anything else, in the app's own words (never the model's).
+   - Candidates: the entry the app works with, marked Suggested; the model's alternatives (`l4_alt`); the closest
+     entries across the whole list.
+   - A rules alternative's % is damped by √(its score ÷ the best score), so a far weaker entry can't look like a 78%
+     match.
+   - Every candidate at `CONFIG.thresholds.l4Match` (75%) or more is shown, up to 3, and at least 2. The area's
+     "(other)" entry is added when nothing else shares a word.
+   - Answers: a button, "the second one", a code or a name. "None of these" asks for a few words, rebuilds the
+     candidates from them (with AI, the model picks again from a shortlist for those words), and leaves out the
+     rejected ones. Two answers that are no choice keep the first.
+   - Checks on the first message wait until the choice is made, and the route news comes with the first question after
+     it.
 
 **Recognition benchmark** (realistic test data, 60 requests written without seeing the descriptions):
 

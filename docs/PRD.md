@@ -76,9 +76,13 @@ Requesters cannot change them.
 
 - **Level 4 category.** The list has about 400 entries with Level 1–3 parents and descriptions, and every entry belongs
   to one of 20 buying categories (themes). The category decides the questions and the outsourcing test.
-  - The rules pick the Level 4 entry.
-  - With AI, the model chooses from about 20 candidates.
-  - The requester can change it at the check step or by searching in the summary.
+  - After the first message, on every route, the requester **chooses the Level 4** from 2–3 candidates, each shown with
+    its Level 1 › 2 › 3 path, match % and reason. All candidates at 75% or more are shown (up to 3). If only one reaches
+    75%, the next best is added as a weaker match. If none does, the top 3 are shown. "None of these" asks for a few
+    words and suggests again.
+  - The candidates come from the rules (closest entries across the whole list, so a wrong category can be put right)
+    and, with AI, from the model's pick and up to 2 alternatives out of about 20 candidates.
+  - The requester can still change it at the check step or by searching in the summary.
 - **ICT service (DORA):** whether technology is involved, and the DORA service type proposed from the description (SaaS,
   licensing, infrastructure…).
 - **Outsourcing (group standard EBA/GL/2019/02):**

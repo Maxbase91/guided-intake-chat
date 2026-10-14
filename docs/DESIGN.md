@@ -58,8 +58,8 @@
 | **Welcome** | Short intro and example requests by path (new demand, catalogue, call-off, external workers) |
 | **Step bar** | Only the stages this route needs. ✓ done, ● current, ○ to come |
 | **Messages** | Assistant replies type out: short ones in about a second, long ones line by line in about two seconds. A click, typing or sending shows them in full. With "reduce motion", they appear at once |
-| **Chips** | Answer buttons under the last question ("Yes", "Not sure", "Use this suggestion", "Skip for now"). They appear after the text has finished typing |
-| **Classification card** | After the first message: Level 4, match %, reason, and up to two alternatives when they score close |
+| **Chips** | Answer buttons under the last question ("Yes", "Not sure", "Use this suggestion", "Skip for now"; for the category, one per candidate and "None of these"). They appear after the text has finished typing |
+| **Classification card** | After the first message, before any other question: 2–3 Level 4 candidates as a numbered list. Each shows the name, code, match % (or "weaker match"), the Level 1 › 2 › 3 path, the reason and a **Choose** button. The first is marked **Suggested**. The chosen one gets "✓ Your choice" |
 | **Stage recap** | When a stage is finished: a short card with what was captured |
 | **Check step** | A numbered list of what the rules worked out and what it means (outsourcing result, reviews). "Yes, that's right" or a correction in words ("8 is wrong: …") |
 | **Route card** | Route name, typical working days, value, **Why**, reviews and next steps. **More options** offers another route (with a justification) and a JSON download |

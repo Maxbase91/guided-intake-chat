@@ -87,6 +87,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 .classcard .ch{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}.classcard .cr{margin:4px 0}
 .classcard .cc{color:var(--ink-3);font-size:12px}.classcard .cm{display:inline-block;margin-left:6px;padding:0 8px;border-radius:99px;background:var(--line-2);font-size:12px;font-weight:600}
 .classcard .cx{color:var(--ink-2);font-size:12.5px;margin-top:2px}.classcard .cf{color:var(--ink-3);font-size:12px;margin-top:6px}
+.classcard .cl{margin:4px 0 0;padding-left:20px}.classcard .cl li{margin:8px 0}.classcard .cp{color:var(--ink-3);font-size:11.5px;overflow-wrap:anywhere}
+.classcard .cm.weak{background:transparent;border:1px dashed var(--line);font-weight:500}.classcard .cs{display:inline-block;margin-left:4px;padding:0 8px;border-radius:99px;background:var(--amber-soft);color:var(--amber-ink);font-size:11.5px;font-weight:600}
+.classcard .cy{color:var(--ok);font-size:12px;font-weight:600;margin-left:4px}.classcard .cr.picked b{color:var(--ok)}
+.classcard .cb{margin-top:5px;padding:3px 12px;border:1px solid var(--navy-3);border-radius:99px;background:#fff;color:var(--navy);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}.classcard .cb:hover{background:var(--navy);color:#fff}
+@media (max-width:600px){.classcard{max-width:100%}.classcard .cx{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}}
 .ucol{display:flex;flex-direction:column;align-items:flex-end;max-width:min(600px,85%)}.ucol .bub{max-width:100%}
 .m.a .bub{background:#f3f5fa;border-bottom-left-radius:5px}
 .m.a .bub b{color:var(--navy)}
@@ -1008,7 +1013,7 @@ const CONFIG = {
   accessCode: "",                         // only if ACCESS_CODE is set on Vercel
   forceProvider: new URLSearchParams(location.search).get("ai") || "",   // testing: ?ai=mistral uses only that provider
   currency: "EUR",
-  thresholds: { lowValueMax: 5000, quickQuoteMax: 50000, materialityMin: 1000000, qualityMin: 75, answerTip: 5 }
+  thresholds: { lowValueMax: 5000, quickQuoteMax: 50000, materialityMin: 1000000, qualityMin: 75, answerTip: 5, l4Match: 75 }
 };
 
 /* =========================================================
@@ -1149,6 +1154,7 @@ const QUAL_Q = {consulting:"What expertise and seniority must the consultants ha
   "hr-services":"What experience must the recruiters or the screening provider have?"};
 const FACTS = {
   need:           {label:"What you need",   q:()=>"Could you tell me a bit more about what you need?", ex:()=>"For example: \"an agency to run a client dinner for 40 people in March\"."},
+  l4_pick:        {label:"Category (Level 4)", q:()=>"Which of these categories fits your request best?", ex:()=>"", choices:()=>l4Chips()},
   item:           {label:"Item",            q:f=>f.demand_type==="services"?"What exactly are you buying?":"Which item or product do you need?", ex:f=>f.demand_type==="software"?"For example: \"a project-tracking tool for 25 users\".":f.demand_type==="services"?"For example: \"one ticket for the Procurement Leaders conference\".":"For example: \"a 27-inch monitor\" or a product link."},
   quantity:       {label:"Quantity",        q:f=>f.demand_type==="software"&&S.det&&NEW_DEMAND(S.det.route)?"Who will use it, and roughly how many people? A rough number is fine.":f.demand_type==="software"?"How many users or licences?":"How many do you need?", ex:f=>f.demand_type==="software"&&S.det&&NEW_DEMAND(S.det.route)?"For example: \"about 400 buyers and requesters across Europe\", or \"not sure yet\". The licence count and pricing model are agreed with suppliers later.":"", choices:f=>f.demand_type==="software"&&S.det&&NEW_DEMAND(S.det.route)?["Not sure yet"]:null},
   value:          {label:"Budget",          q:()=>shopOrder()?"Roughly how much will the order be?":"Roughly what will this cost in total?", ex:f=>shopOrder()?`The shop takes orders up to ${money(S.det.catalogue[0].max_order)}; above that, I'll find you the right route.`:`A rough figure is fine${f.duration&&/week|month|year/i.test(f.duration)?`, for the full ${f.duration}`:""}. If you don't know, just say so and I'll estimate it.`, why:()=>"The amount decides how much competition is needed."},
@@ -1241,7 +1247,9 @@ const REL = {
 // It is still picked up and used if the requester mentions it.
 // one named supplier asks "why them?"; several named ones are the competition
 const oneSupplier = f => hasSupplier(f) && supplierNames(f.supplier).length<=1;
-function requiredFor(route, f){
+// every route starts with the category the requester chooses
+function requiredFor(route, f){ return ["l4_pick", ...routeFacts(route, f)]; }
+function routeFacts(route, f){
   const g=GOODSLIKE(f), sw=f.demand_type==="software", cont=f.demand_type==="contingent_labour", pureGoods=f.demand_type==="goods", on=(c,k)=>c?[].concat(k):[];
   const role = () => cont ? ["role","headcount","skills"] : [];
   const ong = isOngoing(f), ictOng = yes(f.tech_service) && ong, proj = kindOf(f)==="project";
@@ -1274,8 +1282,8 @@ function requiredFor(route, f){
 
 // Stages group the questions so the requester sees a short, clear path. Only stages with questions for the route are shown.
 const STAGES=[
-  {id:"need",    name:"Your need",            intro:"First, what you need, roughly what it costs and how long it runs.",
-   facts:["need","item","quantity","role","headcount","skills","value","purpose","day_rate","duration","tech_service","contract_ok","renewal_change"]},
+  {id:"need",    name:"Your need",            intro:"First, the category, what you need, roughly what it costs and how long it runs.",
+   facts:["need","l4_pick","item","quantity","role","headcount","skills","value","purpose","day_rate","duration","tech_service","contract_ok","renewal_change"]},
   {id:"purpose", name:"Purpose and profile",  intro:"Now, why it's needed and who it's for. For some points I'll suggest an answer you can accept in one tap.",
    facts:["background","impact_delay","audience_fn","users","functions","current_solution","value_props","usp","benefits","reg_benefits","profile"]},
   {id:"scope",   name:"Scope and deliverables", intro:"Next, what exactly the provider does and delivers, and how the work is accepted.",
@@ -1301,7 +1309,7 @@ const currentStage = () => S.missing.length && S.det ? STAGES[stageOf(S.missing[
 /* =========================================================
    4. STATE
    ========================================================= */
-const BLANK_FACTS = {purpose:null,hosting:null,phasing:null,summary:null,category:null,demand_type:null,item:null,quantity:null,value:null,value_is_estimate:false,deliverables:null,duration:null,
+const BLANK_FACTS = {l4_pick:null,purpose:null,hosting:null,phasing:null,summary:null,category:null,demand_type:null,item:null,quantity:null,value:null,value_is_estimate:false,deliverables:null,duration:null,
   needed_by:null,location:null,supplier:null,supplier_reason:null,personal_data:null,ict_outsourcing:null,critical_service:null,offshore:null,
   budget_approved:null,decline_contract:null,scope_in:null,scope_out:null,acceptance_pack:null,acc_review:null,qualifications:null,kpis_pack:null,kpis:null,service_model:null,support_model:null,service_hours:null,tools:null,
   governance:null,gov_meetings:null,reporting:null,change_mgmt:null,escalation:null,supplier_terms:null,entity:null,in_house:null,ongoing:null,important_fn:null,deps_pack:null,our_deps:null,prov_assumptions:null,
@@ -1309,7 +1317,7 @@ const BLANK_FACTS = {purpose:null,hosting:null,phasing:null,summary:null,categor
   volume:null,support_needs:null,data_details:null,criticality:null,subcontracting:null,pricing_model:null,service_levels:null,ip_ownership:null,performance:null,role:null,headcount:null,skills:null,day_rate:null,system_access:null,renewal_change:null,wants_renewal:null};
 let CONV_SEQ=0;
 const S = fresh();
-function fresh(){ return {cid:++CONV_SEQ, curStage:null, stageIds:[], recapped:{}, req:[], challenged:{}, challengeCount:0, flags:[], pending:null, thinChecked:{}, thinCount:0, offerImprove:null, pendingCorr:null, editing:null, improveRound:0, improveDone:false, sdShown:-1, holdScroll:false, belowThresholdOk:false, derived:{}, offChecked:{}, suggest:{}, sugAccepted:{}, checkRound:0, checkWait:false, l4Initial:null, l4Settled:null, completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
+function fresh(){ return {cid:++CONV_SEQ, curStage:null, stageIds:[], recapped:{}, req:[], challenged:{}, challengeCount:0, flags:[], pending:null, thinChecked:{}, thinCount:0, offerImprove:null, pendingCorr:null, editing:null, improveRound:0, improveDone:false, sdShown:-1, holdScroll:false, belowThresholdOk:false, derived:{}, offChecked:{}, suggest:{}, sugAccepted:{}, checkRound:0, checkWait:false, l4Initial:null, l4Settled:null, l4Cands:null, l4Ai:null, l4Alt:[], l4Chosen:null, l4None:false, l4Rejected:[], l4Held:null, l4Lead:null, routeIntro:false, completed:false, submitted:null, docKey:"", msgs:[], f:{...BLANK_FACTS}, det:null, missing:["need"], lastAsked:null, asked:{}, choices:[], lastRecKey:"", sd:null, override:"", busy:false, showMore:false}; }
 
 /* =========================================================
    5. RULES ENGINE (deterministic)
@@ -1321,7 +1329,8 @@ const hasSupplier = f => known(f.supplier) && !/^(none|no|no preference|not sure
 const yes = v => v===true || /^y/i.test(String(v));
 // work outside the entity's country: an explicit "no" from the requester wins over the wording of the location
 const isOffshore = f => f.offshore===false ? false : yes(f.offshore) || /offshore|other country|another country/i.test(f.location||"");
-const userText = () => " "+S.msgs.filter(m=>m.role==="user").map(m=>m.text).join(" ").toLowerCase()+" ";
+// what the requester said about the request; a category they picked from the list ("Business cards and print") is no request text
+const userText = () => " "+S.msgs.filter(m=>m.role==="user" && !m.l4).map(m=>m.text).join(" ").toLowerCase()+" ";
 // whole words with an optional plural, so "pens" no longer hits "expenses" or "screen" hits "screening"; "consult*" is a stem
 const kwRe = (k, flags) => new RegExp(k.endsWith("*") ? "\\b"+k.slice(0,-1) : "\\b"+k+"(?:e?s)?\\b", flags);
 const kwHit = (t, k) => kwRe(k).test(t);
@@ -1455,7 +1464,7 @@ function nextSteps(route, cat, ctr){
 
 /* ---------- ICT (DORA) and outsourcing: a decision tree run by rules, never a picker for the user ---------- */
 const TECH_WORDS=/\b(software|systems?|platform|cloud|saas|paas|iaas|hosting|hosted|data feeds?|data cent(?:re|er)|digital|cyber\w*|network|infrastructure|applications?|apps?|technology|database|api|it support|help ?desk|service desk|developers?|engineers?|architects?|devops|testers?|erp|crm|sap)\b/;
-function userRaw(){ return " "+S.msgs.filter(m=>m.role==="user").map(m=>m.text).join(" ")+" "; }
+function userRaw(){ return " "+S.msgs.filter(m=>m.role==="user" && !m.l4).map(m=>m.text).join(" ")+" "; }
 // a named supplier with a reason is a single-source request, unless the requester wants it in the competition ("include", "invite");
 // "only", "directly" or "no tender" make it one even without a reason
 const SOLE_RE=/\b(?:only|solely|exclusively|directly|sole[- ]source\w*|single[- ]source\w*|no (?:competition|tender|rfp|other (?:suppliers?|vendors?|providers?|offers?|quotes?))|without (?:a |any )?(?:competition|tender|rfp)|(?:nobody|no one|no-one) else|just (?:them|go with|use them|buy from|award))\b/i;
@@ -1472,7 +1481,7 @@ function soleSupplier(f){
 // "no technology involved" says no; it is not a technology word
 const NO_TECH_RE=/\b(?:no|without|not involving|does(?:n'?t| not) involve)\s+(?:any\s+)?(?:technology|IT|ICT|systems?|software)\b(?:\s+(?:is\s+)?(?:involved|needed|required))?/gi;
 function techFromRules(f){
-  const raw0=[S.msgs.find(m=>m.role==="user")?.text, f.item, f.deliverables, f.scope_in, f.must_haves, f.current_solution].filter(x=>typeof x==="string").join(" ")+" ";
+  const raw0=[firstRequest(), f.item, f.deliverables, f.scope_in, f.must_haves, f.current_solution].filter(x=>typeof x==="string").join(" ")+" ";
   const negated=raw0.search(NO_TECH_RE)>=0, raw=raw0.replace(NO_TECH_RE," ");
   const t=raw.toLowerCase().replace(/personal data|client data|customer data|employee data/g,"");
   const it=/\b(IT|ICT)\b/.test(raw) || TECH_WORDS.test(t);
@@ -1514,7 +1523,7 @@ function demandText(f){ return (userText()+" "+[f.item,f.deliverables,f.scope_in
 // Level 4 matching for a list of hundreds: each entry's words are weighted by where they appear (search terms and name 3, a word of a search phrase 2,
 // the Level 3 group 2, the Level 2 group and the description 1) and by how rare they are across the list, so that
 // "orchestration" decides and "services" does not. A description's "Not X: see Y" part never counts for the entry.
-const L4_GENERIC=new Set("we to in of on at by or an as is be us my me do so no up our team teams someone somebody something anyone company firm partner vendor supplier suppliers external service services management support solution solutions system systems provider providers platform platforms other general including related bank banks banking it eu uk us buy buying purchase purchasing looking require required new year years month months around approx budget cost costs euro eur total per day help can".split(" "));
+const L4_GENERIC=new Set("hi hello hey we to in of on at by or an as is be us my me do so no up our team teams someone somebody something anyone company firm partner vendor supplier suppliers external service services management support solution solutions system systems provider providers platform platforms other general including related bank banks banking it eu uk us buy buying purchase purchasing looking require required new year years month months around approx budget cost costs euro eur total per day help can".split(" "));
 // 7 letters, not 5: "translation" and "transaction" must not be one word; a final "e" goes, so "trade" and "trading" meet
 const l4Stem = w => { const x=w.replace(/(?:ies|es|s|ing|ed)$/,""); return (x.length>3?x.replace(/e$/,""):x).slice(0,7); };
 // "roll out", "roll-out" and "rolling out" are one word ("rollout"), so a rollout never meets a roll-up banner; "S/4HANA" is "s4hana"
@@ -1540,10 +1549,13 @@ function requestHead(first){
     if(l4Words(obj).length) return obj; rest=sep<0?"":rest.slice(sep).replace(/^[\s,.;:!?]*(?:for|to|with|that|which|as|including|incl\.?|plus|along with|together with|as well as)?\s*/i,""); }
   return "";
 }
-const firstHead = () => requestHead((S.msgs.find(m=>m.role==="user")||{}).text);
+// the request itself: the first message with real words, not a "Hi" before it
+const GREETING=/^\s*(?:hi|hello|hey|hallo|good (?:morning|afternoon|evening)|dear [a-z]+)[\s,!.]*$/i;
+const firstRequest = () => ((S.msgs.find(m=>m.role==="user" && !GREETING.test(m.text) && l4Words(m.text).length) || S.msgs.find(m=>m.role==="user") || {}).text) || "";
+const firstHead = () => requestHead(firstRequest());
 // the secondary scope of a request: what follows "including", "plus", "as well as" ("…trading system, including the client onboarding and KYC process")
 const secondaryOf = t => (String(t||"").match(/\b(?:including|incl\.?|plus|as well as|along with|together with)\b([^.;!?]*)/i)||[,""])[1];
-const firstSecondary = () => secondaryOf((S.msgs.find(m=>m.role==="user")||{}).text);
+const firstSecondary = () => secondaryOf(firstRequest());
 // every entry (or those in pool, a Set of codes) scored against the text, best first; hits are its search terms found in the text,
 // n the number of the text's words the entry shares.
 // Words of the request's subject (head) count double, words only in its secondary scope half; a catch-all "(other)" entry counts
@@ -1559,17 +1571,21 @@ function scoreL4(text, pool, head=firstHead(), second=head?firstSecondary():""){
   }).sort((a,b)=>b.score-a.score);
 }
 const L4_PCT_K=6, L4_WEAK=8, L4_HEAD=2, L4_SECOND=0.25;
+// a score as a match percentage, and the plain reason shown with an entry
+const l4Pct = s => Math.max(35,Math.min(95,Math.round(100*s/(s+L4_PCT_K))));
+const l4Plain = d => lcFirst(String(d).replace(/\s*\b(?:not|excluding|except)\b[^.;]*[.;]?/gi,"").trim().replace(/[.;,]$/,""));
+const l4Why = x => x.hits.length ? `The demand mentions ${listJoin(x.hits.slice(0,3).map(h=>`"${h}"`))}, which fits ${lcFirst(x.e.name)}: ${l4Plain(x.e.desc)}.` : `Closest in meaning to ${lcFirst(x.e.name)}: ${l4Plain(x.e.desc)}.`;
 // the Level 4 within the request's category: up to 3 entries when they score close together
 function classifyL4(f){
   const pool=L4.filter(e=>e.cat===f.category), scored=scoreL4(demandText(f), pool.length?new Set(pool.map(e=>e.code)):null);
   if(!scored.length) return [];
-  const top=scored[0], pct=x=>Math.max(35,Math.min(95,Math.round(100*x.score/(x.score+L4_PCT_K)))), plain=d=>lcFirst(String(d).replace(/\s*\b(?:not|excluding|except)\b[^.;]*[.;]?/gi,"").trim().replace(/[.;,]$/,""));
+  const top=scored[0], pct=x=>l4Pct(x.score), plain=l4Plain;
   // no clear signal: the category's catch-all entry ("… (other)") rather than whichever came first
   if(top.score<2){ const other=(pool.length?pool:L4).find(e=>/\((?:other|general)\b/i.test(e.name))||top.e;
     return [{code:other.code,name:other.name,cat:other.cat,match:35,reason:`Nothing in the request points to a more specific entry, so it is ${lcFirst(other.name)}: ${plain(other.desc)}.`,uncertainty:"Low confidence: the demand has few clear signals."}]; }
   const best=scored.filter(x=>x.score>=top.score*0.9).slice(0,3);
   return best.map(x=>({code:x.e.code,name:x.e.name,cat:x.e.cat,match:pct(x),
-    reason: x.hits.length ? `The demand mentions ${listJoin(x.hits.slice(0,3).map(h=>`"${h}"`))}, which fits ${lcFirst(x.e.name)}: ${plain(x.e.desc)}.` : `Closest in meaning to ${lcFirst(x.e.name)}: ${plain(x.e.desc)}.`,
+    reason: l4Why(x),
     uncertainty: x.score<L4_WEAK ? "Low confidence: the demand has few clear signals." : best.length>1 ? "Two entries match almost equally well." : ""}));
 }
 // the Level 4 entries the AI chooses from: the closest to the request by their words, at the check step also to the
@@ -1577,11 +1593,49 @@ function classifyL4(f){
 function l4Shortlist(k=15){
   const f=S.f, last=(S.msgs.filter(m=>m.role==="user").pop()||{}).text||"";
   const own=[f.l4&&l4ByCode(f.l4), ...(known(f.category)?classifyL4(f).map(x=>l4ByCode(x.code)):[])].filter(Boolean);
-  const fromLast=S.lastAsked==="confirm_derived" ? scoreL4(last,null,"").filter(x=>x.score>0).slice(0,6).map(x=>x.e) : [];
-  const fromAll=scoreL4(demandText(f)).filter(x=>x.score>0).slice(0,k).map(x=>x.e);
-  return [...new Map([...own,...fromLast,...fromAll].map(e=>[e.code,e])).values()].slice(0,k+6);
+  const fromLast=S.lastAsked==="confirm_derived"||(S.lastAsked==="l4_pick"&&S.l4None) ? scoreL4(last,null,"").filter(x=>x.score>0).slice(0,6).map(x=>x.e) : [];
+  const fromAll=scoreL4(demandText(f)).filter(x=>x.score>0).slice(0,k).map(x=>x.e), rej=new Set(S.l4Rejected||[]);
+  return [...new Map([...own,...fromLast,...fromAll].filter(e=>!rej.has(e.code)).map(e=>[e.code,e])).values()].slice(0,k+6);
 }
 const l4ByCode = c => L4_BY_CODE.get(c) || null;
+// the categories the requester chooses from after the first message: the one the app works with first ("Suggested"), then
+// the AI's alternatives and the closest entries across the whole list, so a wrong category can be put right. A rules
+// entry's match is damped by how far its score is below the best one (square root of the ratio): 21 points next to 57 is
+// no 78% match. With text (after "None of these"), only that description counts and the order is by match.
+function l4Candidates(text){
+  const f=S.f, rej=new Set(S.l4Rejected||[]), byCode=new Map();
+  const pool=f.demand_type==="contingent_labour" ? new Set(L4.filter(e=>e.cat==="contingent").map(e=>e.code)) : null;
+  const add=(e, match, reason, ai)=>{ if(!e || rej.has(e.code) || (pool && !pool.has(e.code))) return;
+    const m=Math.max(35,Math.min(95,Math.round(Number(match)||35))), was=byCode.get(e.code);
+    if(!was) byCode.set(e.code, {code:e.code, name:e.name, cat:e.cat, l1:e.l1, l2:e.l2, l3:e.l3, match:m, reason}); else { if(m>was.match) was.match=m; if(reason && (ai || !was.reason)) was.reason=reason; } };
+  const G=(text ? scoreL4(text, pool, "", "") : scoreL4(demandText(f), pool)).filter(x=>x.score>0), best=G.length?G[0].score:0;
+  const own=!text && f.l4 && l4ByCode(f.l4);
+  if(own){ const ini=initialL4().find(x=>x.code===own.code), g=G.find(x=>x.e.code===own.code);
+    add(own, ini ? ini.match : g ? l4Pct(g.score) : 35, ini ? ini.reason : g ? l4Why(g) : `Closest in meaning to ${lcFirst(own.name)}: ${l4Plain(own.desc)}.`, S.l4Ai && S.l4Ai.code===own.code); }
+  if(text && S.l4Ai) add(l4ByCode(S.l4Ai.code), S.l4Ai.match||75, S.l4Ai.reason, true);
+  (S.l4Alt||[]).forEach(a=>add(l4ByCode(a.code), a.match||60, "", true));
+  G.slice(0,6).forEach(x=>add(x.e, l4Pct(x.score)*Math.sqrt(Math.min(1, x.score/best)), l4Why(x)));
+  // nothing else shares a word with the request: the area's general entry is the second choice
+  if(byCode.size<2){ const cat=own ? own.cat : f.category, o=L4.find(e=>e.cat===cat && /\((?:other|general)\b/i.test(e.name));
+    if(o) add(o, 35, `The general entry of this area, if nothing more specific fits: ${l4Plain(o.desc)}.`);
+    else if(own){ const sib=L4.find(e=>e.code!==own.code && e.l3===own.l3 && e.cat===cat) || L4.find(e=>e.code!==own.code && e.l2===own.l2 && e.cat===cat);
+      if(sib) add(sib, 35, `Next to it in the list (${sib.l3}): ${l4Plain(sib.desc)}.`); } }
+  const list=[...byCode.values()], first=own ? list.shift() : null;
+  list.concat(first||[]).forEach(c=>{ if(!c.reason) c.reason=`Closest in meaning to ${lcFirst(c.name)}: ${l4Plain(l4ByCode(c.code).desc)}.`; });
+  list.sort((a,b)=>b.match-a.match);
+  return selectL4(first ? [first, ...list] : list, CONFIG.thresholds.l4Match);
+}
+// every candidate at the threshold or above, up to 3; at least 2 (the next best is added as a weaker match); none at the
+// threshold: the top 3. The first one stays first.
+function selectL4(list, T){
+  if(!list.length) return [];
+  const [first, ...rest]=list, strong=rest.filter(x=>x.match>=T), out=[first, ...strong].slice(0,3);
+  if(first.match<T && !strong.length) out.push(...rest.slice(0,2));
+  else if(out.length<2 && rest.length) out.push(rest[0]);
+  return out.map(x=>({...x, weak:x.match<T}));
+}
+const l4Label = (c, list=S.l4Cands||[]) => list.filter(x=>x.name===c.name).length>1 ? `${c.name} (${c.code})` : c.name;
+const l4Chips = () => [...(S.l4Cands||[]).map(c=>l4Label(c)), "None of these"];
 function entityFrom(f){
   const place=String.raw`(?:the\s+)?[\w-]+(?:\s+(?:and|or)\s+(?:the\s+)?[\w-]+)*`;
   const raw=(userRaw()+" "+(f.location||""))
@@ -1718,7 +1772,7 @@ function usersFromAudience(f){
 }
 // what a small purchase is for, when the request says so: "Flowers for a colleague's farewell" → "a colleague's farewell"
 function purposeFromText(f){
-  const first=(S.msgs.find(m=>m.role==="user")||{}).text||"", m=first.match(/\bfor\s+((?:a|an|the|our|my|his|her|their|this|next)\s+[^,.;!?]{3,60})/i);
+  const first=firstRequest(), m=first.match(/\bfor\s+((?:a|an|the|our|my|his|her|their|this|next)\s+[^,.;!?]{3,60})/i);
   if(!m) return null;
   const p=m[1].replace(/\s+(?:about|around|approx\w*|roughly|budget|costing|at|by|from|until|starting|for)\b.*$/i,"").trim();
   return words(p)>=2 ? p : null;
@@ -2042,7 +2096,7 @@ New demand facts: scope_in (what the provider must do and deliver; also record d
 support_model, service_hours, tools, gov_meetings, reporting, change_mgmt, escalation, supplier_terms, our_deps, prov_assumptions, other_risks,
 entity (the provisioning legal entity that receives the service and signs the contract: one of ${ENTITIES.map(e=>`${e.id} = ${e.name}`).join("; ")}), in_house (true if this is work the bank does itself or could realistically do itself (EBA/GL/2019/02 paragraph 26), false if a bank would not do it itself),
 ongoing (true for an ongoing service, false for a one-off), important_fn (true only if the user says it supports a critical or important function), title (working title), l4 (Level 4 code, see below).
-${!S.det||S.lastAsked==="confirm_derived" ? `Level 4 candidates (the closest of ${L4.length} entries; Level 2 › Level 3 in brackets): ${l4Shortlist().map(e=>`${e.code} ${e.name} (${e.l2} › ${e.l3})`).join("; ")}. On the first message set l4_terms to 2–5 words a procurement category list would use for what is bought, with product and brand names turned into the kind of purchase (for example "courier delivery" for "documents must reach Milan by tomorrow", "CRM software" for "50 more Salesforce seats"). Set l4 to the candidate that fits what is bought (the subject, not a side remark; a shared word is not enough), l4_match (0-100) and l4_reason (one short plain sentence), and set category to match it. If no candidate fits, set l4 to "" and category to the one that fits l4_terms.` : "Level 4: already set; change l4 only when the user corrects it at the check step."}
+${!S.det||S.lastAsked==="confirm_derived"||(S.lastAsked==="l4_pick"&&S.l4None) ? `Level 4 candidates (the closest of ${L4.length} entries; Level 2 › Level 3 in brackets): ${l4Shortlist().map(e=>`${e.code} ${e.name} (${e.l2} › ${e.l3})`).join("; ")}. ${S.l4None?"The user said none of the suggested categories fits; their latest message says what is bought, so set the fields below from it. ":""}On the first message set l4_terms to 2–5 words a procurement category list would use for what is bought, with product and brand names turned into the kind of purchase (for example "courier delivery" for "documents must reach Milan by tomorrow", "CRM software" for "50 more Salesforce seats"). Set l4 to the candidate that fits what is bought (the subject, not a side remark; a shared word is not enough), l4_match (0-100) and l4_reason (one short plain sentence), and set category to match it. If no candidate fits, set l4 to "" and category to the one that fits l4_terms. Also set l4_alt to up to 2 other candidates that could also fit, best first, as [{"code":"L4-…","match":0-100}] ([] if none); the user chooses between them.` : "Level 4: already set; change l4 only when the user corrects it at the check step."}
 If the user types "skip", record nothing for that item.
 At the check step (asking = confirm_derived) the user confirms or corrects facts the app worked out; record any correction (entity, ongoing, in_house, tech_service, important_fn, personal_data, offshore, location, title, l4) and reply briefly. Numbered points refer to the list in your last message. Never decide outsourcing yourself.
 Suggested answers: items marked suggest=true in still_needed are answered by suggestion. When you ask one, put a concrete suggestion tailored to this request in "suggestion" (one plain string, never an object or a list)
@@ -2074,7 +2128,7 @@ function contextLines(){
 // the message sent with each chat turn: recent conversation, the latest answer and the app's state (also shown in How it works)
 const chatUser = (transcript, text, pend) => `${transcript?`Conversation so far:\n${transcript}\n\n`:""}Latest user message:\n${text}${stateBlock(pend)}\n\nAnswer with the JSON object only.`;
 function stateBlock(pend){
-  const f=S.f, still=S.missing.map((k,i)=>i<3?{key:k,label:FACTS[k].label,stage:STAGES[stageOf(k)].name,ask:FACTS[k].q(f),example:(FACTS[k].ex(f)||""),...(isSug(k)?{suggest:true}:{}),...(bundleOf(k)?{lines:bundleOf(k).map(([L])=>L)}:{})}:{key:k,label:FACTS[k].label});
+  const f=S.f, still=S.missing.filter(k=>k!=="l4_pick").map((k,i)=>i<3?{key:k,label:FACTS[k].label,stage:STAGES[stageOf(k)].name,ask:FACTS[k].q(f),example:(FACTS[k].ex(f)||""),...(isSug(k)?{suggest:true}:{}),...(bundleOf(k)?{lines:bundleOf(k).map(([L])=>L)}:{})}:{key:k,label:FACTS[k].label});
   return `\n\n[STATE]\nknown_facts: ${JSON.stringify(Object.fromEntries(Object.entries(f).filter(([k,v])=>known(v)&&v!==false)))}\n`+
     (S.det?`route_so_far: ${CHANNELS[S.det.route].name}\n`:"")+
     `already_checked: ${JSON.stringify(Object.keys(S.challenged||{}))}\n`+
@@ -2097,7 +2151,7 @@ function chatHistory(){
    7. CONVERSATION LOOP
    ========================================================= */
 // the AI must never show internal field names or values to the user; remove such sentences, or fall back to the standard question
-const INTERNAL_KEYS=new RegExp(`\\b(?:${Object.keys(BLANK_FACTS).filter(k=>k.includes("_")).join("|")}|still_needed|known_facts|already_checked|pending_check|route_so_far|facts?\\s*(?:object|json)|json)\\b`,"i");
+const INTERNAL_KEYS=new RegExp(`\\b(?:${Object.keys(BLANK_FACTS).filter(k=>k.includes("_")).join("|")}|l4_alt|still_needed|known_facts|already_checked|pending_check|route_so_far|facts?\\s*(?:object|json)|json)\\b`,"i");
 const INTERNAL_VALS=/\b(?:set|setting|recorded|marked|flagged|updated|stored)\b[^.?!]{0,40}\b(?:to|as)\s+(?:true|false|null|unsure)\b|(?:\b(?:is|as|to|equals)\s+|[=:]\s*)(?:true|false|null)\b/i;
 function cleanReply(t){
   if(!t || typeof t!=="string") return t;
@@ -2200,7 +2254,8 @@ function detectCorrection(text, asked){
     // weak signal: "actually it's consulting" without naming the field → ask
     if(!hit && /\b(actually|sorry|i meant|i mean)\b/i.test(s)){
       const w=s.match(/\b(?:it'?s|it is|this is)\s+(?:really\s+|more\s+)?(?:an?\s+)?(.+)$/i), now=w&&catFromText(w[1]);
-      if(now && now.cat!==S.f.category && asked!=="need"){ out.ambiguous={category:now}; continue; }
+      if(now && now.cat!==S.f.category && asked==="l4_pick"){ out.changes.category=now; hit=true; }   // at the category question both readings are the same
+      else if(now && now.cat!==S.f.category && asked!=="need"){ out.ambiguous={category:now}; continue; }
     }
     if(!hit) keep.push(s);
   }
@@ -2234,6 +2289,8 @@ function applyChanges(ch){
       const from=catById(f.category).name, c=catById(v.cat);
       f.category=v.cat; f.demand_type=c.type; S.catGuess=null;
       if(code){ f.l4=code; delete S.derived.l4; f.l4_reason="Set by you during the intake."; }
+      // a category named while the category question is open gives new candidates; a chosen one follows the change
+      if(known(f.l4_pick)){ if(code){ f.l4_pick=code; S.l4Chosen={code, match:null, how:"chosen"}; } } else S.l4Cands=null;
       f.contract_ok=null; f.decline_contract=null; S.override="";
       // suggestions prepared for the old category no longer fit
       Object.keys(S.suggest).forEach(x=>{ if(!known(f[x])) delete S.suggest[x]; });
@@ -2252,7 +2309,7 @@ async function afterChanges(done, cid, opts={}){
   const prevRoute=S.det&&S.det.route, prevMissing=[...(S.missing||[])], asked=S.lastAsked, hadDoc=!!S.sd;
   refresh();
   const route=S.det.route, added=S.missing.filter(k=>!prevMissing.includes(k)), dropped=prevMissing.filter(k=>!S.missing.includes(k)&&!known(S.f[k]));
-  let msg=`Changed: ${done.join("; ")}.`;
+  let msg=opts.lead || `Changed: ${done.join("; ")}.`;
   if(prevRoute && route!==prevRoute) msg+=` That changes the route from ${CHANNELS[prevRoute].name} to **${CHANNELS[route].name}**.`;
   const nq=n=>n===1?"one question":`${n} questions`;
   const qa = dropped.length&&added.length ? [`${nq(dropped.length)} ${dropped.length===1?"is":"are"} no longer needed and ${added.length===1?"one is":`${added.length} are`} added`]
@@ -2263,6 +2320,10 @@ async function afterChanges(done, cid, opts={}){
     return;
   }
   if(S.completed) S.completed=false;
+  // a check on the first message, held back until the category was chosen, now for that category
+  const held=S.l4Held; S.l4Held=null;
+  if(held && known(S.f.l4_pick)){ const is=findIssue(held.changed.filter(k=>known(S.f[k]))) || (held.ai && S.req.includes(held.ai.fact) ? held.ai : null);
+    if(is){ S.msgs.push({role:"assistant",text:msg}); raiseIssue(is); return; } }
   const next=S.missing[0];
   await askNext(next, msg+(next===asked?"\n\nBack to where we were:":""), cid);
 }
@@ -2304,7 +2365,7 @@ function metaKind(text, k){
   if(!aiReady() && QUESTION_BACK.test(t) && GROUNDED.concat(["background"]).includes(k)) return "question";   // with AI, the AI answers these
   return null;
 }
-const WHY_ASK={contract_ok:"The framework was put out to competition before, so the firm, its rates and its terms are already agreed and no new tender is needed. Whether it fits this work is your call: if you'd rather compare firms, choose \"No, look wider\".", background:"The problem and what a delay would cost are the first things approvers and suppliers read.", current_solution:"Procurement needs to know why the bank can't do this itself before it pays a provider.",
+const WHY_ASK={l4_pick:"The category decides the route: catalogue shops, framework contracts and preferred suppliers are set per Level 4, and so are some of the questions.", contract_ok:"The framework was put out to competition before, so the firm, its rates and its terms are already agreed and no new tender is needed. Whether it fits this work is your call: if you'd rather compare firms, choose \"No, look wider\".", background:"The problem and what a delay would cost are the first things approvers and suppliers read.", current_solution:"Procurement needs to know why the bank can't do this itself before it pays a provider.",
   audience_fn:"Suppliers size and price the service by who uses it.", value_props:"Approvers weigh the request by its benefits.", scope_in:"Suppliers price exactly what is listed here; anything missing becomes a change request later.",
   scope_out:"Clear exclusions stop suppliers from pricing work you don't need.", acceptance_pack:"It decides when the work counts as done and can be paid.", qualifications:"Offers are compared on the people the provider puts forward.",
   kpis_pack:"Success measures are how the provider is judged after the contract starts.", governance:"It sets how problems are raised before they become disputes.", needed_by:"The start date decides how much time sourcing has.",
@@ -2342,6 +2403,7 @@ async function metaTurn(kind, text, cid, aiAnswer, display, posted){
   else if(kind==="question") lead=aiAnswer||"Good question. I can't answer that here; the buyer can when they pick this up.";
   else if(kind==="suggest"){
     if(isSug(k)) lead="My suggestion below is what is typical for a request like yours.";
+    else if(k==="l4_pick" && (S.l4Cands||[])[0]) lead=`I'd go with the first one, **${S.l4Cands[0].name}**: it fits your words best.`;
     else if(CLOSED.includes(k) || F.choices) lead=`This one depends on your request, so I can't pick it for you. ${WHY_ASK[k]||""} Choose the closest answer, or say "not sure".`.replace(/\s+/g," ");
     else {
       const sg=await adhocSuggest(k, cid); guard(cid);
@@ -2458,6 +2520,8 @@ async function handleTurn(text, cid, opts={}){
     }
     if(/^(?:no|nope|it'?s my answer|my answer)\b/i.test(tt)){ S.msgs.push({role:"user",text:tt}); return handleTurn(pc.text, cid, {noCorr:true, silent:true}); }
   }
+  // the category question: a button, "the second one", a code or a name picks; "None of these" asks for a few words
+  if(S.lastAsked==="l4_pick" && !S.pending && !known(S.f.l4_pick)){ const r=readL4Pick(text); if(r) return answerL4Pick(r, text, cid, opts); }
   // a correction of something said earlier, rather than (or as well as) an answer
   if(!opts.noCorr){
     const corr=detectCorrection(text, S.lastAsked);
@@ -2535,7 +2599,7 @@ async function handleTurn(text, cid, opts={}){
       // the AI put a category change among the facts, which only the first message may set ("Its more consulting support",
       // and its reply said "I've noted the shift"): it is a correction when the requester's own words name that category
       const fl4=out.facts&&l4ByCode(out.facts.l4), fcat=fl4 ? fl4.cat : out.facts&&CATEGORIES.some(c=>c.id===out.facts.category) ? out.facts.category : null;
-      if(S.det && asked!=="confirm_derived" && fcat && fcat!==S.f.category && !(aiCorr && aiCorr.category)){ const said=catFromText(text);
+      if(S.det && asked!=="confirm_derived" && !(asked==="l4_pick" && S.l4None) && fcat && fcat!==S.f.category && !(aiCorr && aiCorr.category)){ const said=catFromText(text);
         if(said && said.cat===fcat) aiCorr={...(aiCorr||{}), category:{cat:fcat, l4:fl4 ? fl4.code : said.l4 || (typeof out.facts.l4_terms==="string" ? l4InCat(out.facts.l4_terms, fcat) : null)}}; }
       if(aiCorr && !opts.corrDone){
         const done=applyChanges(aiCorr);
@@ -2584,7 +2648,7 @@ async function handleTurn(text, cid, opts={}){
   if(asked && bundleOf(asked) && !sugResult && !pend && givenText(S.f[asked]) && S.f[asked]!=="Confirmed" && !bundleOf(asked).some(([,x])=>givenText(S.f[x]))){
     const free={kpis_pack:"kpis"}[asked]; if(free){ S.f[free]=String(S.f[asked]); } else setFromSuggestion(asked, String(S.f[asked])); }
   // "skip": the point is recorded as to be determined and listed as an open point
-  const skipped = asked && !pend && !["need","confirm_derived"].includes(asked) && /^(skip|skip (?:for now|this|it)|pass)[.!]?$/i.test(text.trim());
+  const skipped = asked && !pend && !["need","confirm_derived","l4_pick"].includes(asked) && /^(skip|skip (?:for now|this|it)|pass)[.!]?$/i.test(text.trim());
   if(skipped){ S.f[asked]="Not given"; if(bundleOf(asked)) bundleOf(asked).forEach(([,k])=>{ if(!known(S.f[k]) || JSON.stringify(before[k])!==JSON.stringify(S.f[k])) S.f[k]="Not given"; }); }
   // the check step: confirm what the rules worked out, or correct it in plain words
   if(asked==="confirm_derived" && !pend){
@@ -2654,12 +2718,14 @@ async function handleTurn(text, cid, opts={}){
   if(asked && asked!=="confirm_derived" && !known(S.f[asked]) && (S.asked[asked]||0)>=2) giveUp(asked);
   const prevRoute=S.det&&S.det.route, prevStages=[...(S.stageIds||[])];
   refresh();
-  // first classification against the Level 4 list, shown straight away
-  if(!prevRoute && S.det && !S.l4Initial){ S.l4Initial=initialL4(); S.msgs.push({role:"assistant",kind:"class"}); }
+  // first classification against the Level 4 list: the candidates the requester chooses from, asked before anything else
+  if(!prevRoute && S.det && !S.l4Initial){ S.l4Initial=initialL4(); S.l4Cands=l4Candidates(); }
+  // "None of these" and a few words: new candidates from that description (and the AI's pick for it)
+  if(asked==="l4_pick" && S.l4None && !known(S.f.l4_pick)){ S.l4None=false; S.asked.l4_pick=0; const c=l4Candidates(text); S.l4Cands=c.length ? c : l4Candidates(); S.l4Lead=c.length ? "Here's what fits that best." : "I couldn't match that to a category, so here are the closest to your request."; }
   if(note) S.msgs.push({role:"assistant",kind:"sys",text:note});
 
   // quality check of what changed this turn: rules first, then the AI's view; one challenge per item, three per conversation
-  const changed=Object.keys(FACTS).filter(k=>known(S.f[k]) && JSON.stringify(before[k])!==JSON.stringify(S.f[k]) && (S.req||[]).concat(["value","needed_by","data_details"]).includes(k) && !(pend&&pend.fact===k));
+  const changed=Object.keys(FACTS).filter(k=>k!=="l4_pick" && known(S.f[k]) && JSON.stringify(before[k])!==JSON.stringify(S.f[k]) && (S.req||[]).concat(["value","needed_by","data_details"]).includes(k) && !(pend&&pend.fact===k));
   if(changed.some(k=>["day_rate","duration","headcount","deliverables","quantity"].includes(k)) && known(S.f.value) && !changed.includes("value")) changed.push("value");
   if(prevRoute && S.det && prevRoute!==S.det.route && known(S.f.needed_by) && !changed.includes("needed_by")) changed.push("needed_by");
   let issue = findIssue(changed);
@@ -2670,26 +2736,20 @@ async function handleTurn(text, cid, opts={}){
   if(!issue && aiOff && aiCheck.fact===asked && asked!=="supplier_reason" && !bizWords(S.f[asked]||text) && FACTS[asked] && !S.offChecked[asked] && asked!==(pend&&pend.fact)) issue=offTopicIssue(asked);
   if(!issue && aiCheck && !(sugResult && aiCheck.fact===asked) && S.challengeCount<3 && changed.includes(aiCheck.fact) && !S.challenged[aiCheck.fact] && FACTS[aiCheck.fact])
     issue={fact:aiCheck.fact, issue:String(aiCheck.issue||"needs a second look").slice(0,140), message:String(cleanReply(aiCheck.follow_up||"")||reply||"").trim()||`Could you double-check this? ${FACTS[aiCheck.fact].q(S.f)}`};
+  // a check on the first message waits until the category is chosen, and is then made for that category
+  if(issue && S.missing[0]==="l4_pick" && !pend){ S.l4Held={changed:[...changed], ai:aiCheck && aiCheck.fact===issue.fact ? issue : null}; issue=null; }
   const ansScore = skipped ? null : asked==="confirm_derived" ? null : answerScore(asked, text, issue, sugResult, aiScore, pend);
   if(!issue && !pend && !skipped && asked && TIPS[asked] && ansScore!=null && ansScore<=CONFIG.thresholds.answerTip && !S.thinChecked[asked] && S.thinCount<3 && S.det && NEW_DEMAND(S.det.route) && givenText(S.f[asked])) issue=thinIssue(asked);
-  if(issue){
-    if(issue.kind==="offtopic") S.offChecked[issue.fact]=true; else if(issue.kind==="thin"){ S.thinChecked[issue.fact]=true; S.thinCount++; } else { S.challenged[issue.fact]=true; S.challengeCount++; }
-    S.pending={fact:issue.fact, prev:S.f[issue.fact], issue:issue.issue, kind:issue.kind||"", flip:!!issue.flip};
-    const exF=FACTS[issue.fact]&&FACTS[issue.fact].ex(S.f), short=words(issue.message)<14 && exF && !/for example|such as|e\.g\./i.test(issue.message);
-    S.msgs.push({role:"assistant",text:issue.message+(short?" "+exF:""), check:true});
-    const fc=FACTS[issue.fact]&&FACTS[issue.fact].choices, fcs=typeof fc==="function"?fc(S.f):fc;
-    S.choices=issue.choices||(fcs?[...fcs]:(S.det&&NEW_DEMAND(S.det.route)&&!CLOSED.includes(issue.fact)?["Skip for now"]:[])); S.lastAsked=issue.fact;
-    S.busy=false; render(); return;
-  }
+  if(issue){ raiseIssue(issue); S.busy=false; render(); return; }
 
   // what the provider does, written back as obligations
   if(asked==="scope_in" && givenText(S.f.scope_in)){ const ob=shallify(S.f.scope_in); if(ob.length) S.msgs.push({role:"assistant",text:`I've written this as obligations:\n${ob.map(x=>"• "+x).join("\n")}\n\nTell me if anything is wrong.`}); }
   // the route changed and needs more stages: say why, briefly
   const added=S.stageIds.filter(id=>!prevStages.includes(id)&&id!=="review"&&S.missing.some(k=>factsOf(stageById(id)).includes(k)));
-  if(prevStages.length && added.length && S.msgs.filter(m=>m.role==="user").length>1)
+  if(prevStages.length && added.length && S.msgs.filter(m=>m.role==="user").length>1 && S.missing[0]!=="l4_pick")
     S.msgs.push({role:"assistant",kind:"sys",text:`This is now ${CHANNELS[S.det.route].name.replace(/^New demand: /,"new demand with ")}, so I've added a few questions on ${listJoin(added.map(id=>stageById(id).name.toLowerCase()))}.`});
   // the amount made it a small purchase: say so, and that the long questions are gone
-  if(prevRoute && prevRoute!==S.det.route && LIGHT(S.det.route) && !LIGHT(prevRoute))
+  if(prevRoute && prevRoute!==S.det.route && LIGHT(S.det.route) && !LIGHT(prevRoute) && S.missing[0]!=="l4_pick" && S.routeIntro)
     S.msgs.push({role:"assistant",kind:"sys",text: shopOrder() ? `You can order this from the ${S.det.catalogue[0].name.toLowerCase()} of ${S.det.catalogue[0].supplier} in our catalogue, so I only need a few details.` : `At ${money(Number(S.f.value))} this is a low-value purchase: no service description, just a few details.`});
 
   if(!S.missing.length){
@@ -2697,7 +2757,8 @@ async function handleTurn(text, cid, opts={}){
     await finishIntake(cid, lead);
   } else {
     let next=S.missing[0];
-    const aiAskedOk = reply && !complete && !aiCheck && !aiDropped && aiAsking && S.missing.slice(0,2).includes(aiAsking) && stageOf(aiAsking)===stageOf(S.missing[0]) && replyAsksAbout(aiAsking, reply);
+    if(next==="l4_pick"){ const lead=S.l4Lead || (asked==="l4_pick" ? "Thanks, noted." : ""), card=!!S.l4Lead || !S.msgs.some(m=>m.kind==="class"); S.l4Lead=null; askL4Pick(lead, card); S.busy=false; render(); return; }
+    const aiAskedOk = S.routeIntro && reply && !complete && !aiCheck && !aiDropped && aiAsking && S.missing.slice(0,2).includes(aiAsking) && stageOf(aiAsking)===stageOf(S.missing[0]) && replyAsksAbout(aiAsking, reply);
     if(aiAskedOk) next=aiAsking;
     const newStage=STAGES[stageOf(next)].id, stageChanged=newStage!==S.curStage;
     stageTransition(newStage);
@@ -2767,7 +2828,55 @@ async function startOptional(k){
   render();
 }
 // ask a question without the AI (used when resuming after the description was written)
+// the category question, always in the app's words: the candidates as a card, then the question with one button each
+function askL4Pick(lead, card=true){
+  const rebuilt=!S.l4Cands || !S.l4Cands.length; if(rebuilt) S.l4Cands=l4Candidates();
+  stageTransition(STAGES[stageOf("l4_pick")].id);
+  if(card || rebuilt) S.msgs.push({role:"assistant", kind:"class", cands:S.l4Cands.map(c=>({...c}))});
+  const n=catById(S.f.category).name, first=S.l4Cands[0];
+  const intro = lead || (S.catGuess ? "I'm not sure which category this is." : first && first.cat===S.f.category ? `This sounds like ${/^[A-Z]{2}/.test(n)?n:lcFirst(n)}.` : "It could be one of these.");
+  S.msgs.push({role:"assistant", text:`${intro} ${FACTS.l4_pick.q()} If none fits, choose "None of these" and tell me in a few words what it is.`, ask:"l4_pick"});
+  S.choices=l4Chips(); S.lastAsked="l4_pick";
+}
+// what the reply to the category question picks: {code}, {code, keep}, {none} or null (an answer to something else)
+function readL4Pick(text){
+  const t=text.trim(), l=t.toLowerCase().replace(/[.!]+$/,""), C=S.l4Cands||[];
+  const code=(t.match(/\bL4-\d{4}\b/i)||[])[0]; if(code && l4ByCode(code.toUpperCase())) return {code:code.toUpperCase()};
+  const chip=C.find(c=>l4Label(c).toLowerCase()===l); if(chip) return {code:chip.code};
+  if(/^(?:skip|skip (?:for now|this|it)|pass|not sure|no idea|don'?t know|i don'?t know)$/.test(l)) return C[0] ? {code:C[0].code, keep:true} : null;
+  if(S.l4None) return null;   // after "None of these", anything else describes what it is
+  if(/^(?:none(?: of (?:these|them|those|the above))?(?: fits?)?|neither(?: of (?:these|them))?|something else|other|no(?:ne)?,? (?:it'?s )?something else|not (?:these|any of (?:these|them)))$/.test(l)) return {none:true};
+  const ord=l.match(/^(?:the\s+)?(?:(first|1st|top)|(second|2nd)|(third|3rd)|(last))(?:\s+one)?(?:\s+(?:please|fits?|is right))?$|^(?:option|number|no\.?|#)?\s*([1-3])$/);
+  if(ord){ const i=ord[1]?0:ord[2]?1:ord[3]?2:ord[4]?C.length-1:Number(ord[5])-1; return C[i] ? {code:C[i].code} : null; }
+  if(C[0] && (ACCEPT.test(t) || DELEGATE.test(t) || /^(?:yes|yep|yeah|correct|right|that'?s (?:it|right|correct)|looks (?:good|right)|the suggested one|your suggestion)$/.test(l))) return {code:C[0].code};
+  const named=C.filter(c=>(" "+l+" ").includes(" "+c.name.toLowerCase().replace(/\s*\(.*\)$/,"")+" ")).sort((a,b)=>b.name.length-a.name.length)[0]; if(named) return {code:named.code};
+  // a few words that fit one shown entry clearly better than the others ("the ERP one")
+  if(words(t)<=6){ const sc=scoreL4(t, new Set(C.map(c=>c.code)), "", ""); if(sc[0] && sc[0].score>=4 && sc[0].score>1.5*((sc[1]||{}).score||0)) return {code:sc[0].e.code}; }
+  return null;
+}
+// the chosen (or kept) Level 4 becomes the request's category; the card shows the choice
+function pickL4(code, how){
+  const e=l4ByCode(code), c=(S.l4Cands||[]).find(x=>x.code===code), keep=S.l4Cands;
+  applyChanges({category:{cat:e.cat, l4:e.code}}); S.l4Cands=keep;
+  const f=S.f; f.l4=e.code; delete S.derived.l4; f.l4_pick=e.code; f.l4_match=c ? c.match : null;
+  f.l4_reason = how==="kept" ? (c && c.reason) || f.l4_reason : "Chosen by you from the suggested categories.";
+  S.l4Chosen={code:e.code, match:c ? c.match : null, how}; S.l4None=false;
+  const card=[...S.msgs].reverse().find(m=>m.kind==="class"); if(card) card.picked=e.code;
+}
+async function answerL4Pick(r, text, cid, opts={}){
+  if(!opts.silent) S.msgs.push({role:"user", text:opts.display||text, l4:true}); S.choices=[];
+  if(r.none){
+    S.l4None=true; S.l4Rejected=[...new Set([...(S.l4Rejected||[]), ...(S.l4Cands||[]).map(c=>c.code)])];
+    S.msgs.push({role:"assistant", text:`What is it, in a few words? For example "courier delivery" or "SAP implementation support". You can also search all ${L4.length} categories with ✎ next to the category in the summary.`, ask:"l4_pick"});
+    S.lastAsked="l4_pick"; render(); return;
+  }
+  const e=l4ByCode(r.code);
+  pickL4(r.code, r.keep ? "kept" : "chosen");
+  S.busy=true; render();
+  await afterChanges([], cid, {lead: r.keep ? `I'll keep **${e.name}** (${e.code}) for now. You can change it with ✎ next to the category in the summary.` : `Thanks, I'll use **${e.name}** (${e.code}).`});
+}
 async function askNext(next, lead, cid){
+  if(next==="l4_pick"){ askL4Pick(lead, false); return; }
   if(isSug(next) && !S.suggest[next] && aiReady()){ S.busy=true; render(); const ai=await aiSuggest(next, cid||S.cid); if(ai) S.suggest[next]=ai; S.busy=false; }
   stageTransition(STAGES[stageOf(next)].id);
   const msg = next==="confirm_derived" ? checkMessage() : offlineQuestion(next, S.det.route, true);
@@ -2821,7 +2930,8 @@ function screenAIFacts(nf, asked, text){
     if(v===null||v===undefined||v==="") continue;
     const sv=flat(v);
     if(bundleOf(k) || k==="confirm_derived" || k==="need") continue;                         // a bundle question is answered by its lines, which the app sets
-    if(["category","demand_type","l4","l4_match","l4_reason","l4_terms"].includes(k) && !first && asked!=="confirm_derived"){ if((k==="category"||k==="l4") && sv && sv!==S.f[k]) screenAIFacts.dropped++; continue; }   // later changes come as corrections; a reply saying "noted" is not shown
+    if(k==="l4_pick") continue;   // the requester's choice, set by the app
+    if(["category","demand_type","l4","l4_match","l4_reason","l4_terms","l4_alt"].includes(k) && !first && asked!=="confirm_derived" && !(asked==="l4_pick" && S.l4None)){ if((k==="category"||k==="l4") && sv && sv!==S.f[k]) screenAIFacts.dropped++; continue; }   // later changes come as corrections; a reply saying "noted" is not shown
     if(PLACEHOLDER.test(sv.trim()) && !own.has(k)) continue;                                  // never a gap filled with "unknown" or "none"
     if(AI_FLAGS.includes(k) && asked!=="confirm_derived" && !own.has(k)) continue;           // classification: the rules, or the requester at the check step
     if(GROUNDED.includes(k)){ const w=contentWords(sv), src=k===asked&&!isSug(asked)?now_:own.has(k)?said:own_; if(w.length && w.filter(x=>src.has(stem(x))).length/w.length<0.5){ screenAIFacts.dropped=(screenAIFacts.dropped||0)+1; continue; } }   // free text comes from what was said
@@ -2874,6 +2984,9 @@ function mergeFacts(nf){
   // no good candidate ("S4 HANA Roll Out" found only roll-up banners), so the entry its terms point to replaces the pick
   else if(l4ByCode(nf.l4) && typeof nf.l4_terms==="string" && nf.l4_terms.trim()){ const T=scoreL4(nf.l4_terms, null, ""), top=T[0], own=T.find(x=>x.e.code===nf.l4), req=scoreL4(userText(), new Set([nf.l4]))[0];
     if(top && top.score>=L4_WEAK && top.e.code!==nf.l4 && !(own && own.score>0) && !(req && req.hits.length)){ nf={...nf, l4:top.e.code}; S.f.l4=top.e.code; S.f.l4_match=null; S.f.l4_reason=`Closest to “${nf.l4_terms.trim()}”: ${lcFirst(top.e.name)}.`; } }
+  // the AI's pick and up to 2 alternatives, offered with the rules' candidates ("L4-1234" or {code, match})
+  if(l4ByCode(nf.l4)) S.l4Ai={code:nf.l4, match:Number(S.f.l4_match)||null, reason:typeof S.f.l4_reason==="string"?S.f.l4_reason:""};
+  if(Array.isArray(nf.l4_alt)) S.l4Alt=nf.l4_alt.map(a=>typeof a==="string" ? {code:(a.match(/L4-\d{4}/i)||[""])[0].toUpperCase(), match:Number((a.match(/(\d{1,3})\s*%/)||[])[1])||null} : {code:String(a&&a.code||"").toUpperCase(), match:Number(a&&a.match)||null}).filter(a=>l4ByCode(a.code) && a.code!==nf.l4).slice(0,2);
   // the AI's Level 4 decides its category, so the two never disagree (the subject named first can still override it, in offlineRead)
   if(typeof nf.l4==="string" && l4ByCode(nf.l4) && S.f.category!==l4ByCode(nf.l4).cat){ S.f.category=l4ByCode(nf.l4).cat; S.f.demand_type=catById(S.f.category).type; }
   if(S.f.category && !S.f.demand_type) S.f.demand_type=catById(S.f.category).type;
@@ -2895,7 +3008,7 @@ function finalL4(aiPick){
   const r=classifyL4(S.f), ini=(S.l4Initial||[])[0], cur=S.f.l4&&l4ByCode(S.f.l4), user=cur && S.derived.l4!==S.f.l4;
   const ai=aiPick && l4ByCode(aiPick.code) ? aiPick : null, rc=cur && r.find(x=>x.code===S.f.l4);
   // S.f.l4 is the one Level 4 value: shown and confirmed at the check step, then written into the record. The AI's re-check only adds a note.
-  let pick = cur ? {code:S.f.l4, match:ai&&ai.code===S.f.l4?Number(ai.match)||null:null, reason:user?"Set by you during the intake.":(rc&&rc.reason)||"",
+  let pick = cur ? {code:S.f.l4, match:ai&&ai.code===S.f.l4?Number(ai.match)||null:null, reason:user?(S.l4Chosen&&S.l4Chosen.code===S.f.l4?"Chosen by you from the suggested categories.":"Set by you during the intake."):(rc&&rc.reason)||"",
         uncertainty:ai&&ai.code!==S.f.l4 ? `The final check also considered ${l4ByCode(ai.code).name} (${ai.code})${ai.reason?`: ${String(ai.reason).replace(/\.$/,"")}`:""}.` : String((ai&&ai.uncertainty)||"")}
     : ai ? {code:ai.code, match:Number(ai.match)||null, reason:String(ai.reason||""), uncertainty:String(ai.uncertainty||"")}
     : {code:r[0].code, reason:r[0].reason, uncertainty:r[0].uncertainty};
@@ -2920,10 +3033,19 @@ function applyCorrections(t){
   if(/no (?:access|personal data|data)|won.?t (?:see|access)/.test(l)) f.personal_data=false;
   const ent=ENTITIES.find(e=>e.re.test(t)||(e.abbr&&e.abbr.test(t))); if(ent && /entit|branch|for the|it'?s for|sign/.test(l)) f.entity=ent.id;
   const ti=t.match(/(?:call it|title (?:is|should be)|name (?:is|should be))\s+["“]?([^"”.]+)/i); if(ti) f.title=ti[1].trim();
-  const cm=l.match(/(?:category|classification)(?: should be| is|:)\s+([a-z ,&-]{4,})/); if(cm){ const e=catFromText(cm[1]), code=e&&(e.l4||(classifyL4({...f, category:e.cat})[0]||{}).code); if(code){ f.l4=code; f.category=e.cat; f.demand_type=catById(e.cat).type; delete S.derived.l4; } }
+  const cm=l.match(/(?:category|classification)(?: should be| is|:)\s+([a-z ,&-]{4,})/); if(cm){ const e=catFromText(cm[1]), code=e&&(e.l4||(classifyL4({...f, category:e.cat})[0]||{}).code); if(code){ f.l4=code; f.category=e.cat; f.demand_type=catById(e.cat).type; delete S.derived.l4; if(known(f.l4_pick)){ f.l4_pick=code; S.l4Chosen={code, match:null, how:"chosen"}; } } }
   // "point 9 is wrong" with nothing more specific: turn that yes/no point around
   const pn=l.match(/\b(?:point|item|number|no\.?|#)\s*(\d{1,2})\b/)||l.match(/^\s*(\d{1,2})\b[^.]{0,20}\b(?:wrong|incorrect)/), [k,shown]=(pn&&(S.checkKeys||[])[+pn[1]-1])||[];
   if(k && typeof shown==="boolean" && JSON.stringify(f)===snap && /\b(?:wrong|incorrect|not (?:right|correct|true)|isn.?t (?:right|correct|true))\b/.test(l)) f[k]=!shown;
+}
+// ask about an answer that looks wrong: the requester keeps it or corrects it
+function raiseIssue(issue){
+  if(issue.kind==="offtopic") S.offChecked[issue.fact]=true; else if(issue.kind==="thin"){ S.thinChecked[issue.fact]=true; S.thinCount++; } else { S.challenged[issue.fact]=true; S.challengeCount++; }
+  S.pending={fact:issue.fact, prev:S.f[issue.fact], issue:issue.issue, kind:issue.kind||"", flip:!!issue.flip};
+  const exF=FACTS[issue.fact]&&FACTS[issue.fact].ex(S.f), short=words(issue.message)<14 && exF && !/for example|such as|e\.g\./i.test(issue.message);
+  S.msgs.push({role:"assistant",text:issue.message+(short?" "+exF:""), check:true});
+  const fc=FACTS[issue.fact]&&FACTS[issue.fact].choices, fcs=typeof fc==="function"?fc(S.f):fc;
+  S.choices=issue.choices||(fcs?[...fcs]:(S.det&&NEW_DEMAND(S.det.route)&&!CLOSED.includes(issue.fact)?["Skip for now"]:[])); S.lastAsked=issue.fact;
 }
 // what the provider does, as "The Service Provider shall ..." statements
 const SHALL_VERBS=/^(run|process|provide|deliver|design|build|develop|host|maintain|support|operate|manage|create|implement|migrate|train|review|assess|analy[sz]e|prepare|test|monitor|report|clean|cater|organi[sz]e|recruit|advise|answer|handle|send|produce|configure|install|document|hand over|integrate|redesign|map|write|supply|perform|conduct|carry out|set up|update|check|reconcile|pay|collect|book|escalate|notify|inform|screen|investigate|complete|verify|ensure|track|flag|record|coordinate|onboard|translate|audit|schedule|deploy|upgrade|respond|resolve|submit|keep|store|protect|retain|archive|comply|attend|give|share|follow|use|apply|identify|assist|help|cover|staff)\b/i;
@@ -2939,7 +3061,7 @@ function shallify(text){
 const workingTitle = () => {
   const people=/^(?:an?\s+|\d+\s+|one\s+|two\s+|three\s+|four\s+|five\s+|six\s+|ten\s+)?(?:[\w-]+\s+){0,2}(?:consultants?|advisers?|advisors?|experts?|specialists?|lawyers?|developers?|engineers?|analysts?|contractors?|people|staff)\b/i;
   if(givenText(S.f.title) && !people.test(S.f.title)) return S.f.title;
-  const first=(S.msgs.find(m=>m.role==="user")||{}).text||"", it0=givenText(S.f.item)||"";
+  const first=firstRequest(), it0=givenText(S.f.item)||"";
   if(people.test(it0) || people.test(firstPerson(first))){ const m=first.match(/\bfor\s+(?:a|an|the|our)?\s*(.+?)(?=\s+(?:for|over|during|within|starting|from)\s+(?:\d|the next|a period|about)|[,.;]|$)/i);
     if(m && words(m[1])>=2 && words(m[1])<=9 && !/^\d/.test(m[1])) return cap1(m[1].replace(/\bour\s+/gi,"")); }
   if(givenText(S.f.title)) return S.f.title;
@@ -2951,7 +3073,8 @@ function checkMessage(){
   const f=S.f, cl=classify(f), o=cl.o, L=[], K=[], e=l4ByCode(f.l4), ini=(S.l4Initial||[])[0];
   const at=(k,shown)=>K[L.length-1]=[k,shown];
   L.push(`Working title: **${workingTitle()}**`);
-  if(e) L.push(`Category (Level 4): **${e.name}** (${e.code}${ini&&ini.code===e.code?`, ${ini.match}% match`:""})`);
+  const ch=S.l4Chosen && e && S.l4Chosen.code===e.code ? S.l4Chosen : null;
+  if(e) L.push(`Category (Level 4): **${e.name}** (${e.code}${ch ? (ch.how==="kept" ? ", suggested and kept" : ", chosen by you") : ini&&ini.code===e.code?`, ${ini.match}% match`:""})`);
   if(f.demand_type==="goods") L.push("It's a **purchase of goods**, so it is not outsourcing");
   else {
     L.push(o.entity ? `Provisioning legal entity: **${o.entity.name}**` : "The provisioning legal entity is **not known yet**");
@@ -3009,6 +3132,7 @@ function giveUp(k){
   if(["tech_service","personal_data","ict_outsourcing","system_access","subcontracting"].includes(k)){ f[k]="unsure"; return; }
   if(k==="supplier"){ f.supplier="None"; return; }
   if(k==="need"||k==="confirm_derived") return;
+  if(k==="l4_pick"){ const c=(S.l4Cands||[])[0]; if(c){ pickL4(c.code, "kept"); S.msgs.push({role:"assistant",kind:"sys",text:`I'll keep ${c.name} (${c.code}) as the category for now. You can change it with ✎ next to the category in the summary.`}); } return; }
   f[k]="Not given";
 }
 function wrapUp(){
@@ -3403,7 +3527,7 @@ function offlineRead(text, asked){
   if((!asked || asked==="need") && known(f.category) && f.demand_type!=="contingent_labour"){ f.summary=f.summary||firstSentence(text); if(!known(f.item)) f.item=itemFrom(text); }
   const firstTurn=!S.det;   // the AI's category on the first message gives way to a clear keyword match (it called KYC "legal")
   if(!known(f.category) || asked==="need" || firstTurn){
-    const first=S.msgs.find(m=>m.role==="user");
+    const first={text:firstRequest()};
     const aiCat=firstTurn && known(f.category) ? CATEGORIES.find(c=>c.id===f.category) : null;   // set by the AI just before, from the same message
     let best=bestCategory(all, " "+(first?first.text:"").toLowerCase()); const headHit=bestCategory.inHead;
     if(/contractor|freelance|temporary staff|interim|day rate|\ba day\b|per day/.test(all) && /developer|engineer|analyst|manager|designer|tester|contractor|freelance|interim/.test(all)) best=catById("contingent");
@@ -3433,7 +3557,7 @@ function offlineRead(text, asked){
       if(f.demand_type!=="contingent_labour" && !known(f.item)) f.item=itemFrom(text);
     }
   }
-  if(asked && asked!=="need" && asked!=="confirm_derived" && !known(f[asked])){ const v=readAnswer(asked, text); if(known(v)) f[asked]=v; }
+  if(asked && asked!=="need" && asked!=="confirm_derived" && asked!=="l4_pick" && !known(f[asked])){ const v=readAnswer(asked, text); if(known(v)) f[asked]=v; }
   splitCombined(asked, text);
   fillUnknown(extractAll(text, asked));
   // a sentence that became "today's solution" is no longer part of the problem statement
@@ -3697,13 +3821,13 @@ const listJoin=a=>a.length<2?a.join(""):a.slice(0,-1).join(", ")+" and "+a[a.len
 function offlineQuestion(k, prevRoute, stageChanged){
   const f=S.f, F=FACTS[k];
   let intro="";
-  if(!prevRoute && S.det){
-    const n=catById(f.category).name; intro = S.catGuess ? "" : `This sounds like ${/^[A-Z]{2}/.test(n)?n:n.charAt(0).toLowerCase()+n.slice(1)}. `;
+  if(S.det && !S.routeIntro && k!=="l4_pick"){
+    S.routeIntro=true;
     if(S.det.contract && hasSupplier(f)) intro += `We have the ${S.det.contract.title} with ${S.det.contract.supplier}, which makes this quicker. `;
     if(shopOrder()) intro += `Good news: you can order this from the ${S.det.catalogue[0].name.toLowerCase()} of ${S.det.catalogue[0].supplier} in our catalogue, for orders up to ${money(S.det.catalogue[0].max_order)}. `;
     else if(S.det.route==="catalogue") intro += `Good news: ${S.det.catalogue.map(i=>i.name).join(" and ")} ${S.det.catalogue.length>1?"are":"is"} in our catalogue. `;
     else if(S.det.route==="lowvalue") intro += `At this amount it's a low-value purchase, so I only need a few details. `;
-    const req=requiredFor(S.det.route,f), got=req.filter(k=>known(f[k]) && !(k in S.derived) && f[k]!=="Not given");
+    const req=requiredFor(S.det.route,f), got=req.filter(k=>k!=="l4_pick" && known(f[k]) && !(k in S.derived) && f[k]!=="Not given");
     if(got.length>=3) intro += `Thanks for the detail, I've already noted the ${listJoin(got.slice(0,6).map(k=>FACTS[k].label.toLowerCase()))}${got.length>6?" and more":""}. ${S.missing.length===1?"Just one more thing.":S.missing.length<=6?`Just ${S.missing.length} more things.`:""} `;
   } else {
     const acks=["Thanks.","Okay, noted.","That helps.","Understood."]; intro=stageChanged?"":acks[Object.values(S.asked).reduce((a,b)=>a+b,0)%acks.length]+" ";
@@ -3926,8 +4050,9 @@ function intakeRecord(){
   const f=S.f, D=S.det, route=S.override||D.route, cl=classify(f), o=cl.o, a=accessFlags(f), nd=NEW_DEMAND(route), v=k=>known(f[k])&&!isTBD(f[k])?show(k,f[k]):null;
   const supplier = hasSupplier(f) ? `${f.supplier}${givenText(f.supplier_reason)?` (${f.supplier_reason})`:""}` : nd ? "Open"+(preferredFor(f).length?`, preferred: ${someNames(preferredFor(f))}`:"") : null;
   const ini=(S.l4Initial||[])[0], fin=(S.sd&&S.sd.l4Final) || (f.l4&&ini&&f.l4!==ini.code&&l4ByCode(f.l4) ? finalL4(null) : null);
+  const ch=S.l4Chosen && S.l4Chosen.code===f.l4 && (!fin || fin.code===f.l4) && l4ByCode(f.l4) ? S.l4Chosen : null;
   const rows=[["Buying route",CHANNELS[route].name],
-    ["Category (Level 4)", fin ? `${fin.name} (${fin.code})${ini?(ini.code===fin.code?", initial classification confirmed":`, changed from ${ini.name}`):""}` : ini ? `${ini.name} (${ini.code}), ${ini.match}% match` : null],
+    ["Category (Level 4)", ch ? `${l4ByCode(ch.code).name} (${ch.code}), ${ch.how==="kept"?"suggested and kept":"chosen by you"}` : fin ? `${fin.name} (${fin.code})${ini?(ini.code===fin.code?", initial classification confirmed":`, changed from ${ini.name}`):""}` : ini ? `${ini.name} (${ini.code}), ${ini.match}% match` : null],
     ["Budget",known(f.value)?money(Number(f.value))+(f.value_is_estimate?" (estimate)":""):null], ["Budget approved",v("budget_approved")],
     // how many, in the words of the kind of purchase: items, users of software, people; a service has no quantity
     [f.demand_type==="software"?"Users":"Quantity", ["goods","software"].includes(f.demand_type)&&known(f.quantity)&&Number(f.quantity)>0 ? (f.demand_type==="software"?`About ${fmtN(f.quantity)}`:v("quantity")) : null],
@@ -4246,7 +4371,7 @@ function docUser(){
   return `Conversation:\n${convo}\n\nFacts: ${JSON.stringify({...cleanFacts(), value_display: known(S.f.value)?money(Number(S.f.value))+(S.f.value_is_estimate?" (estimate)":""):"unknown"})}\nCategory: ${catById(S.f.category).name}\n`+
         `ICT service (DORA): ${cl.ict?cl.ict.text:"not assessed"}\nOutsourcing: ${cl.out?cl.out.text:"not assessed"}\n`+
         (NEW_DEMAND(S.det.route)?`Critical or important function: ${isImportant(S.f)?"may apply (flag only)":"no indication"}\nProvisioning legal entity: ${(entityById(S.f.entity)||{}).name||"to be determined"}\nDerived facts checked by the requester: ${known(S.f.confirm_derived)&&!isTBD(S.f.confirm_derived)?S.f.confirm_derived:"no"}\n`+
-          `Initial Level 4 classification: ${(S.l4Initial||[]).map(x=>`${x.code} ${x.name} (${x.match}%)`).join("; ")}\nLevel 4 candidates: ${[...new Set([S.f.l4,...(S.l4Initial||[]).map(x=>x.code),...classifyL4(S.f).map(x=>x.code)].filter(Boolean))].slice(0,5).map(c=>l4ByCode(c)).filter(Boolean).map(e=>`${e.code} ${e.name}: ${e.desc}`).join(" | ")}\n`:"")+
+          `Initial Level 4 classification: ${(S.l4Initial||[]).map(x=>`${x.code} ${x.name} (${x.match}%)`).join("; ")}\n${S.l4Chosen&&l4ByCode(S.l4Chosen.code)?`Level 4 ${S.l4Chosen.how==="kept"?"suggested and kept":"chosen by the requester from the suggestions"}: ${S.l4Chosen.code} ${l4ByCode(S.l4Chosen.code).name}\n`:""}Level 4 candidates: ${[...new Set([S.f.l4,...(S.l4Initial||[]).map(x=>x.code),...classifyL4(S.f).map(x=>x.code)].filter(Boolean))].slice(0,5).map(c=>l4ByCode(c)).filter(Boolean).map(e=>`${e.code} ${e.name}: ${e.desc}`).join(" | ")}\n`:"")+
         `Recommended route: ${CHANNELS[S.det.route].name}.`;
 }
 // the message sent to change the documents on request
@@ -4276,6 +4401,7 @@ function payload(){
     conversation:S.msgs.filter(m=>!m.kind).map(m=>({role:m.role,text:m.text})),
     decision:S.det?{route:S.det.route, chosen:S.override||S.det.route, override:!!S.override, justification:($("#just")||{}).value||null, why:S.det.why,
       required_facts:requiredFor(S.det.route,S.f), contract:S.det.contract?.id||null, controls:S.det.controls.map(c=>c[1]), next_steps:S.det.steps, thresholds:CONFIG.thresholds}:null,
+    l4_candidates:(S.l4Cands||[]).map(c=>({code:c.code, name:c.name, path:[c.l1,c.l2,c.l3].filter(Boolean).join(" › "), match:c.match, weaker:!!c.weak})), l4_choice:S.l4Chosen||null,
     quality:S.quality||null, quality_threshold:CONFIG.thresholds.qualityMin, submitted_below_threshold:!!S.belowThreshold, answer_checks:S.flags,
     service_description:S.sd?{name:S.sd.title,...S.sd.desc}:null, intake_record:S.sd&&S.det?Object.fromEntries(intakeRecord()):null, business_requirements:S.sd&&S.sd.brd, title:S.sd&&S.sd.title, source:S.sd&&S.sd._ai?CONFIG.provider:"rules"};
 }
@@ -4289,7 +4415,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&
 const md=s=>esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
 const money=v=>v==null?"Unknown":new Intl.NumberFormat("en-GB",{style:"currency",currency:CONFIG.currency,maximumFractionDigits:0}).format(v);
 const fmtDate=d=>{const x=new Date(d);return isNaN(x)?d:x.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});};
-const show=(k,v)=>k==="hosting"&&/^(?:provider|own|unsure)$/.test(String(v))?{provider:"The provider hosts and runs it",own:"We install and run it ourselves",unsure:"Not sure yet"}[v]:v==="Confirmed"&&bundleOf(k)?(bundleOf(k).map(([,x])=>givenText(S.f[x])).filter(Boolean).join("; ")||"Confirmed"):isTBD(v)?"To be determined":k==="entity"&&entityById(v)?entityById(v).name:k==="l4"&&l4ByCode(v)?`${l4ByCode(v).name} (${v})`:v===true?"Yes":v===false?"No":v==="unsure"?"Not sure":k==="value"?money(Number(v))+(S.f.value_is_estimate?" (est.)":""):["quantity","headcount"].includes(k)?fmtN(v):cap1(String(v));
+const show=(k,v)=>k==="hosting"&&/^(?:provider|own|unsure)$/.test(String(v))?{provider:"The provider hosts and runs it",own:"We install and run it ourselves",unsure:"Not sure yet"}[v]:v==="Confirmed"&&bundleOf(k)?(bundleOf(k).map(([,x])=>givenText(S.f[x])).filter(Boolean).join("; ")||"Confirmed"):isTBD(v)?"To be determined":k==="entity"&&entityById(v)?entityById(v).name:(k==="l4"||k==="l4_pick")&&l4ByCode(v)?`${l4ByCode(v).name} (${v})`:v===true?"Yes":v===false?"No":v==="unsure"?"Not sure":k==="value"?money(Number(v))+(S.f.value_is_estimate?" (est.)":""):["quantity","headcount"].includes(k)?fmtN(v):cap1(String(v));
 
 // examples on the welcome screen: mostly new demand, each showing a different path, then one per other route
 const TRIES=[
@@ -4393,7 +4519,9 @@ function recapHTML(m, expanded){
 function msgHTML(m,i,lastRec,lastSd){
   if(m.role==="user") return `<div class="m u"><div class="ucol"><div class="bub">${esc(m.text)}</div></div></div>`;
   if(m.kind==="sys") return `<div class="sys">${esc(m.text)}</div>`;
-  if(m.kind==="class"){ const r=S.l4Initial||[]; return `<div class="m a"><div class="av">G</div><div class="classcard"><div class="ch">Category (Level 4), initial</div>${r.map(x=>`<div class="cr"><b>${esc(x.name)}</b> <span class="cc">${esc(x.code)}</span> <span class="cm">${x.match}% match</span><div class="cx">${esc(x.reason)}${x.uncertainty?` <i>${esc(x.uncertainty)}</i>`:""}</div></div>`).join("")}<div class="cf">Based on your first message. I'll check it again at the end; if it's wrong, just tell me.</div></div></div>`; }
+  if(m.kind==="class"){ const r=m.cands||S.l4Initial||[], lastCls=S.msgs.map((x,j)=>x.kind==="class"?j:-1).filter(j=>j>=0).pop(), open=i===lastCls && S.lastAsked==="l4_pick" && !known(S.f.l4_pick) && !S.l4None && !S.busy;
+    return `<div class="m a"><div class="av">G</div><div class="classcard"><div class="ch">Category (Level 4)</div><ol class="cl">${r.map((x,j)=>{ const e=l4ByCode(x.code)||x, mine=m.picked===x.code;
+      return `<li class="cr${mine?" picked":""}"><div class="ct"><b>${esc(x.name)}</b> <span class="cc">${esc(x.code)}</span> <span class="cm${x.weak?" weak":""}">${x.match}% ${x.weak?"· weaker match":"match"}</span>${j===0&&m.cands?' <span class="cs">Suggested</span>':""}${mine?' <span class="cy">✓ Your choice</span>':""}</div><div class="cp">${esc([e.l1,e.l2,e.l3].filter(Boolean).join(" › "))}</div><div class="cx">${esc(x.reason)}${x.uncertainty?` <i>${esc(x.uncertainty)}</i>`:""}</div>${open?`<button class="cb" data-act="pickl4" data-i="${j}" aria-label="Choose ${esc(x.name)}">Choose</button>`:""}</li>`; }).join("")}</ol>${open?'<div class="cf">Choose one, or “None of these” below and tell me in a few words what it is.</div>':""}</div></div>`; }
   if(m.kind==="stage"){ const st=stageById(m.stage); return `<div class="stagemark"><span><b>Step ${m.idx} of ${m.total} · ${esc(st.name)}</b><br>${esc(st.intro)}</span></div>`; }
   if(m.kind==="recap"){ const lastRecap=S.msgs.map((x,j)=>x.kind==="recap"?j:-1).filter(j=>j>=0).pop(); return `<div class="m a"><div class="av">G</div>${recapHTML(m, i===lastRecap)}</div>`; }
   if(m.kind==="rec") return `<div class="m a"><div class="av">G</div><div class="wide">${i===lastRec?recHTML(m.rec):`<div class="card old">Earlier recommendation: ${esc(CHANNELS[m.rec.route].name)}. Updated below.</div>`}</div></div>`;
@@ -4639,6 +4767,7 @@ function bind(){
     const a=b.dataset.act;
     if(a==="submit") submit(); if(a==="json") download(); if(a==="brd") openBRD(); if(a==="addopt") startOptional(b.dataset.key);
     if(a==="more"){ S.showMore=!S.showMore; render(); }
+    if(a==="pickl4"){ const c=(S.l4Cands||[])[Number(b.dataset.i)]; if(c) handleUser(l4Label(c)); }
     if(a==="copy") navigator.clipboard?.writeText(sdText()).then(()=>b.textContent="Copied");
     if(a==="copycompact") navigator.clipboard?.writeText(S.sd.compact||"").then(()=>b.textContent="Copied");
   });
@@ -4678,7 +4807,7 @@ function renderSide(){
   bindEdits();
 }
 // editing a captured detail in the side panel
-const canEdit = k => !bundleOf(k) && !["confirm_derived","need","profile"].includes(k) && FACTS[k];
+const canEdit = k => !bundleOf(k) && !["confirm_derived","need","profile","l4_pick"].includes(k) && FACTS[k];
 function editorHTML(k){
   const f=S.f, opt=(v,t,sel)=>`<option value="${esc(String(v))}"${sel?" selected":""}>${esc(t)}</option>`;
   let ctl;
@@ -4711,6 +4840,12 @@ async function saveEdit(k, raw){
   else v=t?cap1(t):null;
   if(v===null||v===undefined||v===""){ const i=$("#edv"); if(i) i.style.borderColor="var(--bad)"; return; }
   S.editing=null; S.pending=null; S.pendingCorr=null; S.offerImprove=null;
+  // the category set with ✎ answers the category question, if it is still open
+  if(k==="category" && !known(S.f.l4_pick)){ const cid=S.cid; pickL4(v.l4, "chosen"); S.busy=true; render();
+    try{ await afterChanges([], cid, {lead:`Thanks, I'll use **${l4ByCode(v.l4).name}** (${v.l4}).`}); }
+    catch(e){ if(!(e instanceof Stale)) console.error(e); }
+    finally{ if(S.cid===cid){ S.busy=false; render(); } }
+    return; }
   const done=applyChanges({[k]:v});
   if(!done.length){ renderSide(); return; }
   const cid=S.cid; S.busy=true; render();
@@ -4753,7 +4888,7 @@ function withExampleState(text, fn){
   try{
     Object.keys(S).forEach(k=>delete S[k]); Object.assign(S, fresh());
     S.msgs.push({role:"user",text}); offlineRead(text, null); refresh();
-    if(S.det) S.l4Initial=initialL4();
+    if(S.det){ S.l4Initial=initialL4(); S.l4Cands=l4Candidates(); }
     return fn();
   } finally { Object.keys(S).forEach(k=>delete S[k]); Object.assign(S, saved); CONV_SEQ=seq; }
 }
@@ -4828,9 +4963,9 @@ function specModel(withCurrent){
       "**Reading the answer:** with AI, call A. Its facts are screened before they are merged: placeholders (“unknown”, “none”) count only for the question just asked; classification flags (critical function, done in-house, ongoing) only at the check step; free text only when at least half of its words were said by the requester or are in the suggestion they accepted; on the first message a clear keyword category wins over the AI's. Its corrections are applied. The rules then read the same answer as a backup (closed questions, dates, amounts, places) and fill only what is still unknown. Without AI, only the rules read it.",
       "**Suggestions:** “Use this suggestion” or “yes, but add …” stores the suggested lines; “skip” records “Not given”. An AI suggestion keeps a figure only when the requester gave it, with the same unit, or the app's own standard draft has it; otherwise the point goes. What the requester already said for a line comes first, and an empty line takes their words, else the draft's line. The AI's service description is checked the same way, sentence by sentence.",
       "**The check step and follow-up checks** are resolved: a date fixed or flexible, a thin answer extended, a data location added, an off-topic answer recorded as not given.",
-      "**After two tries** a question is given up: a value becomes an estimate, a yes/no becomes “not sure”, anything else “Not given”.",
+      "**After two tries** a question is given up: a value becomes an estimate, a yes/no becomes “not sure”, the category keeps the first candidate, anything else “Not given”.",
       "**Recompute:** relative dates become dates (“next week” → “19 Oct 2026 (next week)”); facts are worked out (technology, users, entity, could the bank do it itself, offshoring, Level 4); then the route, the questions needed, the stages and what is still missing.",
-      "**First route:** the initial Level 4 classification card is shown.",
+      `**Category first:** after the first message the requester chooses the Level 4 from 2–3 candidates, before any other question and on every route. The card shows each with its Level 1 › 2 › 3 path, match and reason; every candidate at ${T.l4Match}% or more is offered (up to 3), at least 2 (the next best as a weaker match, or the area's “(other)” entry or its nearest neighbour), and the top 3 when none reaches ${T.l4Match}%. The question is always in the app's words. A button, “the second one”, a code or a name picks; “None of these” asks for a few words and suggests again without the rejected entries; ✎ in the summary also answers it; two answers that are no choice keep the first. Follow-up checks on the first message wait until the choice, and the route news comes with the question after it.`,
       "**Answer checks** (section 9) may ask one follow-up instead of the next question.",
       "**Next:** the next missing item is asked. The AI's wording is used only when it asks one of the next two items in the same stage; a new stage shows a recap card and a step marker. When nothing is missing: documents (call C) → route card → quality check, and below the threshold an improvement round."]));
 
@@ -4887,7 +5022,7 @@ function specModel(withCurrent){
 
   B.push(h(2,"8. Classification"),
     ul(["**Category:** keywords as whole words (plurals count; `*` marks a stem such as `consult*`). The category with most keywords wins; on a tie the one named last before “for”, “to”, “with”, “that” or a comma. A goods word after “to”, “trading”, “service”, “help” … does not count. With no keyword, the category of the best-scoring Level 4 when it is clear (one of its search terms in the request, or two or more shared words well ahead of the next entry; one shared word such as “roll” for a roll-up banner is not enough), else management consulting as a guess, never a framework call-off. With AI, the AI's category is used, and a Level 4 guess without a search term never overrules it.",
-      "**Level 4:** every entry's words are weighted by where they appear (search terms and name 3, Level 3 group 2, Level 2 group and description 1) and by how rare they are across the list; a description's “not X: see Y” part never counts. The rules pick within the category; with no clear signal, the category's “(other)” entry. The subject of the request counts double, what follows “including” a quarter; when a category keyword points elsewhere, the closest entry across the whole list wins if it scores clearly higher; a confident Level 4 stays put so the route does not change halfway. With AI, the first message (and the check step) gets about 20 candidates: the closest entries across the whole list plus the rules' picks; the AI also names the item in a category list's words (“ERP implementation” for an S/4HANA rollout) and the app looks those up across the whole list: when none of the candidates fits, or when its pick shares no word with its own words and no search term with the request, that entry is used. The AI's pick sets the category too, unless a category is named at the start of the request. The value confirmed at the check step is final; it can be changed in the summary by searching the list.",
+      "**Level 4:** the requester chooses it from 2–3 candidates (section 4, “Category first”): the entry the app works with (marked Suggested), the AI's alternatives and the closest entries across the whole list, so a wrong category can be put right. A rules alternative's match is damped by the square root of its score over the best score, so a far weaker entry never shows as a strong match. For the working entry, every entry's words are weighted by where they appear (search terms and name 3, Level 3 group 2, Level 2 group and description 1) and by how rare they are across the list; a description's “not X: see Y” part never counts. The rules pick within the category; with no clear signal, the category's “(other)” entry. The subject of the request counts double, what follows “including” a quarter; when a category keyword points elsewhere, the closest entry across the whole list wins if it scores clearly higher; a confident Level 4 stays put so the route does not change halfway. With AI, the first message (and the check step) gets about 20 candidates: the closest entries across the whole list plus the rules' picks; the AI also names up to 2 alternatives (l4_alt) and the item in a category list's words (“ERP implementation” for an S/4HANA rollout) and the app looks those up across the whole list: when none of the candidates fits, or when its pick shares no word with its own words and no search term with the request, that entry is used. The AI's pick sets the category too, unless a category is named at the start of the request. The value confirmed at the check step is final; it can be changed in the summary by searching the list.",
       "**ICT service (DORA):** whether technology is involved comes from the rules or the answer; for software the type follows Level 4 (SaaS or licensing), otherwise keywords.",
       `**Outsourcing, group standard ${R.current.id}** (the legal entity does not change the result): 1. excluded under paragraph 28 (goods, statutory audit, card schemes, clearing, SWIFT, correspondent banking, legal, facilities, market data, telecom, training, marketing, external workers) → not outsourcing; 2. not performed on a recurrent or ongoing basis (paragraph 26) → not outsourcing (likely); a project with set deliverables is one-off whatever its length (see Kinds of work); for software, who hosts and runs it decides (asked only when the request doesn't say): we install and run it → not outsourcing (likely), still an ICT service under DORA; the provider hosts and runs it (SaaS) → it is software the bank would otherwise run itself, whatever the business area; 3. work the bank does or could realistically do itself (paragraph 26) → outsourcing (likely); otherwise not outsourcing (likely), or to be determined when unclear. A critical or important function (paragraphs 29–31) is a flag for review, never a decision.`,
       `**Future rule set ${R.future.id}** (${R.future.status}): EBA/GL/2019/02 applies until it does; the app works out the result under it but does not show it.`,
@@ -4924,7 +5059,8 @@ function specModel(withCurrent){
       ["Business-led sourcing up to", eur(T.quickQuoteMax), "Three quotes up to it, RFP above; also the most a catalogue order can be without a quantity"],
       ["Material spend review from", eur(T.materialityMin), "Adds the material spend review"],
       ["Quality needed before submitting", String(T.qualityMin), "Below it the chat offers an improvement round"],
-      ["Tips for thin answers", String(T.answerTip), "One tip when a new-demand answer rates this or lower (0 = off)"]]),
+      ["Tips for thin answers", String(T.answerTip), "One tip when a new-demand answer rates this or lower (0 = off)"],
+      ["Level 4 candidates shown from", `${T.l4Match}%`, "After the first message every candidate at this match or more is offered (up to 3, at least 2); the requester chooses"]]),
     table(["Category","Type","Keywords (first five)","Framework contract"], CATEGORIES.map(c=>[c.name, DEMAND_TYPES[c.type]||c.type, c.kw.slice(0,5).join(", "), [...new Set(frameworks.filter(x=>x.themes.includes(c.id)).map(x=>x.supplier))].join(", ")||"–"])),
     p(`**Level 4 list** (${TAXONOMY.version}): ${L4.length} entries, ${TAXONOMY.suppliers.length} suppliers with their preferred Level 4 entries, ${TAXONOMY.contracts.length} framework contracts, ${CATALOGUE.length} catalogue entries (${CATALOGUE.filter(c=>c.kind==="shop").length} punch-out shops). They live in the JSON block \`taxonomy-data\` of this page and are written by an import script from CSV files (the Excel sheets saved as CSV): code, name, Level 1–3, category, description, search terms. Every Level 4 belongs to one category, which decides the questions and the outsourcing check; the import refuses rows without one.`),
     table(["Category","Level 4 entries","Examples"], CATEGORIES.map(c=>{ const es=L4.filter(e=>e.cat===c.id); return [c.name, String(es.length), es.slice(0,3).map(e=>`${e.code} ${e.name}`).join("; ")||"–"]; })),
