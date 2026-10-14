@@ -102,7 +102,7 @@ the Level 4 list.
 | Number grounding | `groundSuggestion()`, `mergeExec()`, `numTokens()` | A figure must be the requester's, with the same unit ("6 months" ≠ "3 months"), or come from the app's standard draft. Otherwise the point or sentence goes. The requester's own answer for a line comes first |
 | Length | `fitLine`, `clipWords`, `shortReply`, `execLimits` | Suggestion lines 30 words; replies over 45 words cut to the first sentence and the question; description fields 12–25 words; headline and executive text within the route's limits |
 | Wording | `scrubText`, `cleanReply`, `dropFigures` | No amounts, dates, places, suppliers or route in the description; no internal field names in replies; no markdown; no leftover brackets from removed figures |
-| Category consistency | `mergeFacts`, `offlineRead` | The AI's Level 4 sets the category. A category named at the start of the request overrules it only when the AI's entry fits the words far worse |
+| Category consistency | `mergeFacts`, `offlineRead`, `handleTurn` | The AI's Level 4 sets the category. A category named at the start of the request overrules it only when the AI's entry fits the words far worse. A pick that matches neither the request nor the AI's own `l4_terms` gives way to the entry those terms find. A later category change in the facts counts only when the requester's words name it; a reply claiming a dropped change is not shown |
 | Edits | `editSuggestion()` | "Drop…", "replace…", "add … as a KPI" are applied by the app, not the model |
 
 ## 6. Classification
@@ -119,8 +119,17 @@ the Level 4 list.
    whole list scores clearly higher (×1.25, or ×1.5 against a keyword in the subject).
 4. **A confident Level 4 stays settled** for the conversation, so a framework can't flip the route halfway. A weak one is
    refined as answers come in.
-5. **With AI,** about 20 candidates (the closest across the list plus the rules' picks) go into the first prompt. When
-   none fits, the model may return `l4_terms`, which the app looks up in the whole list.
+5. **With AI,** about 20 candidates (the closest across the list plus the rules' picks) go into the first prompt. The
+   model also returns `l4_terms`, the item in a category list's words ("ERP implementation" for "S4 HANA Roll Out"),
+   which the app looks up in the whole list. That entry is used when no candidate fits, or when the pick shares no word
+   with the model's own terms and no search term with the request (the shortlist had no good candidate).
+6. **Weak evidence never decides a category.** A Level 4 match without a search term needs two or more shared words to
+   set or overrule a category ("Roll" alone is no roll-up banner, "Windows" alone no window cleaning), and it never
+   overrules the AI's category. "Roll out" and "rollout" are one word, as are "S/4HANA" and "S4HANA".
+7. **Category corrections at any point** ("it's not software, it's consulting", "it's more consulting support") are read
+   by the rules and change the category, the Level 4 and the questions. In answer to an open question the app asks
+   first. A category change the model files among the facts is applied only when the requester's own words name that
+   category; otherwise it is dropped and the model's reply is not shown.
 
 **Recognition benchmark** (realistic test data, 60 requests written without seeing the descriptions):
 
