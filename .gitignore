@@ -1,5 +1,10 @@
-node_modules
-.vercel
-.env*
-test-results
-playwright-report
+# Only the app and its documentation are in Git. Tests, the local server, the mock providers, the data import
+# script, the test data, package files and task notes stay on the developer's machine (docs/ARCHITECTURE.md §10).
+/*
+!/.gitignore
+!/index.html
+!/api/
+!/vercel.json
+!/README.md
+!/docs/
+**/.DS_Store

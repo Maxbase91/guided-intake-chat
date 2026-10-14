@@ -1,9 +1,0 @@
-id,supplier,title,l4,expires,remaining
-CTR-1101,Northwind IT,End-user device supply framework,L4-1101;L4-1102;L4-1103;L4-1104,2028-06-30,3200000
-CTR-1102,Kestrel Mobile Supply,Mobile devices framework,L4-1106;L4-1107;L4-1108,2027-01-31,450000
-CTR-1103,Brackenridge Compute,Data centre hardware framework,L4-1112;L4-1113;L4-1115,2028-12-31,2750000
-CTR-1104,Larkspur Networks,"Network hardware, EMEA",L4-1116;L4-1117;L4-1118,2029-03-31,1600000
-CTR-1201,Adatum Software,Enterprise software reseller agreement,L4-1201;L4-1202;L4-1247,2027-12-31,4100000
-CTR-1202,Watchmere Compliance,Financial crime software licence,L4-1222;L4-1223;L4-1225,2028-09-30,1350000
-CTR-1203,Insightloom Analytics,Data and analytics subscription,L4-1229;L4-1230;L4-1231,2026-12-31,220000
-CTR-1204,Shieldmoor Security,Security software enterprise agreement,L4-1238;L4-1239;L4-1240,2029-06-30,1900000

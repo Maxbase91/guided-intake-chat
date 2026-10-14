@@ -1,9 +1,0 @@
-id,supplier,title,l4,expires,remaining
-CTR-1301,Proseware Digital,Application development framework,L4-1301;L4-1304;L4-1305;L4-1306;L4-1307;L4-1308;L4-1309;L4-1313,2027-10-31,1200000
-CTR-1302,Fourth Coffee Tech,IT infrastructure and service desk outsourcing,L4-1302;L4-1315;L4-1316;L4-1317;L4-1318;L4-1319,2029-06-30,8500000
-CTR-1303,Redcliff Cyber,"Cyber testing, assessments and incident response",L4-1322;L4-1325;L4-1326,2027-01-31,450000
-CTR-1304,Nightjar Security Operations,Managed SOC and threat intelligence,L4-1323;L4-1327,2028-09-30,1750000
-CTR-1401,Contoso Cloud,Cloud hosting framework,L4-1401;L4-1402;L4-1403;L4-1404;L4-1405;L4-1406;L4-1407;L4-1408;L4-1409;L4-1410,2028-03-31,2400000
-CTR-1402,Vaultmere Recovery,Backup and disaster recovery as a service,L4-1407;L4-1408,2029-03-31,780000
-CTR-1501,Fabrikam Mobile,"Mobile, fixed voice and IoT connectivity",L4-1501;L4-1502;L4-1503;L4-1512,2028-12-31,3200000
-CTR-1502,Brennfeld Carrier Networks,Enterprise WAN and internet,L4-1505;L4-1506;L4-1507,2026-12-31,1100000

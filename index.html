@@ -1012,7 +1012,7 @@ const CONFIG = {
 };
 
 /* =========================================================
-   2. REFERENCE DATA (mock — replace with your own)
+   2. REFERENCE DATA (categories and legal entities here; Level 4, suppliers, frameworks and catalogue in the data block)
    ========================================================= */
 // keywords match whole words (plural allowed, see kwHit); a trailing * marks a stem that also matches longer words
 const CATEGORIES = [
@@ -1040,7 +1040,7 @@ const CATEGORIES = [
 const DEMAND_TYPES = {goods:"Goods", services:"Services", software:"Software", contingent_labour:"External workers"};
 
 /* Level 4 taxonomy, preferred suppliers and framework contracts: the JSON block "taxonomy-data" above this script,
-   written by scripts/import_taxonomy.py from CSV files (see README). Each Level 4 belongs to one buying category (theme). */
+   written by the local import script from CSV files (see docs/ARCHITECTURE.md). Each Level 4 belongs to one buying category (theme). */
 const TAXONOMY = JSON.parse(document.getElementById("taxonomy-data").textContent);
 const L4 = TAXONOMY.l4.map(e=>({...e, cat:e.theme, kw:e.kw||[]}));
 const L4_BY_CODE = new Map(L4.map(e=>[e.code,e]));
@@ -4902,7 +4902,7 @@ function specModel(withCurrent){
       ["Quality needed before submitting", String(T.qualityMin), "Below it the chat offers an improvement round"],
       ["Tips for thin answers", String(T.answerTip), "One tip when a new-demand answer rates this or lower (0 = off)"]]),
     table(["Category","Type","Keywords (first five)","Framework contract"], CATEGORIES.map(c=>[c.name, DEMAND_TYPES[c.type]||c.type, c.kw.slice(0,5).join(", "), [...new Set(frameworks.filter(x=>x.themes.includes(c.id)).map(x=>x.supplier))].join(", ")||"–"])),
-    p(`**Level 4 list** (${TAXONOMY.version}): ${L4.length} entries, ${TAXONOMY.suppliers.length} suppliers with their preferred Level 4 entries, ${TAXONOMY.contracts.length} framework contracts, ${CATALOGUE.length} catalogue entries (${CATALOGUE.filter(c=>c.kind==="shop").length} punch-out shops). They live in the JSON block \`taxonomy-data\` of this page and are written by \`scripts/import_taxonomy.py\` from CSV files (the Excel sheets saved as CSV): code, name, Level 1–3, category, description, search terms. Every Level 4 belongs to one category, which decides the questions and the outsourcing check; the import refuses rows without one.`),
+    p(`**Level 4 list** (${TAXONOMY.version}): ${L4.length} entries, ${TAXONOMY.suppliers.length} suppliers with their preferred Level 4 entries, ${TAXONOMY.contracts.length} framework contracts, ${CATALOGUE.length} catalogue entries (${CATALOGUE.filter(c=>c.kind==="shop").length} punch-out shops). They live in the JSON block \`taxonomy-data\` of this page and are written by an import script from CSV files (the Excel sheets saved as CSV): code, name, Level 1–3, category, description, search terms. Every Level 4 belongs to one category, which decides the questions and the outsourcing check; the import refuses rows without one.`),
     table(["Category","Level 4 entries","Examples"], CATEGORIES.map(c=>{ const es=L4.filter(e=>e.cat===c.id); return [c.name, String(es.length), es.slice(0,3).map(e=>`${e.code} ${e.name}`).join("; ")||"–"]; })),
     p("The Level 4 list, suppliers, contracts and the catalogue in this version are realistic test data; the legal entities are mock data. Replace them with your own."));
 
@@ -4912,7 +4912,7 @@ function specModel(withCurrent){
       "**The conversation loop** in section 4, with a rule-based reader as a backup for every AI step.",
       "**Prompts A–E** (section 7) with their JSON shapes. Always validate and override the AI's output as described.",
       "**A server function** with provider fallback, time and usage limits and an access code; keys only on the server.",
-      "**Outputs and quality** (sections 9–10), and tests for each route and check (see `tests/e2e`)."]));
+      "**Outputs and quality** (sections 9–10), and tests for each route and check."]));
   return B;
 }
 // the panel: built on click, read-only, printable, downloadable; Escape or Close returns to the chat
