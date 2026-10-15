@@ -27,7 +27,7 @@
 
 ```
 ┌───────────────────────────── header ─────────────────────────────┐
-│ G  Guided Intake · How it works            AI on · Mistral   New │
+│ G  Guided Intake · How it works · Decision tree      AI on   New │
 ├──────────────────────────── step bar ────────────────────────────┤
 │ ✓ Your need ── ✓ Purpose ── ● Scope ── ○ Timing ── ○ Check …     │
 ├────────────────────────────────────────┬─────────────────────────┤
@@ -52,7 +52,7 @@
 
 | Component | Behaviour |
 |---|---|
-| **Header** | Logo, name, the **How it works** link, the AI pill and **New** |
+| **Header** | Logo, name, the **How it works** and **Decision tree** links, the AI pill and **New**. On the narrowest phones the two links wrap onto two lines |
 | **AI pill** | "Offline rules", "AI on", or "AI on · Groq" once a provider has answered. Hovering shows the fallback order |
 | **Access gate** | A full-screen code prompt, shown when the server requires it. It is remembered for the browser tab, and re-opens if the code stops working |
 | **Welcome** | Short intro and example requests by path (new demand, catalogue, call-off, external workers) |
@@ -67,6 +67,7 @@
 | **Quality check** | A rating badge (Strong, Good, Fair, Needs work), the score, and one **Still to clarify** list with each point once. An optional point appears only when it improves the description, with **Answer one more question** |
 | **Side panel** | The captured details grouped by stage. Finished stages fold to one line; long answers fold to two lines. The pencil edits a detail in place. The category pencil opens a search over all Level 4 entries |
 | **How it works** | A full-page specification generated from the code: rules, prompts (behind "Show full prompt"), questions per route, classification, quality, settings. **Download (.md)**, **Print**, Escape to close. It never contains what the requester typed |
+| **Decision tree** | The same panel, written for business readers and generated from the code. It opens with the whole tree as one picture in five bands (what is bought, how, what is asked, which checks, what goes to procurement): navy hexagons are questions the rules answer, amber hexagons choices the requester makes, green boxes routes or results, orange boxes flags for a reviewer. A click switches the picture between fitted and full size; on a phone it scrolls sideways inside its frame. Then the yes/no ladders (route, ICT, outsourcing), the review flags, a question → decision index and worked examples. **Download picture (.svg)**, **Download (.md)** (with a Mermaid diagram), **Print** (the picture fits one A4 page) |
 
 ## 4. Visual language
 
@@ -130,11 +131,11 @@
 **Supported:**
 - reduce motion;
 - keyboard sending (Enter; Shift+Enter for a new line);
-- Escape closes the How it works panel and the phone summary;
+- Escape closes the How it works and Decision tree panels and the phone summary, and focus returns to the link that opened them;
 - labelled access-code field;
 - colour is never the only signal (icons and words go with each status).
 
 **To do:**
 - a live region (`role="log"`) for new messages;
-- focus handling in the side-panel editor and the How it works panel;
+- focus handling in the side-panel editor and the How it works and Decision tree panels;
 - a visible label for the message input.

@@ -22,12 +22,13 @@ tiers.
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Components, the turn flow, AI calls and guardrails, classification, reference data, server, deployment |
 | [docs/DESIGN.md](docs/DESIGN.md) | Principles, layout, components, visual language, voice, states, accessibility |
 | **How it works** (link in the app) | The full specification generated from the code: every rule, question and exact prompt |
+| **Decision tree** (link in the app) | The same rules for business readers: the whole tree as one picture, the yes/no ladders for the route and the checks, which question drives which decision, and worked examples. Generated from the code; downloads as Markdown (with a Mermaid diagram) or as an SVG picture |
 
 ## What is in this repository
 
 | Path | Role |
 |---|---|
-| `index.html` | The whole application, with no build step. It includes the reference data (one JSON block) and the How it works specification |
+| `index.html` | The whole application, with no build step. It includes the reference data (one JSON block), the How it works specification and the Decision tree |
 | `api/llm.js` | Vercel serverless function. It holds the AI keys and the access code, and tries Gemini, Groq, Mistral and OpenRouter in turn |
 | `vercel.json` | Function timeout (60 s) |
 | `docs/` | Product, architecture and design documentation |

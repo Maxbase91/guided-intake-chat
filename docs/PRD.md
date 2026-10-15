@@ -5,7 +5,7 @@
 | Product | Guided Intake Chat, the procurement front door of a European bank (prototype) |
 | Status | Working prototype on https://guided-intake-chat.vercel.app, behind an access code. It runs on test data. |
 | Last updated | 14 October 2026 |
-| Related | [Architecture](ARCHITECTURE.md) · [Design](DESIGN.md) · the in-app **How it works** panel (generated from the code) |
+| Related | [Architecture](ARCHITECTURE.md) · [Design](DESIGN.md) · the in-app **How it works** panel and **Decision tree** (both generated from the code) |
 
 ## 1. Problem
 
@@ -161,7 +161,7 @@ They are still built from the answers (no AI) and travel in the JSON payload.
 | Latency | A turn should feel conversational | 2–20 s per AI turn depending on the provider. Replies type out; the rules answer instantly |
 | Privacy | No real data in a prototype on free tiers | Access code; keys only on the server. **Dummy data only** |
 | Scale | ~400 Level 4 entries, hundreds of suppliers | Prompt size independent of list size; matching < 1 ms |
-| Auditability | Every route and flag explainable | The route card states the reason; How it works documents every rule and prompt, generated from the code |
+| Auditability | Every route and flag explainable | The route card states the reason; How it works documents every rule and prompt; the Decision tree shows which question drives which decision, for business readers. Both are generated from the code |
 
 ## 6. Success measures
 

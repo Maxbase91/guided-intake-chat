@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Last updated | 14 October 2026 |
-| Related | [PRD](PRD.md) · [Design](DESIGN.md) · the in-app **How it works** panel, which documents every rule and prompt and is generated from the code |
+| Related | [PRD](PRD.md) · [Design](DESIGN.md) · the in-app **How it works** panel, which documents every rule and prompt, and the in-app **Decision tree** for business readers; both are generated from the code |
 
 ## 1. Overview
 
@@ -21,7 +21,7 @@ There are two deployable parts:
 
 | Part | Role |
 |---|---|
-| `index.html` | The whole application: screen, rules engine, conversation loop, prompts, outputs, reference data and the How it works specification. No build step and no dependencies (Google Fonts only). |
+| `index.html` | The whole application: screen, rules engine, conversation loop, prompts, outputs, reference data, the How it works specification and the Decision tree. No build step and no dependencies (Google Fonts only). |
 | `api/llm.js` | A thin serverless proxy. It holds the AI keys, enforces the access code, tries the providers in order with cooldowns, and returns the model's text. It decides nothing about the request. |
 | `vercel.json` | Gives the function 60 s. |
 
@@ -49,7 +49,7 @@ suppliers, frameworks and catalogue (§7).
 | 7 | Conversation loop | `handleTurn()`: corrections, questions back, suggestion edits, the AI call or rules-only reading, screening, merging, checks, next question |
 | 8 | Results | `determine`'s route card, `buildDoc()` (description or purchase request), quality score, submit and JSON payload |
 | 9 | Render | Chat, cards, step bar, side panel, editor |
-| 10 | How it works | `specModel()`: the specification built from the live constants and the exact prompts, with Markdown download and print |
+| 10 | How it works and Decision tree | `specModel()`: the specification built from the live constants and the exact prompts. `treeModel()`: the same rules as business decisions (yes/no ladders, the question → decision index, worked examples), with `treeFigure()` drawing the whole tree as one SVG picture (Mermaid in the download). Both open in `openPanel()` with Markdown download and print |
 | 11 | Wiring | Event handlers, access gate, start-up |
 
 ## 3. A turn, step by step
@@ -236,5 +236,6 @@ The tools stay on the developer's machine and are not in Git:
 **Working rules:**
 - Run the full test suite before every push.
 - After every scripted edit of `index.html`, run a syntax check over its script block.
-- When route, check or quality logic changes, update `specModel()` (How it works). Functions it describes carry a
-  `described in How it works` comment.
+- When route, check or quality logic changes, update `specModel()` (How it works) and `treeModel()` / `treeFigure()`
+  (Decision tree). Functions they describe carry a `described in How it works` or `described in … the Decision tree`
+  comment.
