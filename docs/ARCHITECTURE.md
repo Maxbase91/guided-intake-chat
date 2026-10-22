@@ -115,6 +115,8 @@ the Level 4 list.
    - Each weight is multiplied by its rarity across the list (IDF).
    - In the request, subject words count double, words after "including" a quarter, and a whole search phrase scores a
      bonus. Catch-all "(other)" entries count three quarters.
+   - Known supplier names are removed before scoring ("Lakeshore Advisory" is no advisory request). Stems keep a final
+     "ss" and are cut to 7 letters before a final "e" goes, so "process" meets "processes" and "improve" "improvement".
 3. **A misleading category keyword** ("agency" in "temps through an agency") gives way when the best Level 4 across the
    whole list scores clearly higher (×1.25, or ×1.5 against a keyword in the subject).
 4. **A confident Level 4 stays settled** for the conversation, so a framework can't flip the route halfway. A weak one is

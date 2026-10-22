@@ -1091,6 +1091,9 @@ function knownSupplierIn(t){
   if(!SUPPLIER_RE) SUPPLIER_RE=new RegExp(`\\b(?:${[...ALL_SUPPLIERS].sort((a,b)=>b.length-a.length).map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|")||"(?!)"})\\b`,"i");
   const m=String(t||"").match(SUPPLIER_RE); return m ? ALL_SUPPLIERS.find(x=>x.toLowerCase()===m[0].toLowerCase()) : null;
 }
+// a supplier's name says who, not what: "Lakeshore Advisory" is no advisory request, "Contoso Cloud" no cloud request (Level 4 matching)
+let SUPPLIER_RE_G=null;
+const withoutSuppliers = t => { if(!SUPPLIER_RE_G){ knownSupplierIn(""); SUPPLIER_RE_G=new RegExp(SUPPLIER_RE.source,"gi"); } return String(t||"").replace(SUPPLIER_RE_G," "); };
 // the word that identifies a supplier in free text: its first word when no other known supplier shares it ("Lakeshore"), else the full name ("Contoso Cloud")
 function supplierKey(name){
   const n=String(name||"").toLowerCase().trim(), w=n.split(/\s+/)[0];
@@ -1524,8 +1527,9 @@ function demandText(f){ return (userText()+" "+[f.item,f.deliverables,f.scope_in
 // the Level 3 group 2, the Level 2 group and the description 1) and by how rare they are across the list, so that
 // "orchestration" decides and "services" does not. A description's "Not X: see Y" part never counts for the entry.
 const L4_GENERIC=new Set("hi hello hey we to in of on at by or an as is be us my me do so no up our team teams someone somebody something anyone company firm partner vendor supplier suppliers external service services management support solution solutions system systems provider providers platform platforms other general including related bank banks banking it eu uk us buy buying purchase purchasing looking require required new year years month months around approx budget cost costs euro eur total per day help can".split(" "));
-// 7 letters, not 5: "translation" and "transaction" must not be one word; a final "e" goes, so "trade" and "trading" meet
-const l4Stem = w => { const x=w.replace(/(?:ies|es|s|ing|ed)$/,""); return (x.length>3?x.replace(/e$/,""):x).slice(0,7); };
+// 7 letters, not 5: "translation" and "transaction" must not be one word; a final "e" goes after the cut, so "trade" and "trading" meet
+// and so do "improve" and "improvement"; a word ending in "ss" keeps it ("process" and "processes" meet, "business" is no plural)
+const l4Stem = w => { const x=(/ss$/.test(w)?w:w.replace(/(?:ies|es|s|ing|ed)$/,"")).slice(0,7); return x.length>3?x.replace(/e$/,""):x; };
 // "roll out", "roll-out" and "rolling out" are one word ("rollout"), so a rollout never meets a roll-up banner; "S/4HANA" is "s4hana"
 const l4Words = t => (String(t||"").toLowerCase().replace(/\b([a-z])\/(?=\d)/g,"$1").replace(/(\w)-(?=\w)/g,"$1 ").replace(/\b(?:roll|rolled|rolling)\s+out\b/g,"rollout").match(/[a-zäöüß0-9][a-zäöüß0-9&+-]*[a-zäöüß0-9&+]|[a-z]{2,}/g)||[]).filter(w=>w.length>=2 && !/^\d+$/.test(w) && !STOP.has(w) && !L4_GENERIC.has(w)).map(l4Stem);
 let L4_INDEX=null;
@@ -1561,6 +1565,7 @@ const firstSecondary = () => secondaryOf(firstRequest());
 // Words of the request's subject (head) count double, words only in its secondary scope half; a catch-all "(other)" entry counts
 // three quarters, so a specific entry wins a close call.
 function scoreL4(text, pool, head=firstHead(), second=head?firstSecondary():""){
+  text=withoutSuppliers(text); head=withoutSuppliers(head); second=withoutSuppliers(second);
   const q=new Set(l4Words(text)), hq=new Set(l4Words(head)), sq=new Set(l4Words(second).filter(x=>!hq.has(x))), norm=x=>" "+String(x||"").toLowerCase().replace(/[^a-zäöüß0-9&+]+/g," ")+" ", flat=norm(text), hflat=norm(head), sflat=norm(second);
   return l4Index().docs.filter(d=>!pool||pool.has(d.e.code)).map(d=>{
     let score=0, n=0; q.forEach(x=>{ const w=d.w.get(x)||0; if(w) n++; score+=w*(hq.has(x)?L4_HEAD:sq.has(x)?L4_SECOND:1); });
@@ -1684,7 +1689,11 @@ function hostingOf(t, answer=true){
   const own=/\b(?:on[- ]?prem\w*|our (?:own )?(?:servers|data cent(?:re|er)s?|infrastructure|technology team)|install(?:ed)? (?:it )?(?:ourselves|on our|in our)|we (?:will )?(?:install|host|run) it|run (?:it )?ourselves|runs? on our servers)\b/.test(t) || /^we (?:install|run|host)\b/.test(t);
   return prov && own ? null : prov ? "provider" : own ? "own" : null;   // both (one option hosted, one installed): ask
 }
-const hostingFromText = f => f.demand_type==="software" ? hostingOf(demandText(f), false) : null;
+// what the request says about the NEW solution: "replace our on-premise payroll tool" or "today it runs on our servers" describes
+// what exists today and says nothing about who will host the new one (then the question is asked)
+const TODAY_RE=/\b(?:today|currently|at the moment|at present|so far)\b[^.;!?]*|\b(?:replac\w*|instead of|migrat\w*\s+(?:off|away from)|moving\s+(?:off|away from)|our\s+(?:current|existing|old|legacy))\s+(?:(?:our|the|an?|its|this|that|existing|current|old|legacy)\s+)*(?:[\w-]+\s+){0,4}?(?:tools?|systems?|platforms?|software|solutions?|applications?|apps?|suites?)\b/gi;
+const newNeedText = f => [firstRequest(), f.item, f.must_haves, f.scope_in, f.deliverables].filter(x=>typeof x==="string").join(". ").replace(TODAY_RE," ");
+const hostingFromText = f => f.demand_type==="software" ? hostingOf(newNeedText(f), false) : null;
 // would we otherwise do this ourselves? true / false / null (unclear)
 function inHouseFromText(f){
   const t=demandText(f);
@@ -2480,11 +2489,12 @@ function exampleIn(t){
 }
 const askedMessage = k => [...S.msgs].reverse().find(m=>m.role==="assistant" && m.ask===k);
 const exampleFor = k => exampleIn((askedMessage(k)||{}).text) || exampleIn(FACTS[k] ? FACTS[k].ex(S.f) : "");
-// a message made mostly of one of the last questions' own words is a copy of that question, not a new answer
+// a message made mostly of one of the last questions' own words is a copy of that question, not a new answer. The example and
+// the suggestion shown with the question don't count: a real answer often resembles the example and must not be replaced by it
 function echoedAsk(text){
   const w=[...new Set(contentWords(text))]; if(w.length<5) return null;
   for(const m of S.msgs.filter(x=>x.role==="assistant" && x.ask).slice(-3).reverse()){
-    const q=new Set(contentWords(m.text));
+    const q=new Set(contentWords(String(m.text).split(/\b(?:for example|for instance|e\.g\.)|\bmy suggestion\b/i)[0]));
     if(w.filter(x=>q.has(x)).length/w.length>=0.75) return {k:m.ask, msg:m};
   }
   return null;
@@ -3058,6 +3068,17 @@ function shallify(text){
     .map(x=>x.trim().replace(/[.]$/,"").replace(/^(?:they|the provider|the supplier|it)\s+(?:will|should|must|shall)\s+/i,"").replace(/^(?:to|will|should|must)\s+/i,"")).filter(x=>words(x)>=2)
     .slice(0,8).map(back).map(x=>`The Service Provider shall ${SHALL_VERBS.test(x)?lcFirst(x):"deliver "+lcFirst(x)}.`);
 }
+// a title names what is bought: a leading verb goes ("Replace core treasury system" → "Core treasury system"); a provider word on its
+// own ("Agency", "More support") gives way to what it is for ("Client dinner for 40 people"), else to the chosen Level 4
+const GENERIC_HEAD=/^(?:(?:more|extra|additional|some|external|new|an?|the)\s+)*(?:providers?|suppliers?|agency|agencies|consultants?|consultancy|company|partners?|firms?|vendors?|support|help|services?|resources?|capacity)$/i;
+function titleFor(x){
+  let t=String(x||"").trim().replace(/^(?:to\s+)?(?:replace|transform|upgrade|moderni[sz]e|introduce|implement|buy|procure|renew)\s+(?!of\b)(?:(?:our|the|an?|its)\s+)?/i,"");
+  if(words(t)>2) t=t.replace(/^(?:an?|the)\s+/i,"");
+  if(t && !GENERIC_HEAD.test(t.replace(/\s+(?:from|by|with)\s+.*$/i,"").trim())) return cap1(t);
+  const m=withoutSuppliers(firstRequest()).match(/\bfor\s+(?:an?\s+|the\s+)?(.+?)(?=[,.;!?]|\s+(?:to|around|about|budget|costing|worth|at)\b|$)/i), what=m&&m[1].trim();
+  if(what && !/^(?:our|my|the|their)\s+(?:[\w-]+\s+){0,2}teams?\b/i.test(what) && words(what)>=2 && words(what)<=7) return cap1(what.replace(/\bour\s+/gi,""));
+  const e=l4ByCode(S.f.l4); return e ? e.name : catById(S.f.category).name;
+}
 const workingTitle = () => {
   const people=/^(?:an?\s+|\d+\s+|one\s+|two\s+|three\s+|four\s+|five\s+|six\s+|ten\s+)?(?:[\w-]+\s+){0,2}(?:consultants?|advisers?|advisors?|experts?|specialists?|lawyers?|developers?|engineers?|analysts?|contractors?|people|staff)\b/i;
   if(givenText(S.f.title) && !people.test(S.f.title)) return S.f.title;
@@ -3067,7 +3088,7 @@ const workingTitle = () => {
   if(givenText(S.f.title)) return S.f.title;
   const it=givenText(S.f.item)||givenText(S.f.summary)||"";
   const x=it.replace(/^(?:an?|the)\s+(?:external\s+|new\s+|specialist\s+)?(?:provider|supplier|agency|consultants?|consultancy|company|partner|firm|vendor)s?\s+(?:to|for|who (?:can|will))\s+/i,"").replace(/\bour\s+/gi,"").replace(/[.,;:].*$/,"").trim();
-  return x && words(x)<=9 ? cap1(x) : offlineSummary().title; };
+  return x && words(x)<=9 ? titleFor(x) : offlineSummary().title; };
 function checkMessage(){
   // each point remembers which fact it shows and the yes/no it showed, so "point 9 is wrong" can turn it around
   const f=S.f, cl=classify(f), o=cl.o, L=[], K=[], e=l4ByCode(f.l4), ini=(S.l4Initial||[])[0];
@@ -3862,7 +3883,7 @@ function offlineSummary(){
   if(known(f.subcontracting)) risk.push(yes(f.subcontracting)?"Subcontractors may be used.":"No subcontractors are expected.");
   if(isOffshore(f)) risk.push("Work happens outside the requester's country.");
   const shortT=x=>{x=String(x||"").replace(/\.$/,""); if(x.length<=60) return x; x=x.slice(0,60); return x.slice(0,x.lastIndexOf(" "))+"…";};
-  const head = f.demand_type==="contingent_labour" ? `${g("role")||"External worker"} support` : (g("item")||g("deliverables")||c.name);
+  const head = f.demand_type==="contingent_labour" ? `${g("role")||"External worker"} support` : titleFor(g("item")||g("deliverables")||c.name);
   return {title:cap1(shortT(scrubText(head)||c.name)), risk};
 }
 
@@ -3870,11 +3891,18 @@ function offlineSummary(){
 const DESC_SECTIONS=[["summary","What it is"],["audience","Who it is for"],["problem","Problem it solves"],["functions","Functions it supports"],
   ["capabilities","Key capabilities"],["benefits","Main benefits"],["difference","What changes from today"],["success","How success is measured"],["regulatory","Regulatory and control benefits"]];
 const DESC_LISTS=["capabilities","benefits"];
+// list items are split at commas, but never inside a number: "ratings for 5,000 companies" is one item, "6, 7" two
+const COMMA_SEP=/(?<!\d),\s*(?:and\s+)?|,(?!\d)\s*(?:and\s+)?/i, LIST_SEP=new RegExp(String.raw`;|\n|${COMMA_SEP.source}|\s+and\s+`,"i");
 const CITIES=PLACES.split("|").slice(0,PLACES.split("|").indexOf("Jaipur")+1);
 const MONTHS_RE="(?:January|February|March|April|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)";
-const AMOUNT_RE="(?:€|EUR\\s?)?\\d(?:[\\d,.]*\\d)?(?:\\s*(?:k|m|bn|million|thousand)\\b)?(?:\\s*(?:€|EUR|euros?)\\b)?";
+// an amount: a number ending in a digit (so a sentence's full stop stays), with a currency sign or word or a k/m/million, and the
+// period it is for ("120k a year"); after "budget" any number is an amount; a bare number ("40 people", "5,000 companies") is not
+const AMT_NUM="\\d(?:[\\d,.]*\\d)?", AMT_MULT="(?:\\s*(?:k|m|bn|million|thousand|billion)\\b)", AMT_CUR="(?:\\s*(?:€|EUR\\b|euros?\\b))",
+  AMT_PER="(?:\\s*(?:a|per|each)\\s+(?:year|month|week|day|annum)\\b|\\s*(?:annually|yearly|monthly|p\\.a\\.))?";
+const AMOUNT_RE=`(?:(?:€|EUR\\s?)\\s?${AMT_NUM}${AMT_MULT}?${AMT_CUR}?|${AMT_NUM}(?:${AMT_MULT}${AMT_CUR}?|${AMT_CUR}))${AMT_PER}`;
+const AMOUNT_ANY=`(?:(?:€|EUR\\s?)\\s?)?${AMT_NUM}${AMT_MULT}?${AMT_CUR}?${AMT_PER}`;
 const SCRUB={
-  money:/€|£|\$\s?\d|\bEUR\b|\b\d+(?:[.,]\d+)?\s*(?:k|m|bn|million|thousand)\b|\bbudget\w*\b|\bcost cent(?:re|er)s?\b|\bbudget approval\b|\b(?:which|that|it|this) (?:is|has been|was) (?:already |not yet |partly )?(?:approved|signed off)\b|\bapproved budget\b|\bday rates?\b/i,
+  money:/€|£|\$\s?\d|\bEUR\b|\beuros?\b|\b\d+(?:[.,]\d+)?\s*(?:k|m|bn|million|thousand)\b|\bbudget\w*\b|\bcost cent(?:re|er)s?\b|\bbudget approval\b|\b(?:which|that|it|this) (?:is|has been|was) (?:already |not yet |partly )?(?:approved|signed off)\b|\bapproved budget\b|\bday rates?\b/i,
   route:/recommended route|buying route|sourcing (?:project|event)|quick quote|call-?off|\bp-?card\b|card purchase|catalogue order|existing (?:contract|framework)|framework (?:agreement|contract)|preferred suppliers?|three quotes|competing offers|procurement route|\bcompete\b/i,
   risk:/\b(?:will|won.?t|will not|does not|doesn.?t|no|not|without)\b[^.]{0,40}\b(?:personal|client|customer) data\b|\b(?:no|not|is|are|be|being|will be|isn.?t)\s+(?:\w+\s+){0,3}outsourc\w*|\boutsourcing (?:review|assessment|flag)\b|\blikely outsourcing\b|\bsubcontract\w*|\boffshor\w*|\bsystem access\b|\bif it stopped\b|\bICT review\b|\btreated as critical\b|\bdata protection review\b|\b(?:hosted|stored|stores?|storing|held|holds?|hosting)\b[^.]{0,60}\b(?:in the (?:EU|UK|US)|EU|names|contacts|salar\w*|personal|client data|employee data)\b|\bGDPR\b|\brequester names\b|\bsupplier contacts\b/i,
   unknown:/\b(?:i|we) (?:don.?t|do not|dont) know\b|\bnot sure\b|\bunsure\b|\bnot given\b|\btbc\b|\btbd\b|\bto be confirmed\b|\bno idea\b/i,
@@ -3890,8 +3918,9 @@ const STRIP_TIME=[
   /\s*,?\s*\b(?:around|about|roughly|approximately)\s+\d+\s*(?:-|–|to)?\s*\d*\s*(?:months?|years?|weeks?)\b/gi,
   /\s*,?\s*(?:as soon as possible|asap)\b/gi
 ];
-const STRIP_MONEY=[new RegExp(`\\s*,?\\s*(?:with\\s+)?(?:an?\\s+|the\\s+)?(?:(?:approved|agreed|total|overall|estimated|available)\\s+)*budget\\s*(?:is|of)?\\s*(?:about|around|roughly|approximately|of|up to)?\\s*${AMOUNT_RE}`,"gi"),
-  new RegExp(`\\s*,?\\s*\\b(?:for|at|around|about|roughly|costing|worth)\\s+(?:about\\s+|around\\s+)?(?:€|EUR\\s?)\\d[\\d,.]*\\s*(?:k|m|million)?|\\s*,?\\s*\\b(?:around|about|roughly)\\s+\\d[\\d,.]*\\s*(?:k|m|million)\\b`,"gi")];
+const STRIP_MONEY=[new RegExp(`\\s*,?\\s*(?:with\\s+)?(?:an?\\s+|the\\s+)?(?:(?:approved|agreed|total|overall|estimated|available)\\s+)*budget\\s*(?:is|of)?\\s*(?:about|around|roughly|approximately|of|up to)?\\s*${AMOUNT_ANY}`,"gi"),
+  new RegExp(`\\s*,?\\s*\\b(?:for|at|around|about|roughly|approximately|costing|worth|up to|under|below|max(?:imum)?)\\s+(?:about\\s+|around\\s+|roughly\\s+)?${AMOUNT_RE}`,"gi"),
+  new RegExp(`\\s*,?\\s*${AMOUNT_RE}`,"gi")];
 function supplierRe(){ const names=[...ALL_SUPPLIERS,...(hasSupplier(S.f)?[String(S.f.supplier)]:[])].filter(x=>x&&x.length>2).map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")); return names.length?new RegExp(`\\b(?:${names.join("|")})\\b`,"i"):null; }
 // removes captured details (money, dates, places, suppliers, route, risk answers, "I don't know") from description text
 function scrubText(t, keepTime){
@@ -3915,7 +3944,7 @@ function offlineDescription(){
   const f=S.f, c=catById(f.category), cont=f.demand_type==="contingent_labour", sw=f.demand_type==="software", goods=GOODSLIKE(f);
   const g=k=>known(f[k])&&!["Not given","unsure","None"].includes(f[k])&&typeof f[k]==="string"?f[k].trim().replace(/\.$/,""):null;
   const lf=lcFirst, sentence=x=>x?cap1(String(x).trim().replace(/\.?$/,".")):"";
-  const split=x=>x?String(x).split(/;|\n|,\s*(?:and\s+)?|\s+and\s+/).map(t=>t.trim().replace(/\.$/,"")).filter(Boolean).map(cap1):[];
+  const split=x=>x?String(x).split(LIST_SEP).map(t=>t.trim().replace(/\.$/,"")).filter(Boolean).map(cap1):[];
   const lead=scrubText(firstPerson(g("summary")||"")), dl=g("deliverables")?listJoin(split(g("deliverables")).map(lf)):null;
   let summary="";
   if(cont) summary=`External ${lf(g("role")||"specialist")} support${g("skills")?` with ${g("skills")}`:""}${dl?`, working on ${dl}`:""}.`;
@@ -3965,10 +3994,12 @@ const NO_BENEFIT=/^(?:no specific|none\b|no\b|n\/?a\b|not applicable|nothing\b|n
 function offlineExec(lead){
   const f=S.f, c=catById(f.category), cont=f.demand_type==="contingent_labour";
   const g=k=>known(f[k])&&!["Not given","unsure","None","Confirmed"].includes(f[k])&&typeof f[k]==="string"?f[k].trim().replace(/\.$/,""):null;
-  const lf=lcFirst, split=x=>!x?[]:(/[;\n]/.test(x)?String(x).split(/;|\n/):/,/.test(x)?String(x).split(/,\s*(?:and\s+)?/i):String(x).split(/\s+and\s+(?=[a-z])/i)).map(t=>t.trim().replace(/\.$/,"")).filter(t=>words(t)>=1).map(cap1);
-  const sc=x=>clipWords(dropFigures(scrubText(x||"",false)),25), scl=a=>a.map(x=>clipWords(dropFigures(scrubText(x,true)),12)).filter(Boolean).slice(0,5);
+  const lf=lcFirst, split=x=>!x?[]:(/[;\n]/.test(x)?String(x).split(/;|\n/):COMMA_SEP.test(x)?String(x).split(COMMA_SEP):String(x).split(/\s+and\s+(?=[a-z])/i)).map(t=>t.trim().replace(/\.$/,"")).filter(t=>words(t)>=1).map(cap1);
+  // list items keep the requester's own figures ("payroll for 6 countries"); a figure nobody said goes, as in the AI's text
+  const said=saidNums(), ownFigures=x=>grounded(x,said)?x:dropFigures(x);
+  const sc=x=>clipWords(dropFigures(scrubText(x||"",false)),25), scl=a=>a.map(x=>clipWords(ownFigures(scrubText(x,true)),12)).filter(Boolean).slice(0,5);
   const t={audience:sc(g("users")), functions:sc(g("functions")), problem:sc(g("background")),
-    capabilities:scl(split(g("must_haves")||(cont?g("skills"):g("deliverables")))), benefits:scl(split(g("benefits"))), usp:sc(g("usp")),
+    capabilities:scl(split(g("must_haves")||(cont?g("skills"):g("deliverables")||g("scope_in")))), benefits:scl(split(g("benefits"))), usp:sc(g("usp")),
     kpis:scl(split(g("kpis")||g("acceptance"))), regulatory:NO_BENEFIT.test(g("reg_benefits")||"")?"":sc(g("reg_benefits"))};
   const L=execLimits(), what=lf(String(lead||c.name).replace(/\.$/,"")), nd=x=>String(x).replace(/\.$/,"");
   // a noun phrase ("a process orchestration platform") becomes a sentence; a problem phrased as a goal ("providing a single entry") is not "today"
@@ -4187,7 +4218,7 @@ function offlineCompact(){
 function offlineBRD(risk){
   const f=S.f, D=S.det, route=D.route, c=catById(f.category);
   const g=k=>known(f[k])&&f[k]!=="Not given"&&f[k]!=="unsure"?(NUM_KEYS.includes(k)||typeof f[k]==="boolean"?f[k]:String(f[k])):null, cap=cap1, lf=lcFirst;
-  const split=x=>x?String(x).split(/;|\n|,\s*(?:and\s+)?|\s+and\s+/).map(t=>t.trim().replace(/\.$/,"")).filter(Boolean).map(cap):[];
+  const split=x=>x?String(x).split(LIST_SEP).map(t=>t.trim().replace(/\.$/,"")).filter(Boolean).map(cap):[];
   const R=[], req=(type,text,priority="Must")=>R.push({type,text,priority});
   const goods=GOODSLIKE(f), cont=f.demand_type==="contingent_labour";
   // requirements
@@ -4983,7 +5014,7 @@ function specModel(withCurrent){
       "**Corrections in words** (“sorry, the budget is 80k not 30k”, “it's not software, it's consulting”, “it's more consulting support”) are applied by the rules; the route is checked again and the chat returns to the open question. A category named in answer to an open question (“it's more of a software problem”) is asked about first. A category change the AI reads but files among the facts is applied when the requester's own words name that category; otherwise it is dropped and the AI's reply, which may claim it, is not shown.",
       "**A question back instead of an answer** is answered and nothing is recorded; the same question comes back with its answer buttons. “Why do you need that?” gets the reason; “what would you suggest?” or “you decide” gets a suggestion that can be accepted in one tap; pushback on the route (“can't we just book directly?”) gets the route's reason and the options. With AI, other questions (“are they any good?”) are answered by call A.",
       "**Side remarks and other purchases** (“btw our CFO loves jazz”, “also we need 10 laptops”) are kept out of the answer, and the chat says so; a budget change mentioned in passing is applied and shown as “Changed: …”.",
-      "**“Use the example”** takes the example the question showed; a message that repeats an earlier question's wording corrects that question.",
+      "**“Use the example”** takes the example the question showed; a message that repeats an earlier question's wording (not its example: a real answer often resembles it) corrects that question.",
       "**Requests to change the documents** go to call D once a description exists.",
       "**Reading the answer:** with AI, call A. Its facts are screened before they are merged: placeholders (“unknown”, “none”) count only for the question just asked; classification flags (critical function, done in-house, ongoing) only at the check step; free text only when at least half of its words were said by the requester or are in the suggestion they accepted; on the first message a clear keyword category wins over the AI's. Its corrections are applied. The rules then read the same answer as a backup (closed questions, dates, amounts, places) and fill only what is still unknown. Without AI, only the rules read it.",
       "**Suggestions:** “Use this suggestion” or “yes, but add …” stores the suggested lines; “skip” records “Not given”. An AI suggestion keeps a figure only when the requester gave it, with the same unit, or the app's own standard draft has it; otherwise the point goes. What the requester already said for a line comes first, and an empty line takes their words, else the draft's line. The AI's service description is checked the same way, sentence by sentence.",
@@ -5047,9 +5078,9 @@ function specModel(withCurrent){
 
   B.push(h(2,"8. Classification"),
     ul(["**Category:** keywords as whole words (plurals count; `*` marks a stem such as `consult*`). The category with most keywords wins; on a tie the one named last before “for”, “to”, “with”, “that” or a comma. A goods word after “to”, “trading”, “service”, “help” … does not count. With no keyword, the category of the best-scoring Level 4 when it is clear (one of its search terms in the request, or two or more shared words well ahead of the next entry; one shared word such as “roll” for a roll-up banner is not enough), else management consulting as a guess, never a framework call-off. With AI, the AI's category is used, and a Level 4 guess without a search term never overrules it.",
-      "**Level 4:** the requester chooses it from 2–3 candidates (section 4, “Category first”): the entry the app works with (marked Suggested), the AI's alternatives and the closest entries across the whole list, so a wrong category can be put right. A rules alternative's match is damped by the square root of its score over the best score, so a far weaker entry never shows as a strong match. For the working entry, every entry's words are weighted by where they appear (search terms and name 3, Level 3 group 2, Level 2 group and description 1) and by how rare they are across the list; a description's “not X: see Y” part never counts. The rules pick within the category; with no clear signal, the category's “(other)” entry. The subject of the request counts double, what follows “including” a quarter; when a category keyword points elsewhere, the closest entry across the whole list wins if it scores clearly higher; a confident Level 4 stays put so the route does not change halfway. With AI, the first message (and the check step) gets about 20 candidates: the closest entries across the whole list plus the rules' picks; the AI also names up to 2 alternatives (l4_alt) and the item in a category list's words (“ERP implementation” for an S/4HANA rollout) and the app looks those up across the whole list: when none of the candidates fits, or when its pick shares no word with its own words and no search term with the request, that entry is used. The AI's pick sets the category too, unless a category is named at the start of the request. The value confirmed at the check step is final; it can be changed in the summary by searching the list.",
+      "**Level 4:** the requester chooses it from 2–3 candidates (section 4, “Category first”): the entry the app works with (marked Suggested), the AI's alternatives and the closest entries across the whole list, so a wrong category can be put right. A rules alternative's match is damped by the square root of its score over the best score, so a far weaker entry never shows as a strong match. For the working entry, every entry's words are weighted by where they appear (search terms and name 3, Level 3 group 2, Level 2 group and description 1) and by how rare they are across the list; a description's “not X: see Y” part never counts. The rules pick within the category; with no clear signal, the category's “(other)” entry. Known supplier names are ignored (“Lakeshore Advisory” is no advisory request), and word forms meet (“process” and “processes”, “improve” and “improvement”). The subject of the request counts double, what follows “including” a quarter; when a category keyword points elsewhere, the closest entry across the whole list wins if it scores clearly higher; a confident Level 4 stays put so the route does not change halfway. With AI, the first message (and the check step) gets about 20 candidates: the closest entries across the whole list plus the rules' picks; the AI also names up to 2 alternatives (l4_alt) and the item in a category list's words (“ERP implementation” for an S/4HANA rollout) and the app looks those up across the whole list: when none of the candidates fits, or when its pick shares no word with its own words and no search term with the request, that entry is used. The AI's pick sets the category too, unless a category is named at the start of the request. The value confirmed at the check step is final; it can be changed in the summary by searching the list.",
       "**ICT service (DORA):** whether technology is involved comes from the rules or the answer; for software the type follows Level 4 (SaaS or licensing), otherwise keywords.",
-      `**Outsourcing, group standard ${R.current.id}** (the legal entity does not change the result): 1. excluded under paragraph 28 (goods, statutory audit, card schemes, clearing, SWIFT, correspondent banking, legal, facilities, market data, telecom, training, marketing, external workers) → not outsourcing; 2. not performed on a recurrent or ongoing basis (paragraph 26) → not outsourcing (likely); a project with set deliverables is one-off whatever its length (see Kinds of work); for software, who hosts and runs it decides (asked only when the request doesn't say): we install and run it → not outsourcing (likely), still an ICT service under DORA; the provider hosts and runs it (SaaS) → it is software the bank would otherwise run itself, whatever the business area; 3. work the bank does or could realistically do itself (paragraph 26) → outsourcing (likely); otherwise not outsourcing (likely), or to be determined when unclear. A critical or important function (paragraphs 29–31) is a flag for review, never a decision.`,
+      `**Outsourcing, group standard ${R.current.id}** (the legal entity does not change the result): 1. excluded under paragraph 28 (goods, statutory audit, card schemes, clearing, SWIFT, correspondent banking, legal, facilities, market data, telecom, training, marketing, external workers) → not outsourcing; 2. not performed on a recurrent or ongoing basis (paragraph 26) → not outsourcing (likely); a project with set deliverables is one-off whatever its length (see Kinds of work); for software, who hosts and runs it decides (asked only when the request doesn't say; what is said about today's tool, such as “replace our on-premise tool”, does not count): we install and run it → not outsourcing (likely), still an ICT service under DORA; the provider hosts and runs it (SaaS) → it is software the bank would otherwise run itself, whatever the business area; 3. work the bank does or could realistically do itself (paragraph 26) → outsourcing (likely); otherwise not outsourcing (likely), or to be determined when unclear. A critical or important function (paragraphs 29–31) is a flag for review, never a decision.`,
       `**Future rule set ${R.future.id}** (${R.future.status}): EBA/GL/2019/02 applies until it does; the app works out the result under it but does not show it.`,
       "**Critical or important function:** from the answer on impact (clients, payments, regulatory, trading, outage, audit) or a known bank domain (KYC, payments, payroll, contact centre, regulatory reporting, service desk); never for events, training, office or hardware.",
       "**Offshoring:** the provider works from a country other than the entity's. An explicit “no” wins; where users or data are does not count."]));
