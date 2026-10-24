@@ -1,0 +1,249 @@
+// Conversation features in offline rules mode: corrections, checks, skipping, side panel edits, rules and outputs.
+const { test, expect } = require("@playwright/test");
+const { openApp, say, choose, idle, answerUntilDone, sideFacts, downloadJSON, lastAssistant, choices, setThreshold, start } = require("./helpers");
+
+const DINNER = "An agency for a client dinner for 40 people, around 30k.";
+const routeInPanel = (page) => page.locator("#side .route");
+const ANSWERS = [
+  [/business problem/i, "Client dinners are how we win new corporate clients; if this slips we lose the Q1 pipeline"],
+  [/exactly must the provider do/i, "Find a venue, run the invitations and guest list, organise catering and host the evening for 40 guests"],
+  [/When (do you need it|should it start)/i, "1 February 2027"],
+  [/Where and how/i, "At the provider's venue in Frankfurt"],
+  [/access any of our/i, "No access"],
+  [/Where should it be delivered/i, "Frankfurt office"],
+];
+
+test("a budget correction mid-way re-routes across the €50,000 threshold", async ({ page }) => {
+  const errors = await openApp(page);
+  await start(page, DINNER);
+  await expect(routeInPanel(page)).toHaveText("New demand: business-led sourcing");
+  await say(page, "sorry, the budget is 80k not 30k");
+  await expect(lastAssistant(page)).toContainText("Changed: budget from €30,000 to €80,000");
+  await expect(lastAssistant(page)).toContainText("New demand: procurement-led sourcing");
+  await expect(lastAssistant(page)).toContainText("Back to where we were");
+  await expect(routeInPanel(page)).toHaveText("New demand: procurement-led sourcing");
+  await expect(page.locator("#stepbar")).toContainText("Success and steering");   // an event is a project: measured and steered, not run
+  // the correction is not taken as the answer to the open question
+  expect((await sideFacts(page))["Problem to solve"]).not.toMatch(/80k/);
+  expect(errors).toEqual([]);
+});
+
+test("changing the category in words re-routes to the framework contract", async ({ page }) => {
+  await openApp(page);
+  await start(page, DINNER);
+  await say(page, "change the category to management consulting");
+  await expect(lastAssistant(page)).toContainText("Changed: category from Marketing and events to Management consulting");
+  await expect(routeInPanel(page)).toHaveText("Contract call-off");
+});
+
+test("an unclear correction is confirmed before anything changes", async ({ page }) => {
+  await openApp(page);
+  await start(page, DINNER);
+  await say(page, "actually it's more a consulting job");
+  await expect(lastAssistant(page)).toContainText("Do you want me to change");
+  await expect(choices(page)).toHaveText(["Yes, change it", "No, it's my answer"]);
+  await choose(page, "Yes, change it");
+  // the summary names the Level 4 within the new category
+  expect(await page.evaluate(() => S.f.category)).toBe("consulting");
+  await expect(page.locator("#side .prov")).toContainText(await page.evaluate(() => l4ByCode(S.f.l4).name));
+});
+
+test("a captured detail edited in the side panel updates the route", async ({ page }) => {
+  await openApp(page);
+  await start(page, DINNER);
+  await page.click('#side [data-grp="need"]');   // a finished step is folded; one click opens it
+  await page.click('#side [data-edit="value"]');
+  await expect(page.locator("#edv")).toHaveValue("30000");
+  await page.fill("#edv", "250000");
+  await page.click("#side [data-esave]");
+  await idle(page);
+  await expect(page.locator("#msgs")).toContainText("Changed: budget from €30,000 to €250,000");
+  await expect(routeInPanel(page)).toHaveText("New demand: procurement-led sourcing");
+  // an invalid value is refused and the editor stays open
+  await page.click('#side [data-edit="value"]');
+  await page.fill("#edv", "lots");
+  await page.click("#side [data-esave]");
+  await expect(page.locator("#edv")).toBeVisible();
+  await page.click("#side [data-ecancel]");
+  await expect(page.locator("#edv")).toHaveCount(0);
+});
+
+test("an off-topic answer is asked again once, then recorded as not given", async ({ page }) => {
+  await openApp(page);
+  await start(page, DINNER);
+  await say(page, "Mix flour, eggs and milk, then fry the pancakes in butter");
+  await expect(lastAssistant(page)).toContainText("That doesn't seem to answer my question");
+  await expect(page.locator("#msgs .m.u").last()).not.toContainText("Answer quality");   // no per-answer score is shown
+  await say(page, "Bake the cake for 40 minutes at 180 degrees");
+  expect((await sideFacts(page))["Problem to solve"]).toBe("To be determined");
+});
+
+test("a delivery date in the past gets a quick check and can be corrected", async ({ page }) => {
+  await openApp(page);
+  await start(page, "We need 15 laptops for new joiners in Frankfurt.");
+  await say(page, "by 1 October 2026");
+  await expect(lastAssistant(page)).toContainText("seems to be in the past");
+  await say(page, "1 December 2026");
+  await expect(page.locator("#msgs")).toContainText("Strong");
+  expect((await sideFacts(page))["Start / delivery"]).toMatch(/1 December 2026/);
+});
+
+test("periods and two-digit years are read as dates: 'mid 26' in October 2026 is in the past, 'Q4 2026' is not", async ({ page }) => {
+  await openApp(page);   // today is 12 Oct 2026 (helpers.js)
+  const got = await page.evaluate(() => Object.fromEntries(["mid 26", "mid-2026", "Q2 26", "Q4 2026", "Q1", "H2 2026", "end of 2026", "early 2027", "summer 2026", "start 15 March"]
+    .map((t) => [t, fmtDate(parseWhen(t))])));
+  expect(got).toEqual({ "mid 26": "31 Aug 2026", "mid-2026": "31 Aug 2026", "Q2 26": "30 Jun 2026", "Q4 2026": "31 Dec 2026", "Q1": "31 Mar 2027",
+    "H2 2026": "31 Dec 2026", "end of 2026": "31 Dec 2026", "early 2027": "31 Mar 2027", "summer 2026": "31 Aug 2026", "start 15 March": "15 Mar 2027" });
+  // the case from a real run: a consulting start "mid 26", asked in October 2026
+  await start(page, "We need 15 laptops for new joiners in Frankfurt.");
+  await say(page, "mid 26");
+  await expect(lastAssistant(page)).toContainText("mid 26 seems to be in the past");
+  // the AI is told today's date, so it can spot past dates too
+  expect(await page.evaluate(() => chatSystem())).toContain("Today is 12 Oct 2026.");
+});
+
+test("a new date given in reply to the timeline check is stored without the words around it", async ({ page }) => {
+  await openApp(page);
+  await start(page, "We need 15 laptops for new joiners in Frankfurt.");
+  await say(page, "ASAP");
+  await expect(lastAssistant(page)).toContainText("Is that a fixed deadline");
+  await say(page, "ok then 1 December 2026");
+  expect((await sideFacts(page))["Start / delivery"]).toBe("1 December 2026");
+});
+
+test("skipping a question records it as to be determined", async ({ page }) => {
+  await openApp(page);
+  await start(page, DINNER);
+  await choose(page, "Skip for now");
+  expect((await sideFacts(page))["Problem to solve"]).toBe("To be determined");
+});
+
+test("an example on the welcome screen starts the conversation, and New starts over", async ({ page }) => {
+  await openApp(page);
+  await page.locator("[data-try]", { hasText: "15 laptops" }).click();
+  await idle(page);
+  await expect(page.locator("#msgs .m.u").first()).toContainText("15 laptops");
+  await expect(routeInPanel(page)).toHaveText("Catalogue order");
+  await page.click("#newBtn");
+  await expect(page.locator(".welcome")).toBeVisible();
+  await expect(page.locator("#msgs .m.u")).toHaveCount(0);
+  await expect(page.locator("#side")).toContainText("Start by describing what you need");
+  await expect(page.locator("#inp")).toBeFocused();
+});
+
+test("a lower sourcing threshold re-routes the current request; there is no Rules panel for requesters", async ({ page }) => {
+  await openApp(page);
+  await start(page, DINNER);
+  await expect(routeInPanel(page)).toHaveText("New demand: business-led sourcing");
+  await expect(page.locator("#cfgBtn")).toHaveCount(0);
+  await setThreshold(page, "quickQuoteMax", 20000);
+  await expect(routeInPanel(page)).toHaveText("New demand: procurement-led sourcing");
+});
+
+test("a route override is recorded with its justification in the JSON payload", async ({ page }) => {
+  await openApp(page);
+  await start(page, "We need 15 laptops for new joiners in Frankfurt.");
+  await answerUntilDone(page, [[/When (do you need it|should it start)/i, "15 December 2026"]]);
+  await page.click("[data-act=more]");
+  await page.selectOption("#ovr", "sourcing");
+  await expect(page.locator(".ovr")).toContainText("A stricter route than needed");
+  await page.fill("#just", "Group IT wants a tender for all laptop purchases this year");
+  const { data } = await downloadJSON(page, () => page.click(".more [data-act=json]"));
+  expect(data.decision).toMatchObject({ route: "catalogue", chosen: "sourcing", override: true, justification: "Group IT wants a tender for all laptop purchases this year" });
+  await page.click("[data-act=submit]");
+  await expect(lastAssistant(page)).toContainText("New demand: procurement-led sourcing");
+});
+
+test("below the quality threshold the chat offers an improvement round, and submitting anyway is recorded", async ({ page }) => {
+  await openApp(page);
+  await start(page, DINNER);
+  await setThreshold(page, "qualityMin", 100);
+  await choose(page, "Skip for now");
+  await answerUntilDone(page, ANSWERS);
+  await expect(page.locator("#msgs")).toContainText("Shall we go through them?");
+  await expect(choices(page)).toHaveText(["Yes, let's improve it", "Submit anyway"]);
+  await choose(page, "Submit anyway");
+  await page.click("[data-act=submit]");
+  await expect(lastAssistant(page)).toContainText("submitted below the quality threshold");
+  const { data } = await downloadJSON(page, async () => { await page.click("[data-act=more]"); await page.click(".more [data-act=json]"); });
+  expect(data.submitted_below_threshold).toBe(true);
+  expect(data.quality_threshold).toBe(100);
+});
+
+test("the improvement round asks for the weak points and rebuilds the description", async ({ page }) => {
+  await openApp(page);
+  await start(page, DINNER);
+  await setThreshold(page, "qualityMin", 100);
+  await choose(page, "Skip for now");
+  await answerUntilDone(page, ANSWERS);
+  await choose(page, "Yes, let's improve it");
+  await expect(lastAssistant(page)).toContainText("Let's go through them, one at a time");
+  // the weak points are asked again one by one (a start date counts as weak while the timeline is only partial)
+  const ROUND = [...ANSWERS, [/kind of data/i, "Guest names and email addresses, stored in the EU"]];
+  for (let i = 0; i < 6 && !(await page.locator("#msgs").innerText()).includes("that makes it stronger"); i++) {
+    const q = await lastAssistant(page).innerText();
+    const hit = ROUND.find(([re]) => re.test(q));
+    if (!hit) throw new Error(`No scripted answer for: ${q}`);
+    await say(page, hit[1]);
+  }
+  await expect(page.locator("#msgs")).toContainText("Thanks, that makes it stronger. I'm updating the service description now.");
+  const facts = await sideFacts(page);
+  expect(facts["Problem to solve"]).toMatch(/corporate clients/);
+  const { data } = await downloadJSON(page, async () => { await page.locator("[data-act=more]").last().click(); await page.locator(".more [data-act=json]").last().click(); });
+  expect(data.facts.data_details).toMatch(/Guest names/);
+});
+
+test("edits made directly in the service description are kept in the output", async ({ page }) => {
+  await openApp(page);
+  await start(page, "We need 15 laptops for new joiners in Frankfurt.");
+  await answerUntilDone(page, [[/When (do you need it|should it start)/i, "15 December 2026"]]);
+  const title = page.locator('.sd-h [data-sd="title"]');
+  await title.click();
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.keyboard.type("New-joiner laptops for Frankfurt");
+  await page.locator(".sd .record").click();
+  const { data } = await downloadJSON(page, async () => { await page.click("[data-act=more]"); await page.click(".more [data-act=json]"); });
+  expect(data.title).toBe("New-joiner laptops for Frankfurt");
+});
+
+test("acronyms keep their capitals in generated text", async ({ page }) => {
+  await openApp(page);
+  // the Level 4 reason starts with the entry's name in lower case: "IT" keeps its capitals
+  await start(page, "Two Java developers as contractors for 9 months.");
+  await expect(page.locator("#msgs")).toContainText("Closest in meaning to IT contractors");
+  await expect(page.locator("#msgs")).not.toContainText("to it contractors");
+});
+
+test("the side panel folds finished steps and shortens long answers until clicked", async ({ page }) => {
+  await openApp(page);
+  await start(page, "A new HR system to replace our payroll tool.");
+  await say(page, "About 400k");
+  await say(page, "Our payroll tool is end of life in 2027 and payroll runs on manual spreadsheets, so we get errors every month; if this is delayed we miss the statutory reporting deadline");
+  // the step being asked is open, a finished one is folded to a single line
+  const need = page.locator('#side [data-grp="need"]');
+  await expect(need).toHaveAttribute("aria-expanded", "false");
+  await expect(need).toContainText(/✓ \d+ details?/);
+  await expect(page.locator("#side .fact.next")).toBeVisible();
+  // a long answer is cut to two lines under its label, and shown in full on a click
+  const purpose = page.locator('#side [data-grp="purpose"]');
+  if ((await purpose.getAttribute("aria-expanded")) !== "true") await purpose.click();
+  const problem = page.locator("#side .fact.long", { hasText: "Problem to solve" });
+  await expect(problem).toBeVisible();
+  const short = await problem.locator(".v").evaluate((e) => e.getBoundingClientRect().height);
+  await problem.locator(".v").click();
+  await expect(page.locator("#side .fact.long.full", { hasText: "Problem to solve" })).toBeVisible();
+  const full = await page.locator("#side .fact.long.full .v").first().evaluate((e) => e.getBoundingClientRect().height);
+  expect(full).toBeGreaterThan(short);
+  // the captured text itself is complete either way
+  expect((await sideFacts(page))["Problem to solve"]).toMatch(/so we get errors every month$/);
+});
+
+test("the welcome screen leads with new-demand examples, then one per other route", async ({ page }) => {
+  await openApp(page);
+  await expect(page.locator(".welcome .tryh")).toHaveText(["New demand", "Other routes"]);
+  await expect(page.locator(".welcome .tries").first().locator("[data-try]")).toHaveCount(6);
+  await expect(page.locator(".welcome .tries").nth(1).locator("[data-try]")).toHaveCount(3);
+  await page.locator("[data-try]", { hasText: "ESG ratings data feed" }).click();
+  await idle(page);
+  await expect(routeInPanel(page)).toHaveText("New demand: procurement-led sourcing");
+});

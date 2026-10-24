@@ -1,5 +1,6 @@
-# Only the app and its documentation are in Git. Tests, the local server, the mock providers, the data import
-# script, the test data, package files and task notes stay on the developer's machine (docs/ARCHITECTURE.md §10).
+# Allow-list: the app, its documentation, and what is needed to run the tests from a fresh clone (tests, local server,
+# mock providers, import script, package files, CI). Test data, task notes and everything else stay on the developer's
+# machine (docs/ARCHITECTURE.md §10).
 /*
 !/.gitignore
 !/index.html
@@ -10,4 +11,14 @@
 !/LICENSE
 !/NOTICE
 !/docs/
+!/tests/
+!/scripts/
+/scripts/*
+!/scripts/dev-server.js
+!/scripts/mock-providers.js
+!/scripts/import_taxonomy.py
+!/package.json
+!/package-lock.json
+!/playwright.config.js
+!/.github/
 **/.DS_Store
