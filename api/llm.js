@@ -1,3 +1,5 @@
+/*! guided-intake-chat | (c) 2026 Maximilian Ziermann. All rights reserved.
+    Authorship fingerprint MZ-ff2381bf5d621e7b | See LICENSE and NOTICE. */
 // Vercel serverless function: keeps the LLM API keys on the server.
 //
 // Environment variables (Vercel > Project > Settings > Environment Variables):
