@@ -2493,11 +2493,16 @@ const askedMessage = k => [...S.msgs].reverse().find(m=>m.role==="assistant" && 
 const exampleFor = k => exampleIn((askedMessage(k)||{}).text) || exampleIn(FACTS[k] ? FACTS[k].ex(S.f) : "");
 // a message made mostly of one of the last questions' own words is a copy of that question, not a new answer. The example and
 // the suggestion shown with the question don't count: a real answer often resembles the example and must not be replaced by it
+// A message that repeats the question's own wording and then gives "for example …" is a copy too (the requester pasted the question
+// with the example they want), because its part before the example is the question's own words.
+const EXAMPLE_CUT=/\b(?:for example|for instance|e\.g\.)|\bmy suggestion\b/i;
 function echoedAsk(text){
   const w=[...new Set(contentWords(text))]; if(w.length<5) return null;
+  const parts=String(text).split(EXAMPLE_CUT), head=parts.length>1?[...new Set(contentWords(parts[0]))]:[];
   for(const m of S.msgs.filter(x=>x.role==="assistant" && x.ask).slice(-3).reverse()){
-    const q=new Set(contentWords(String(m.text).split(/\b(?:for example|for instance|e\.g\.)|\bmy suggestion\b/i)[0]));
+    const q=new Set(contentWords(String(m.text).split(EXAMPLE_CUT)[0]));
     if(w.filter(x=>q.has(x)).length/w.length>=0.75) return {k:m.ask, msg:m};
+    if(head.length>=3 && head.filter(x=>q.has(x)).length/head.length>=0.75) return {k:m.ask, msg:m};
   }
   return null;
 }
