@@ -30,7 +30,7 @@ tiers.
 |---|---|
 | `index.html` | The whole application, with no build step. It includes the reference data (one JSON block), the How it works specification and the Decision tree |
 | `api/llm.js` | Vercel serverless function. It holds the AI keys and the access code, and tries Gemini, Groq, Mistral and OpenRouter in turn |
-| `vercel.json` | Function timeout (60 s) |
+| `vercel.json` | Function timeout (60 s) and security headers |
 | `docs/` | Product, architecture and design documentation |
 
 Tests, the local server, the mock providers, the data import script and the test data stay on the developer's machine.

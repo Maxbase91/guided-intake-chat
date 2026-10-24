@@ -23,7 +23,7 @@ There are two deployable parts:
 |---|---|
 | `index.html` | The whole application: screen, rules engine, conversation loop, prompts, outputs, reference data, the How it works specification and the Decision tree. No build step and no dependencies (Google Fonts only). |
 | `api/llm.js` | A thin serverless proxy. It holds the AI keys, enforces the access code, tries the providers in order with cooldowns, and returns the model's text. It decides nothing about the request. |
-| `vercel.json` | Gives the function 60 s. |
+| `vercel.json` | Gives the function 60 s and sets the response security headers. |
 
 **Design rule: the rules decide, the AI talks.**
 - The browser picks the route, the questions, the Level 4 category, the ICT and outsourcing flags, and every check,
@@ -195,7 +195,7 @@ including 25 shops). The legal entities in section 2 of the script are mock data
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/llm` | Which providers are configured, and whether an access code is required (no secrets) |
-| `GET /api/llm?verify=1` | Checks the access code (header `x-access-code`), with a 700 ms delay on a wrong code |
+| `GET /api/llm?verify=1` | Checks the access code (header `x-access-code`) |
 | `GET /api/llm?check=1` | Live check of every provider (needs the code) |
 | `POST /api/llm` | `{system, history}`, returns `{text, provider, model}` or an error `{error, quota, retryAfter, attempts}` |
 
@@ -211,6 +211,14 @@ including 25 shops). The legal entities in section 2 of the script are mock data
 - `ACCESS_CODE`;
 - optional `LLM_PROVIDER` and per-provider `*_MODEL`.
 
+**Access code:** compared in constant time; every wrong code (`verify`, `check` or `POST`) is answered after a 700 ms
+delay to slow down guessing. Without `ACCESS_CODE` the function is open to anyone.
+
+**Security headers** (`vercel.json`, all paths): `X-Content-Type-Options: nosniff`, `Referrer-Policy:
+strict-origin-when-cross-origin`, a `Permissions-Policy` that turns off camera, microphone, geolocation and payment, and
+a minimal `Content-Security-Policy` (`base-uri 'none'; object-src 'none'`). There is no script CSP, because the app is
+one page with inline script and styles, and no frame restriction, so the page can still be embedded.
+
 Keys never reach the browser. A page opened from a file runs the rules only.
 
 ## 9. Deployment
@@ -220,7 +228,7 @@ Keys never reach the browser. A page opened from a file runs the rules only.
 - **To check a deploy:** compare the live `index.html` with the committed one.
 - **What is in Git:** only what runs the app, plus documentation:
   - `index.html`, `api/llm.js`, `vercel.json`;
-  - `README.md`, `docs/`;
+  - `README.md`, `CLAUDE.md` (agent guide), `docs/`;
   - `.gitignore`, which is an allowlist.
 
 ## 10. Development (local only)
