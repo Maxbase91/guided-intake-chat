@@ -14,6 +14,8 @@
 //   MISTRAL_MODEL          optional; default rotation ministral-14b, ministral-8b, then mistral-small/medium
 //   OPENROUTER_MODEL       optional; otherwise the best free models listed by OpenRouter are picked automatically
 //   ACCESS_CODE            optional: callers must send it in the x-access-code header
+//   RATE_LIMIT_PER_MIN     optional, default 30: POST requests per IP and minute (0 turns the limit off)
+//   CHECK_LIMIT_PER_MIN    optional, default 5: ?check requests per IP and minute (0 turns the limit off)
 //
 // GET /api/llm             -> which providers are configured (no secrets)
 // GET /api/llm?check=1     -> live check of every provider (needs the access code header or ?code=)
@@ -75,6 +77,27 @@ const crypto = require("crypto");
 const sha = (x) => crypto.createHash("sha256").update(String(x || "")).digest();
 const codeOk = (c) => !process.env.ACCESS_CODE || crypto.timingSafeEqual(sha(c), sha(process.env.ACCESS_CODE));
 const WRONG_CODE_DELAY_MS = 700;        // slows down guessing on every endpoint, not only ?verify
+
+// per-IP limit, fixed one-minute windows, in the warm instance's memory (lost on cold start and not shared between instances,
+// which is enough for a demo). x-real-ip / x-forwarded-for are set by Vercel itself, not by the caller.
+const RATE_WINDOW_MS = 60 * 1000;
+const hits = new Map();                 // "bucket:ip" -> { n, start }
+const limitFrom = (name, dflt) => { const v = parseInt(process.env[name], 10); return Number.isFinite(v) && v >= 0 ? v : dflt; };
+const clientIp = (req) => String(req.headers["x-real-ip"] || String(req.headers["x-forwarded-for"] || "").split(",")[0] || req.socket?.remoteAddress || "unknown").trim();
+// seconds to wait when this request is over the limit, else 0
+function overLimit(bucket, req, max) {
+  if (!max) return 0;
+  const now = Date.now(), key = `${bucket}:${clientIp(req)}`;
+  if (hits.size > 10000) for (const [k, h] of hits) if (now - h.start >= RATE_WINDOW_MS) hits.delete(k);
+  let h = hits.get(key);
+  if (!h || now - h.start >= RATE_WINDOW_MS) { h = { n: 0, start: now }; hits.set(key, h); }
+  h.n++;
+  return h.n > max ? Math.max(1, Math.ceil((h.start + RATE_WINDOW_MS - now) / 1000)) : 0;
+}
+function tooMany(res, waitS) {
+  res.setHeader("Retry-After", String(waitS));
+  return res.status(429).json({ error: "Too many requests. Please wait a moment and try again.", code: "rate_limited", quota: false, retryAfter: waitS });
+}
 
 async function callGemini(system, history, model) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
@@ -355,6 +378,8 @@ module.exports = async (req, res) => {
       return res.status(401).json({ ok: false, error: "Wrong access code" });
     }
     if (!q.check) return res.status(200).json(base);
+    const waitCheck = overLimit("check", req, limitFrom("CHECK_LIMIT_PER_MIN", 5));
+    if (waitCheck) return tooMany(res, waitCheck);
     const code = req.headers["x-access-code"] || q.code;
     if (!codeOk(code)) { await sleep(WRONG_CODE_DELAY_MS); return res.status(401).json({ error: "Access code required" }); }
     const checks = [];
@@ -393,6 +418,8 @@ module.exports = async (req, res) => {
     return res.status(200).json({ ...base, checks, groqRotation, mistralRotation, openrouterRotation, ...(mistralDetail ? { mistralDetail } : {}) });
   }
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  const waitPost = overLimit("post", req, limitFrom("RATE_LIMIT_PER_MIN", 30));
+  if (waitPost) return tooMany(res, waitPost);
 
   if (!codeOk(req.headers["x-access-code"])) {
     await sleep(WRONG_CODE_DELAY_MS);

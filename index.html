@@ -5006,6 +5006,7 @@ function specModel(withCurrent){
     ul([`**Time limits:** 25 s per provider call; 55 s per request in total (no new provider is started after 30 s once something failed); the page waits up to ${LLM_CLIENT.timeoutMs/1000} s.`,
       `**Usage limits:** a provider at its limit is skipped for the time it asks for. When all are at their limit the server answers 429 with a retry time. The page retries at most ${LLM_CLIENT.retries} times, and only when the retry time is at most ${LLM_CLIENT.retryMaxS} s and the 429 came back within ${LLM_CLIENT.fastMs/1000} s; otherwise that message is handled by the rules.`,
       "**Access code:** with `ACCESS_CODE` set, the page asks for it (checked at `/api/llm?verify`) and sends it with every AI call as the header `x-access-code`. `GET /api/llm` reports which providers are configured.",
+      "**Rate limit:** the server answers at most 30 AI calls per minute from one IP address (`RATE_LIMIT_PER_MIN`) and 5 live checks (`CHECK_LIMIT_PER_MIN`); over it the answer is 429 with the seconds to wait, and the page waits and tries once more or carries on with the rules.",
       ...(SERVER?[`**On this deployment:** ${Object.keys(PNAMES).filter(x=>SERVER.providers[x]).map(x=>PNAMES[x]).join(", ")||"no provider"} configured${SERVER.accessRequired?", access code required":""}.`]:[])]));
 
   B.push(h(2,"3. When an AI model is called"),
