@@ -70,6 +70,12 @@ const coolingFor = (key) => IGNORE_COOLDOWN ? 0 : Math.max(0, ((cooldown.get(key
 
 const short = (m) => String(m || "").replace(/\s+/g, " ").slice(0, 160);
 
+// access code check in constant time (hashing first makes the lengths equal); no ACCESS_CODE means open
+const crypto = require("crypto");
+const sha = (x) => crypto.createHash("sha256").update(String(x || "")).digest();
+const codeOk = (c) => !process.env.ACCESS_CODE || crypto.timingSafeEqual(sha(c), sha(process.env.ACCESS_CODE));
+const WRONG_CODE_DELAY_MS = 700;        // slows down guessing on every endpoint, not only ?verify
+
 async function callGemini(system, history, model) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const r = await fetch(url, {
@@ -344,14 +350,13 @@ module.exports = async (req, res) => {
     const q = req.query || {};
     // gate for the page: confirm the access code without calling any provider
     if (q.verify) {
-      const vc = req.headers["x-access-code"] || "";
-      if (!process.env.ACCESS_CODE || vc === process.env.ACCESS_CODE) return res.status(200).json({ ok: true });
-      await new Promise(r => setTimeout(r, 700)); // slows down guessing
+      if (codeOk(req.headers["x-access-code"])) return res.status(200).json({ ok: true });
+      await sleep(WRONG_CODE_DELAY_MS);
       return res.status(401).json({ ok: false, error: "Wrong access code" });
     }
     if (!q.check) return res.status(200).json(base);
     const code = req.headers["x-access-code"] || q.code;
-    if (process.env.ACCESS_CODE && code !== process.env.ACCESS_CODE) return res.status(401).json({ error: "Access code required" });
+    if (!codeOk(code)) { await sleep(WRONG_CODE_DELAY_MS); return res.status(401).json({ error: "Access code required" }); }
     const checks = [];
     IGNORE_COOLDOWN = true;
     for (const a of steps) {
@@ -389,7 +394,8 @@ module.exports = async (req, res) => {
   }
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  if (process.env.ACCESS_CODE && req.headers["x-access-code"] !== process.env.ACCESS_CODE) {
+  if (!codeOk(req.headers["x-access-code"])) {
+    await sleep(WRONG_CODE_DELAY_MS);
     return res.status(401).json({ error: "Access code required" });
   }
   if (!steps.length) return res.status(500).json({ error: "No API key configured on the server. Set GEMINI_API_KEY, GROQ_API_KEY, MISTRAL_API_KEY or OPENROUTER_API_KEY in Vercel." });
