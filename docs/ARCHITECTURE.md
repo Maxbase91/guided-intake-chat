@@ -209,7 +209,13 @@ including 25 shops). The legal entities in section 2 of the script are mock data
 **Environment variables:**
 - keys: `GEMINI_API_KEY`, `GROQ_API_KEY`, `MISTRAL_API_KEY`, `OPENROUTER_API_KEY`;
 - `ACCESS_CODE`;
-- optional `LLM_PROVIDER` and per-provider `*_MODEL`.
+- optional `LLM_PROVIDER` and per-provider `*_MODEL`;
+- optional `RATE_LIMIT_PER_MIN` (default 30) and `CHECK_LIMIT_PER_MIN` (default 5); `0` turns a limit off.
+
+**Rate limit:** per IP (`x-real-ip` / `x-forwarded-for`, set by Vercel) in fixed one-minute windows, held in the warm
+instance's memory (lost on a cold start, not shared between instances). `POST` and `?check` have separate budgets;
+`GET /api/llm` and `?verify` are not limited. Over the limit: `429` with a `Retry-After` header and
+`{error, code: "rate_limited", quota: false, retryAfter}`; the page waits and retries once when the wait is short.
 
 **Access code:** compared in constant time; every wrong code (`verify`, `check` or `POST`) is answered after a 700 ms
 delay to slow down guessing. Without `ACCESS_CODE` the function is open to anyone.
@@ -226,17 +232,22 @@ Keys never reach the browser. A page opened from a file runs the rules only.
 - GitHub `main` is deployed to production by Vercel (project `guided-intake-chat`). Framework preset "Other"; no build
   command.
 - **To check a deploy:** compare the live `index.html` with the committed one.
-- **What is in Git:** only what runs the app, plus documentation:
+- **What is in Git** (`.gitignore` is an allowlist): what runs the app, its documentation, and what runs the tests:
   - `index.html`, `api/llm.js`, `vercel.json`;
   - `README.md`, `CLAUDE.md` (agent guide), `docs/`;
-  - `.gitignore`, which is an allowlist.
+  - `tests/`, `scripts/dev-server.js`, `scripts/mock-providers.js`, `scripts/import_taxonomy.py`, `package.json`,
+    `package-lock.json`, `playwright.config.js`, `.github/workflows/ci.yml`.
+- **CI:** GitHub Actions runs `npm run test:api` and `npm run test:e2e` on every push to `main` and every pull request,
+  with mock providers only (no keys). Vercel deploys independently of CI.
 
-## 10. Development (local only)
+## 10. Development
 
-The tools stay on the developer's machine and are not in Git:
+In Git, so a fresh clone can run everything (`npm ci`, `npx playwright install chromium`, `npm test`):
 - **tests:** Playwright end-to-end and `node:test` API tests, with mock providers and a fixed clock;
-- **a local server** that runs the function the way Vercel does;
-- **the data import script and the test data.**
+- **a local server** that runs the function the way Vercel does, and the mock providers;
+- **the data import script** (`scripts/import_taxonomy.py`, Python 3 standard library only).
+
+Local only (not in Git): the test data the taxonomy was imported from (`data/`), task notes (`tasks/`), test output.
 
 **Run locally:**
 - `npm start` serves `index.html` and `/api/llm` on port 3000;

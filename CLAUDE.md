@@ -10,19 +10,23 @@ Dummy data only.
 - `vercel.json`: function timeout (60 s) and security headers.
 - No dependencies are deployed.
 
-## What is in Git (deliberate, do not change)
-`.gitignore` is an allow-list: only `.gitignore`, `CLAUDE.md`, `index.html`, `api/`, `vercel.json`, `README.md`,
-`LICENSE`, `NOTICE`, `docs/` are tracked. Tests, `scripts/` (local server, mock providers, taxonomy import),
-`package.json`, test data and `tasks/` stay on the developer machine (docs/ARCHITECTURE.md §10).
-A new tracked file needs a `!/path` line in `.gitignore`. Never commit the local-only files.
+## What is in Git
+`.gitignore` is an allow-list: the app (`index.html`, `api/`, `vercel.json`), docs (`README.md`, `CLAUDE.md`, `docs/`,
+`LICENSE`, `NOTICE`) and what runs the tests from a fresh clone (`tests/`, `scripts/dev-server.js`,
+`scripts/mock-providers.js`, `scripts/import_taxonomy.py`, `package.json`, `package-lock.json`, `playwright.config.js`,
+`.github/`). Test data (`data/`), task notes (`tasks/`) and test output stay local (docs/ARCHITECTURE.md §10).
+A new tracked file needs a `!/path` line in `.gitignore`. Test data in tracked files must be synthetic: no real
+access codes, keys or personal data.
 
-## Commands (local only, need the untracked package.json)
+## Commands
+- `npm ci` and `npx playwright install chromium` once.
 - `npm start`: local server on port 3000 (`scripts/dev-server.js`, runs `api/llm.js` like Vercel).
 - `npm run start:mock`: same with mock providers (no keys, no network).
 - `npm run test:api`: `node:test` tests for `api/llm.js`.
 - `npm run test:e2e`: Playwright against three local servers (ports 4310–4312, mock providers).
   If the pinned browser is missing, set `CHROMIUM_PATH` to an installed Chromium/headless shell.
 - `npm test`: both. No lint, typecheck or build step exists.
+- CI (`.github/workflows/ci.yml`) runs both on every push to `main` and every PR, mocks only.
 - After a scripted edit of `index.html`, syntax-check its `<script>` blocks before testing (see `tasks/lessons.md`).
 
 ## Repo map
@@ -35,7 +39,8 @@ A new tracked file needs a `!/path` line in `.gitignore`. Never commit the local
 
 ## Env vars (Vercel; names only)
 `GEMINI_API_KEY`, `GROQ_API_KEY`, `MISTRAL_API_KEY`, `OPENROUTER_API_KEY` (at least one), `ACCESS_CODE`,
-optional `LLM_PROVIDER`, `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, `GROQ_MODEL`, `MISTRAL_MODEL`, `OPENROUTER_MODEL`.
+optional `LLM_PROVIDER`, `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, `GROQ_MODEL`, `MISTRAL_MODEL`, `OPENROUTER_MODEL`,
+`RATE_LIMIT_PER_MIN` (default 30 POST per IP/min), `CHECK_LIMIT_PER_MIN` (default 5).
 
 ## Deploy
 Push to `main` → Vercel production (project `guided-intake-chat`, preset "Other", no build command).

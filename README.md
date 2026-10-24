@@ -32,9 +32,20 @@ tiers.
 | `api/llm.js` | Vercel serverless function. It holds the AI keys and the access code, and tries Gemini, Groq, Mistral and OpenRouter in turn |
 | `vercel.json` | Function timeout (60 s) and security headers |
 | `docs/` | Product, architecture and design documentation |
+| `tests/`, `scripts/`, `package.json`, `playwright.config.js` | API and end-to-end tests, the local server, the mock providers and the data import script |
+| `.github/workflows/ci.yml` | CI: runs all tests with mock providers on every push and pull request |
 
-Tests, the local server, the mock providers, the data import script and the test data stay on the developer's machine.
-They are not in Git (see [Architecture §10](docs/ARCHITECTURE.md#10-development-local-only)).
+The test data the taxonomy was imported from and task notes stay on the developer's machine
+(see [Architecture §10](docs/ARCHITECTURE.md#10-development)).
+
+## Develop and test
+
+```sh
+npm ci
+npx playwright install chromium
+npm test            # API tests + Playwright, mock providers, no keys or network
+npm start           # local server on http://localhost:3000 (npm run start:mock for fake providers)
+```
 
 ## Deploy
 
@@ -46,7 +57,8 @@ They are not in Git (see [Architecture §10](docs/ARCHITECTURE.md#10-development
 - at least one of `GEMINI_API_KEY`, `GROQ_API_KEY`, `MISTRAL_API_KEY`, `OPENROUTER_API_KEY`;
 - `ACCESS_CODE`;
 - optional `LLM_PROVIDER` (which provider goes first) and `GEMINI_MODEL`, `GROQ_MODEL`, `MISTRAL_MODEL`,
-  `OPENROUTER_MODEL`.
+  `OPENROUTER_MODEL`;
+- optional `RATE_LIMIT_PER_MIN` (default 30 AI calls per IP and minute) and `CHECK_LIMIT_PER_MIN` (default 5).
 
 **Check providers:** `/api/llm?check=1` with the access code in the `x-access-code` header.
 
