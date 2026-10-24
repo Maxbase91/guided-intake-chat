@@ -26,6 +26,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      # the tests block Google Fonts; with Inter installed locally the page renders in its real font, as on a designer's
+      # machine, so the layout tests (welcome screen fits without scrolling) measure the real layout, not a fallback font
+      - run: sudo apt-get install -y --no-install-recommends fonts-inter
       - run: npm run test:api
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
