@@ -26,6 +26,7 @@ access codes, keys or personal data.
 - `npm run test:e2e`: Playwright against three local servers (ports 4310–4312, mock providers).
   If the pinned browser is missing, set `CHROMIUM_PATH` to an installed Chromium/headless shell.
 - `npm test`: both. No lint, typecheck or build step exists.
+- `scripts/verify.sh` — runs the CI checks locally; runs automatically on `git push`.
 - CI (`.github/workflows/ci.yml`) runs both on every push to `main` and every PR, mocks only.
 - After a scripted edit of `index.html`, syntax-check its `<script>` blocks before testing (see `tasks/lessons.md`).
 

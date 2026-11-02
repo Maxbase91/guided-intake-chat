@@ -44,6 +44,7 @@ The test data the taxonomy was imported from and task notes stay on the develope
 npm ci
 npx playwright install chromium
 npm test            # API tests + Playwright, mock providers, no keys or network
+scripts/verify.sh   # runs the CI checks locally; runs automatically on `git push`
 npm start           # local server on http://localhost:3000 (npm run start:mock for fake providers)
 ```
 

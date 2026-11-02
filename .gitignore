@@ -17,6 +17,7 @@
 !/scripts/dev-server.js
 !/scripts/mock-providers.js
 !/scripts/import_taxonomy.py
+!/scripts/verify.sh
 !/package.json
 !/package-lock.json
 !/playwright.config.js
