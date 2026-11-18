@@ -40,6 +40,7 @@ test.describe("phone layout", () => {
   test.use({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
   test("the summary panel can be closed again on a phone", async ({ page }) => {
     await openApp(page);
+    await expect(page.locator("#adminLink")).toBeHidden();   // no third header link on a phone
     await start(page, "We need 15 laptops for new joiners in Frankfurt.");
     const side = page.locator("#side");
     for (const close of ["Escape", "button", "summary", "outside"]) {

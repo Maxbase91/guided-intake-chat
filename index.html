@@ -52,6 +52,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 @media(max-width:900px){.only-m{display:inline-flex}.brand span:not(.links),.pill{display:none}}
 .howlink{background:none;border:0;padding:0;margin-left:8px;font:inherit;font-size:12px;color:#ffd36b;text-decoration:underline;cursor:pointer;white-space:nowrap}
 .howlink:hover,.howlink:focus-visible{color:#fff}
+@media(max-width:599px){#adminLink{display:none}}   /* the admin page is a desktop task; on a phone a third link would wrap the header over the summary panel */
 @media(max-width:900px){.brand{min-width:0}.brand .links{display:flex;flex-wrap:wrap;column-gap:12px;margin-top:2px}.howlink{margin:0}}   /* the two links wrap onto two lines only on the narrowest phones */
 @media(max-width:600px){.top-in{gap:8px;padding:10px 12px}.brand b{white-space:nowrap;font-size:15px}.tb{padding:7px 10px}}
 .spec details{border:1px solid var(--line);border-radius:8px;background:#fafbfd;margin:8px 0}
