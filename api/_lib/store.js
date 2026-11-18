@@ -114,11 +114,11 @@ function postgresStore(url) {
     async getDraft() {
       const d = (await pool.query("select doc, base_version, revision, updated_at, updated_by from config_draft where id = 1")).rows[0], v = await latest(pool);
       if (!d || !v) throw Object.assign(new Error("No configuration is published yet"), { code: "not_seeded" });
-      return { ...d, published_version: v.version, dirty: checksumOf(d.doc) !== checksumOf(v.doc) };
+      return { ...d, doc: bodyOf(d.doc), published_version: v.version, dirty: checksumOf(d.doc) !== checksumOf(v.doc) };
     },
     async saveDraft(doc, revision, actor) {
       return tx(async (c) => {
-        const d = await lockDraft(c, revision), changes = diff(d.doc, doc);
+        const d = await lockDraft(c, revision), changes = diff(bodyOf(d.doc), bodyOf(doc));
         for (const ch of changes) await c.query("insert into audit_log (actor, action, part, item, before, after) values ($1, 'save', $2, $3, $4, $5)", [actor, ch.part, ch.item, JSON.stringify(ch.before), JSON.stringify(ch.after)]);
         const r = await c.query("update config_draft set doc = $1, revision = revision + 1, updated_at = now(), updated_by = $2 where id = 1 returning revision", [JSON.stringify(bodyOf(doc)), actor]);
         return { revision: r.rows[0].revision, changes: changes.length };

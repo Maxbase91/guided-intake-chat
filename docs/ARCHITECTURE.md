@@ -98,8 +98,11 @@ decision table: ordered rows of conditions on facts (`{fact, op, value}`, a valu
 that holds gives the outcome, and the last row is the "otherwise" row. `engine.js` evaluates, validates and tests
 them; the same file runs in the page and in Node. `determine()` builds the fact view (`leadView` plus the catalogue
 and contract matches), runs R01 (catalogue), R02 (existing contract), R11 (who leads) and R19 (buying channel), and
-records the rows that decided in `S.det.rules`. Text matching, the outcome wording for catalogue and contract, the
-questions and the outsourcing tree stay code.
+records the rows that decided in `S.det.rules`. The reason texts are templates in the rule rows (`{amount}`, `{supplier}`…;
+each rule lists the placeholders it fills). Question texts (`questions`) and category guidance (`guidance`) are parts
+of the same configuration; `applyConfig()` writes them into `FACTS` and the guidance objects (`GUIDANCE`). Every
+suggestion names its source (`sugSource`): the AI, or the guidance for the category or operations domain. Text
+matching, questions worded from the request, the question conditions and the outsourcing tree stay code.
 
 **Routes and channels.** `determine()` returns a route, which is the question profile: `catalogue`, `contract`, `simple`,
 `business` or `procurement`. The buying channel shown to the requester is one of four (`CHANNELS`): a small, simple
@@ -267,8 +270,10 @@ loads `engine.js`, so the rule rows and their test cases are checked in the brow
   A wrong code is delayed and counted per IP in the database; five within 15 minutes lock that IP out.
 - **Draft and versions:** a save names the revision it started from, so two people cannot overwrite each other (409).
   A published version is never changed; going back means loading it into the draft and publishing a new version.
-- **What can be edited:** threshold values, channel names and days, category names and the two flags, and for each
-  rule its name, source, mode, rows, reason texts and test cases. Which thresholds, channels, categories, facts and
+- **What can be edited:** threshold values, channel names and days, category names and the two flags; for each
+  rule its name, source, mode, rows, reason texts and test cases; the label of every question and the question,
+  example and reason texts of the 40 questions the chat asks the same way for every request; and the category
+  guidance (examples and suggested answers per category, with a text for any other category). Which thresholds, channels, categories, facts and
   rules exist, and the attributes of a rule's outcomes, come from the seed.
 - **Test cases follow thresholds:** a given value can be a threshold reference (`{param, plus}`), shown as "just under"
   or "exactly", so lowering a threshold does not break the rule's own tests.

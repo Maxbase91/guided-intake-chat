@@ -6,8 +6,8 @@
 (function () {
   "use strict";
   const $app = document.getElementById("app");
-  const S = { code: sessionStorage.getItem("adm") || "", actor: localStorage.getItem("adm-name") || "", st: null, doc: null, tab: "thresholds", unsaved: false, extra: {}, busy: false };
-  const TABS = [["thresholds", "Thresholds"], ["channels", "Channels"], ["categories", "Categories"], ["rules", "Rules"], ["versions", "Versions and changes"], ["decisions", "Decision log"]];
+  const S = { code: sessionStorage.getItem("adm") || "", actor: localStorage.getItem("adm-name") || "", st: null, doc: null, tab: "thresholds", unsaved: false, extra: {}, busy: false, qFilter: "", gKey: "" };
+  const TABS = [["thresholds", "Thresholds"], ["channels", "Channels"], ["categories", "Categories"], ["rules", "Rules"], ["questions", "Questions"], ["guidance", "Guidance"], ["versions", "Versions and changes"], ["decisions", "Decision log"]];
 
   // ---------- small helpers
   function h(tag, attrs, ...kids) {
@@ -191,7 +191,7 @@
       last ? null : row.when.map((_, ci) => conditionLine(rule, row, ci)),
       last ? null : h("div", { class: "line" }, h("button", { class: "btn s", type: "button", onclick: () => edit(() => { const f = S.doc.facts[0]; row.when.push({ fact: f.key, op: "is", value: defaultValue(f, "is") }); }) }, "+ condition")),
       h("div", { class: "line" }, h("span", { class: "kw" }, "THEN"), select(rule.outcomes.map((o) => [o.key, o.label]), row.then, (v) => edit(() => { row.then = v; }), { "aria-label": `Outcome of row ${i + 1}` })),
-      "text" in row || rule.rows.some((r) => r.text) ? h("div", {}, h("div", { class: "muted", style: "margin-top:4px" }, "What the requester is told. Placeholders: {intro} {amount} {form_threshold} {lead_threshold}"),
+      "text" in row || (rule.placeholders || []).length ? h("div", {}, h("div", { class: "muted", style: "margin-top:4px" }, `What the requester is told.${(rule.placeholders || []).length ? " Placeholders: " + rule.placeholders.map((x) => `{${x}}`).join(" ") : ""}`),
         h("textarea", { "aria-label": `Reason text of row ${i + 1}`, oninput: (e) => editQuiet(() => { if (e.target.value) row.text = e.target.value; else delete row.text; }) }, row.text || "")) : null);
   }
   // one test case: the facts it sets, and the outcome it expects
@@ -240,13 +240,50 @@
   }
   const rules = () => h("div", {}, S.doc.rules.map(ruleCard));
 
+  // ---------- question texts: only those the chat asks the same way every time; the others depend on the request
+  function questions() {
+    const f = S.qFilter.toLowerCase(), list = S.doc.questions.filter((q) => !f || [q.key, q.label, q.q, q.ex].some((x) => String(x || "").toLowerCase().includes(f)));
+    const area = (q, p, label) => h("label", { style: "display:block;margin:4px 0" }, h("span", { class: "muted" }, label), h("textarea", { id: `q-${q.key}-${p}`, rows: "2", class: changed("questions", q.key, p),
+      oninput: (e) => editQuiet(() => { q[p] = e.target.value; }) }, q[p] || ""));
+    return h("div", { class: "card" }, h("h2", {}, "Questions"),
+      h("p", { class: "hint" }, "The label is what the side panel and the record show. The question, example and reason can be changed where the chat asks them the same way for every request; the others are worded from the request and stay in the code. With AI on, the AI uses this wording as a guide and may phrase it a little differently."),
+      h("p", {}, h("input", { type: "text", id: "qFilter", placeholder: "Filter questions", "aria-label": "Filter questions", style: "width:min(360px,100%)", value: S.qFilter, oninput: (e) => { S.qFilter = e.target.value; render(); } }),
+        " ", h("span", { class: "muted" }, `${list.length} of ${S.doc.questions.length}`)),
+      h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Question"), h("th", {}, "Texts"))),
+        h("tbody", {}, list.map((q) => h("tr", { "data-q": q.key },
+          h("td", { style: "width:280px" }, h("input", { type: "text", id: `q-${q.key}-label`, "aria-label": `Label of ${q.key}`, style: "width:100%", class: changed("questions", q.key, "label"), value: q.label, oninput: (e) => editQuiet(() => { q.label = e.target.value; }) }), h("div", { class: "muted" }, q.key)),
+          h("td", {}, "q" in q ? area(q, "q", "Question") : h("div", { class: "muted" }, "Worded from the request (in the code)"), "ex" in q ? area(q, "ex", "Example") : null, "why" in q ? area(q, "why", "Why we ask") : null))))));
+  }
+
+  // ---------- guidance: texts per category that examples and suggestions are built from
+  function guidance() {
+    const g = S.doc.guidance.find((x) => x.key === S.gKey) || S.doc.guidance[0];
+    S.gKey = g.key;
+    const cats = [["_", "Any other category"], ...S.doc.categories.map((c) => [c.id, c.name])];
+    const base = S.st.draft.guidance.find((x) => x.key === g.key) || { texts: {} };
+    return h("div", { class: "card" }, h("h2", {}, "Guidance"),
+      h("p", { class: "hint" }, "Texts per category that the chat uses for examples and suggested answers. Every suggestion tells the requester where it comes from. An empty text means the chat builds the answer from the request instead (or uses \"Any other category\")."),
+      h("p", {}, h("label", {}, h("span", { class: "muted" }, "Guidance "), select(S.doc.guidance.map((x) => [x.key, x.label]), g.key, (v) => { S.gKey = v; render(); }, { id: "gKey" }))),
+      h("p", { class: "hint" }, `${g.description} Source: ${g.source}, maintained by ${g.owner}.`),
+      h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Category"), h("th", {}, "Text"))),
+        h("tbody", {}, cats.map(([id, name]) => h("tr", {}, h("td", { style: "width:240px" }, h("b", {}, name), id === "_" ? h("div", { class: "muted" }, "used when a category has no text") : null),
+          h("td", {}, h("textarea", { id: `g-${g.key}-${id}`, "aria-label": `${g.label}: ${name}`, rows: "2", class: (base.texts[id] || "") !== (g.texts[id] || "") ? "changed" : "",
+            oninput: (e) => editQuiet(() => { if (e.target.value.trim()) g.texts[id] = e.target.value; else delete g.texts[id]; }) }, g.texts[id] || "")))))));
+  }
+
   // ---------- versions, change log, decision log (read from the server when the tab opens)
   function load(key, query) { if (S.extra[key] === undefined) { S.extra[key] = null; api("GET", null, query).then((d) => { S.extra[key] = d; render(); }, (e) => { S.extra[key] = { error: e.message }; render(); }); } return S.extra[key]; }
   const short = (v) => { const s = v === null || v === undefined ? "–" : typeof v === "object" ? JSON.stringify(v) : String(v); return s.length > 140 ? s.slice(0, 140) + "…" : s; };
   // for one changed item, only the fields that differ
   function delta(a) {
     if (!a.before || !a.after) return short(a.after || a.before);
-    return Object.keys({ ...a.before, ...a.after }).filter((k) => !same(a.before[k], a.after[k])).map((k) => `${k}: ${short(a.before[k])} → ${short(a.after[k])}`).join("; ");
+    const sub = (b, c) => Object.keys({ ...b, ...c }).filter((k) => !same(b[k], c[k]));
+    return sub(a.before, a.after).map((k) => {
+      const b = a.before[k], c = a.after[k];
+      // texts per category: name the categories that changed
+      if (b && c && typeof b === "object" && typeof c === "object" && !Array.isArray(b)) return sub(b, c).map((x) => `${k}.${x}: ${short(b[x])} → ${short(c[x])}`).join("; ");
+      return `${k}: ${short(b)} → ${short(c)}`;
+    }).join("; ");
   }
   function versions() {
     const audit = load("audit", { view: "audit" });
@@ -280,7 +317,7 @@
     $app.replaceChildren();
     if (!S.st) { $app.append(login()); return; }
     const prob = problems();
-    const body = { thresholds, channels, categories, rules, versions, decisions }[S.tab]();
+    const body = { thresholds, channels, categories, rules, questions, guidance, versions, decisions }[S.tab]();
     $app.append(
       h("header", { class: "top" }, h("h1", {}, "Rules and settings"), h("span", { class: "muted", style: "color:#d6deef" }, S.actor ? `Signed in as ${S.actor}` : ""), h("span", { class: "sp" }),
         h("a", { href: "./" }, "Open the intake"), h("button", { class: "btn s", type: "button", onclick: () => { if (S.unsaved && !confirm("Leave without saving?")) return; S.code = ""; sessionStorage.removeItem("adm"); S.st = null; S.extra = {}; render(); } }, "Sign out")),

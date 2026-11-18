@@ -27,7 +27,7 @@ test("without a database the server serves the seed, and the page runs on its bu
 test("the request records the rule rows that decided and the configuration it ran on", async ({ page }) => {
   await openApp(page);
   const got = await page.evaluate((t) => withExampleState(t, () => S.det.rules), DINNER);
-  expect(got).toEqual([{ rule: "R01", row: 3, outcome: "not_covered" }, { rule: "R02", row: 2, outcome: "not_covered" }, { rule: "R11", row: 6, outcome: "division" }, { rule: "R19", row: 4, outcome: "business" }]);
+  expect(got).toEqual([{ rule: "R01", row: 3, outcome: "not_covered" }, { rule: "R02", row: 3, outcome: "not_covered" }, { rule: "R11", row: 6, outcome: "division" }, { rule: "R19", row: 4, outcome: "business" }]);
 });
 
 test("a published configuration from the server replaces the defaults and changes the outcome", async ({ page, request }) => {

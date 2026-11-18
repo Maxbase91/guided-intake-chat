@@ -6,14 +6,15 @@
     "mode": "enforce",
     "clause": "",
     "decides": "Whether a catalogue item or a supplier's shop covers the need.",
+    "placeholders": ["items", "is_are", "shop", "supplier", "max_order"],
     "outcomes": [
       {"key": "covered_item", "label": "A catalogue item covers it"},
       {"key": "covered_shop", "label": "A supplier's shop covers it"},
       {"key": "not_covered", "label": "Not covered"}
     ],
     "rows": [
-      {"when": [{"fact": "catalogue_match", "op": "is", "value": "item"}], "then": "covered_item"},
-      {"when": [{"fact": "catalogue_match", "op": "is", "value": "shop"}], "then": "covered_shop"},
+      {"when": [{"fact": "catalogue_match", "op": "is", "value": "item"}], "then": "covered_item", "text": "{items} {is_are} in the catalogue, so you can order directly at the agreed price."},
+      {"when": [{"fact": "catalogue_match", "op": "is", "value": "shop"}], "then": "covered_shop", "text": "The {shop} of {supplier} is in the catalogue for orders up to {max_order}, so you order there directly at the agreed prices."},
       {"when": [], "then": "not_covered"}
     ],
     "tests": [
@@ -29,16 +30,19 @@
     "mode": "enforce",
     "clause": "",
     "decides": "Whether an active framework contract is used.",
+    "placeholders": ["contract", "supplier", "remaining", "expires"],
     "outcomes": [
       {"key": "use_contract", "label": "Use the existing contract"},
       {"key": "not_covered", "label": "Not covered"}
     ],
     "rows": [
-      {"when": [{"fact": "contract_match", "op": "is", "value": true}], "then": "use_contract"},
+      {"when": [{"fact": "contract_match", "op": "is", "value": true}, {"fact": "demand_type", "op": "is", "value": "contingent_labour"}], "then": "use_contract", "text": "External workers come through the {contract} with {supplier}, so this is a call-off with a role profile. No new competition is needed."},
+      {"when": [{"fact": "contract_match", "op": "is", "value": true}], "then": "use_contract", "text": "The {contract} with {supplier} already covers this, with {remaining} left until {expires}. No new competition is needed."},
       {"when": [], "then": "not_covered"}
     ],
     "tests": [
       {"name": "A framework covers it", "given": {"contract_match": true}, "expect": "use_contract"},
+      {"name": "External workers through the staffing framework", "given": {"contract_match": true, "demand_type": "contingent_labour"}, "expect": "use_contract"},
       {"name": "No framework, or the requester looks wider", "given": {"contract_match": false}, "expect": "not_covered"}
     ]
   },
@@ -49,6 +53,7 @@
     "mode": "enforce",
     "clause": "",
     "decides": "Who leads the sourcing of new demand: procurement, or the division through its divisional vendor office.",
+    "placeholders": ["intro", "amount", "form_threshold", "lead_threshold"],
     "outcomes": [
       {"key": "renewal", "label": "Procurement leads through the renewals calendar", "lead": "procurement", "status": "decided", "form": false},
       {"key": "pending_value", "label": "Procurement-led until the value is known", "lead": "procurement", "status": "pending_value", "form": true},
@@ -84,6 +89,7 @@
     "mode": "enforce",
     "clause": "",
     "decides": "Which buying channel is recommended. It combines the results of R01, R02 and R11 and takes no decision of its own.",
+    "placeholders": ["amount"],
     "outcomes": [
       {"key": "catalogue", "label": "Catalogue order", "channel": "catalogue"},
       {"key": "contract", "label": "Existing contract", "channel": "contract"},
@@ -94,7 +100,7 @@
     "rows": [
       {"when": [{"fact": "r01", "op": "in", "value": ["covered_item", "covered_shop"]}], "then": "catalogue"},
       {"when": [{"fact": "r02", "op": "is", "value": "use_contract"}], "then": "contract"},
-      {"when": [{"fact": "r11", "op": "is", "value": "division"}, {"fact": "simple_eligible", "op": "is", "value": true}, {"fact": "total_value", "op": "lte", "value": {"param": "simpleMax"}}], "then": "simple"},
+      {"when": [{"fact": "r11", "op": "is", "value": "division"}, {"fact": "simple_eligible", "op": "is", "value": true}, {"fact": "total_value", "op": "lte", "value": {"param": "simpleMax"}}], "then": "simple", "text": "At {amount} it is a small, simple purchase and no catalogue item or framework covers it, so you buy it directly: a purchase order with one quote, or your corporate card where the card policy allows."},
       {"when": [{"fact": "r11", "op": "is", "value": "division"}], "then": "business"},
       {"when": [], "then": "procurement"}
     ],

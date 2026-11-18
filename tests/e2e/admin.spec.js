@@ -170,3 +170,24 @@ test("the admin page loads no inline script and builds its content as text", asy
   await page.click("#discardBtn");
   await expect(status(page)).toContainText("No changes");
 });
+
+test("guidance and question texts are edited on the admin page, and new conversations use them", async ({ page }) => {
+  const errors = await signIn(page);
+  await page.click("[data-tab=guidance]");
+  await page.selectOption("#gKey", "audience");
+  await page.fill("#g-audience-marketing", "our top 40 corporate clients and their relationship managers");
+  await page.click("[data-tab=questions]");
+  await page.fill("#qFilter", "background");
+  await expect(page.locator("[data-q=item]")).toHaveCount(0);
+  await page.fill("#q-background-q", "Which client problem does this event solve, and what if it slips?");
+  await page.click("#saveBtn");
+  accept(page, "Guidance for client events");
+  await page.click("#publishBtn");
+  await expect(status(page)).toContainText("Published: version 4");
+  await page.click("[data-tab=versions]");
+  await expect(page.locator(".card").nth(1)).toContainText("guidance: audience");
+  await expect(page.locator(".card").nth(1)).toContainText("texts.marketing:");
+  await openApp(page, { kind: "admin" });
+  expect(await page.evaluate(() => [CFG.version, CAT_AUD.marketing, FACTS.background.q(S.f)])).toEqual([4, "our top 40 corporate clients and their relationship managers", "Which client problem does this event solve, and what if it slips?"]);
+  expect(errors).toEqual([]);
+});

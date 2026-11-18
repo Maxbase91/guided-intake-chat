@@ -5,16 +5,25 @@
 const crypto = require("crypto");
 const Engine = require("../../engine.js");
 
-const PARTS = ["params", "channels", "categories", "facts", "rules"];
+const PARTS = ["params", "channels", "categories", "facts", "rules", "questions", "guidance"];
 const SEED = {
   params: require("../../db/seed/params.json"),
   channels: require("../../db/seed/channels.json"),
   categories: require("../../db/seed/categories.json"),
   facts: require("../../db/seed/facts.json"),
   rules: require("../../db/seed/rules.json"),
+  questions: require("../../db/seed/questions.json"),
+  guidance: require("../../db/seed/guidance.json"),
 };
 
-const bodyOf = (doc) => Object.fromEntries(PARTS.map((k) => [k, doc[k]]));
+// a document saved before a part existed gets that part from the seed
+const withDefaults = (doc) => {
+  const out = Object.fromEntries(PARTS.map((k) => [k, Array.isArray(doc && doc[k]) ? doc[k] : structuredClone(SEED[k])]));
+  // the placeholders a rule fills are set by the code, so they always come from the seed
+  out.rules = out.rules.map((r) => { const seed = SEED.rules.find((x) => x.id === (r && r.id)); return seed ? { ...r, placeholders: [...(seed.placeholders || [])] } : r; });
+  return out;
+};
+const bodyOf = (doc) => withDefaults(doc);
 // key order must not matter: a document read back from a jsonb column has its keys in another order
 const canon = (v) => Array.isArray(v) ? v.map(canon) : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v;
 const checksumOf = (doc) => crypto.createHash("sha256").update(JSON.stringify(canon(bodyOf(doc)))).digest("hex").slice(0, 12);
@@ -37,10 +46,24 @@ function validateConfig(cfg) {
     errors.push(...Engine.validateRule(rule, registry, params));
     Engine.runTests(rule, params).filter((t) => !t.ok).forEach((t) => errors.push(`${rule.id}: test "${t.name}" expects ${t.expect}, got ${t.got}`));
   });
+  cfg.rules.forEach((rule) => (rule.rows || []).forEach((row, i) => {
+    const allowed = rule.placeholders || [];
+    for (const m of String(row.text || "").matchAll(/\{(\w+)\}/g)) if (!allowed.includes(m[1])) errors.push(`${rule.id}: row ${i + 1}: the text uses {${m[1]}}, which this rule does not fill (it fills ${allowed.map((x) => `{${x}}`).join(" ") || "nothing"})`);
+  }));
+  for (const q of SEED.questions) {
+    const have = cfg.questions.find((x) => x.key === q.key);
+    if (!have || !String(have.label || "").trim()) errors.push(`question ${q.key} has no label`);
+    else if ("q" in q && !String(have.q || "").trim()) errors.push(`question ${q.key} has no question text`);
+  }
+  for (const g of SEED.guidance) {
+    const have = cfg.guidance.find((x) => x.key === g.key);
+    if (!have) errors.push(`guidance ${g.key} is missing`);
+    else if ("_" in g.texts && !String((have.texts || {})._ || "").trim()) errors.push(`guidance ${g.label}: the text for any other category is empty`);
+  }
   const ids = cfg.rules.map((r) => r.id);
   ids.filter((id, i) => ids.indexOf(id) !== i).forEach((id) => errors.push(`rule ${id} is defined twice`));
   for (const id of SEED.rules.map((r) => r.id)) if (!ids.includes(id)) errors.push(`rule ${id} is missing`);
   return errors;
 }
 
-module.exports = { PARTS, SEED, bodyOf, canon, checksumOf, configFrom, buildConfig, validateConfig };
+module.exports = { PARTS, SEED, withDefaults, bodyOf, canon, checksumOf, configFrom, buildConfig, validateConfig };

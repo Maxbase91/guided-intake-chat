@@ -134,3 +134,64 @@ test("Postgres: the same flow, with an earlier version restored", { skip: !proce
   await migrate(url); await seed(url);
   await editPublishFlow(url);
 });
+
+test("questions and guidance: only texts the code asks the same way can change; unknown keys and categories are dropped", () => {
+  const { sanitize } = require(path.join(ROOT, "api", "_lib", "validate.js"));
+  const { SEED, validateConfig, configFrom } = require(path.join(ROOT, "api", "_lib", "seed.js"));
+  const doc = structuredClone(SEED);
+  const q = (d, k) => d.questions.find((x) => x.key === k);
+  const g = (d, k) => d.guidance.find((x) => x.key === k);
+  assert.ok("q" in q(SEED, "background") && !("q" in q(SEED, "item")), "background is asked the same way; item depends on the request");
+  q(doc, "background").q = "Which problem does it solve?";
+  q(doc, "item").q = "A text the code would never use";
+  q(doc, "item").label = "x".repeat(200);
+  doc.questions.push({ key: "secret", label: "New question", q: "?" });
+  g(doc, "audience").texts.marketing = "  our top clients  ";
+  g(doc, "audience").texts["no-such-category"] = "dropped";
+  delete g(doc, "audience").texts._;                       // the text for any other category comes back from the seed
+  g(doc, "audience").owner = "Someone else";               // who maintains it comes from the seed
+  g(doc, "out_of_scope").texts.legal = "";                 // empty: the category falls back to "any other category"
+  const out = sanitize(doc);
+  assert.equal(q(out, "background").q, "Which problem does it solve?");
+  assert.equal("q" in q(out, "item"), false);
+  assert.equal(q(out, "item").label.length, 80);
+  assert.equal(out.questions.length, SEED.questions.length);
+  assert.deepEqual([g(out, "audience").texts.marketing, g(out, "audience").texts["no-such-category"], g(out, "audience").texts._, g(out, "audience").owner],
+    ["our top clients", undefined, g(SEED, "audience").texts._, "Category Managers"]);
+  assert.equal("legal" in g(out, "out_of_scope").texts, false);
+  assert.deepEqual(validateConfig(configFrom(out, 0, "draft")), []);
+});
+
+test("a reason text may use only the placeholders its rule fills; a document from before questions and guidance existed is completed from the seed", () => {
+  const { SEED, validateConfig, configFrom, bodyOf } = require(path.join(ROOT, "api", "_lib", "seed.js"));
+  const doc = structuredClone(SEED);
+  doc.rules.find((r) => r.id === "R02").rows[1].text = "Ask {supplier} under {contract}, {lead_threshold} applies.";
+  assert.deepEqual(validateConfig(configFrom(doc, 0, "draft")), ['R02: row 2: the text uses {lead_threshold}, which this rule does not fill (it fills {contract} {supplier} {remaining} {expires})']);
+  const old = structuredClone(SEED); delete old.questions; delete old.guidance;
+  const full = bodyOf(old);
+  assert.deepEqual([full.questions.length, full.guidance.length], [SEED.questions.length, SEED.guidance.length]);
+  assert.deepEqual(validateConfig(configFrom(old, 2, "database")), []);
+});
+
+test("a guidance text published on the admin endpoint is served to the page", async () => {
+  process.env.ADMIN_CODE = "admin-secret";
+  const { admin, config } = loadAll();
+  const start = (await call(admin, { headers: H })).body;
+  const doc = structuredClone(start.draft);
+  doc.guidance.find((x) => x.key === "audience").texts.marketing = "our top 40 clients";
+  doc.questions.find((x) => x.key === "background").q = "Which problem does it solve?";
+  const saved = (await call(admin, { method: "POST", headers: H, body: { action: "save", doc, revision: start.revision, actor: "Test" } })).body;
+  assert.equal(saved.changes, 2);
+  await call(admin, { method: "POST", headers: H, body: { action: "publish", revision: saved.revision, note: "Guidance" } });
+  const live = (await call(config)).body;
+  assert.equal(live.guidance.find((x) => x.key === "audience").texts.marketing, "our top 40 clients");
+  assert.equal(live.questions.find((x) => x.key === "background").q, "Which problem does it solve?");
+});
+
+test("a stored version from before placeholders were listed is still valid: placeholders always come from the seed", () => {
+  const { SEED, validateConfig, configFrom } = require(path.join(ROOT, "api", "_lib", "seed.js"));
+  const old = structuredClone(SEED); old.rules.forEach((r) => delete r.placeholders); delete old.questions; delete old.guidance;
+  assert.deepEqual(validateConfig(configFrom(old, 2, "database")), []);
+  const forged = structuredClone(SEED); forged.rules.find((r) => r.id === "R02").placeholders.push("lead_threshold");
+  assert.deepEqual(configFrom(forged, 2, "database").rules.find((r) => r.id === "R02").placeholders, ["contract", "supplier", "remaining", "expires"]);
+});

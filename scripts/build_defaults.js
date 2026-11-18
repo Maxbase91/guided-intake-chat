@@ -7,7 +7,7 @@
 //   node scripts/build_defaults.js --check   exit 1 if the block differs from the seed (run by the tests)
 const fs = require("fs");
 const path = require("path");
-const { buildConfig, validateConfig } = require("../api/_lib/seed.js");
+const { PARTS, buildConfig, validateConfig } = require("../api/_lib/seed.js");
 
 const ROOT = path.join(__dirname, "..");
 const HTML = path.join(ROOT, "index.html");
@@ -16,7 +16,7 @@ const CLOSE = "</script>";
 
 function block(cfg) {
   const lines = ["{", `"version":${cfg.version},"source":"builtin","checksum":"${cfg.checksum}",`];
-  ["params", "channels", "categories", "facts", "rules"].forEach((k, i, a) => {
+  PARTS.forEach((k, i, a) => {
     lines.push(`"${k}":[`, cfg[k].map((x) => JSON.stringify(x)).join(",\n"), `]${i < a.length - 1 ? "," : ""}`);
   });
   lines.push("}");
