@@ -17,7 +17,8 @@ concurrency:
 jobs:
   test:
     name: API and end-to-end tests (mock providers, throwaway Postgres)
-    runs-on: ubuntu-latest
+    # pinned: ubuntu-latest moved to 26.04, which the pinned Playwright (1.56.1) cannot install its browser on
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     # no provider keys: the API tests stub fetch and the e2e servers use scripts/mock-providers.js
     # the store tests run against this throwaway Postgres, never against the real database
