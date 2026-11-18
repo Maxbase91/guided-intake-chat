@@ -265,7 +265,7 @@ body.doc-open{overflow:hidden}
 <header class="top">
   <div class="top-in">
     <div class="logo">G</div>
-    <div class="brand"><b>Guided Intake</b><span>Tell us what you need. We find the right way to buy it.</span><span class="links"><button type="button" class="howlink" id="howBtn" aria-haspopup="dialog">How it works</button><button type="button" class="howlink" id="treeBtn" aria-haspopup="dialog">Decision tree</button></span></div>
+    <div class="brand"><b>Guided Intake</b><span>Tell us what you need. We find the right way to buy it.</span><span class="links"><button type="button" class="howlink" id="howBtn" aria-haspopup="dialog">How it works</button><button type="button" class="howlink" id="treeBtn" aria-haspopup="dialog">Decision tree</button><a class="howlink" id="adminLink" href="admin.html" hidden>Rules and settings</a></span></div>
     <div class="sp"></div>
     <span class="pill"><span class="dot" id="aiDot"></span><span id="aiLabel">Offline</span></span>
     <button class="tb only-m" id="sumBtn">Summary</button>
@@ -5272,7 +5272,7 @@ function specModel(withCurrent){
 
   B.push(h(2,"1. What it is"),
     p("Guided Intake turns a request in plain words into a procurement-ready request: the buying route, the details that route needs, a service description and the documents."),
-    ul(["**Fixed rules decide:** the category, the route, which questions are asked and in which order, what is worked out from the answers (technology, outsourcing, entity, offshoring), the check step, the reviews and the quality score.",
+    ul(["**Fixed rules decide:** the category, the route, which questions are asked and in which order, what is worked out from the answers (technology, outsourcing, entity, offshoring), the check step, the reviews and the quality score. Procurement maintains the thresholds, the routing and check rules, the question texts, the guidance, the divisions and the review lists on the admin page (**Rules and settings**), without a code change.",
       "**The AI (when available) does:** read facts from free text, phrase the next question with an example, suggest answers, judge answers and write the documents.",
       "**The AI never decides:** the route, which questions are asked, the outsourcing or ICT classification, or the quality score.",
       "**Without AI** the same rules ask standard questions with examples and build the documents from the answers."]));
@@ -5280,6 +5280,9 @@ function specModel(withCurrent){
   B.push(h(2,"2. How it is built"),
     ul(["**One page** (`index.html`): the screen, the rules, the prompts and the fallback without AI, in numbered script sections (configuration, reference data, …, how it works, wiring).",
       "**A small server function** (`api/llm.js`, on Vercel) holds the AI keys, tries the AI providers in order and returns the answer as text.",
+      "**Rules as data:** the routing and check rules are decision tables run by one engine (`engine.js`), in the page, on the admin page and on the server. The configuration (thresholds, channels, category flags, rules, question texts, guidance, divisions, review lists) is served by `/api/config` from a Postgres database; the page falls back to the last copy it received and then to its built-in defaults.",
+      "**Admin page** (`admin.html`, `/api/admin`, behind its own admin code): edits are saved as a draft, every rule's own test cases must pass, and a publish creates a new version that is never changed. Earlier versions can be published again; a change log shows who changed what.",
+      "**Decision log** (`/api/decisions`): on submit the page stores which rule row decided, on which configuration version, from which typed facts. Nothing the requester wrote is stored.",
       "**Two modes**, chosen at start: **server** (the function answers) and **offline** (no AI: the page was opened as a file, or no server was found). When a call fails or every provider is at its limit, that message is handled by the rules."]),
     table(["Order","Provider","Notes"],[["1","Gemini (main model)","gemini-2.5-flash by default"],["2","Gemini (fallback model)","gemini-2.5-flash-lite by default"],["3","Groq","rotates through up to 6 models"],["4","Mistral","rotates through its small models"],["5","OpenRouter","its free models, as a last backup (about 50 requests a day without credits)"]]),
     ul([`**Time limits:** 25 s per provider call; 55 s per request in total (no new provider is started after 30 s once something failed); the page waits up to ${LLM_CLIENT.timeoutMs/1000} s.`,
@@ -5321,12 +5324,17 @@ function specModel(withCurrent){
     table(["Route","Typical working days","A start date counts as tight under"], Object.entries(CHANNELS).map(([k,c])=>[c.name, c.days, `${LEAD_DAYS[k]} days`])),
     table(["Category with a framework contract","Contract","Supplier","Level 4 entries covered","Ends"], frameworks.map(c=>[c.themes.map(x=>catById(x).name).join(", "), c.title, c.supplier, String(c.l4.length), fmtDate(c.expires)])),
     p(`**Reviews added to the result:** data protection review (personal or client data); ICT review under DORA (a technology service, for new demand or external workers); outsourcing assessment (outsourcing likely or to be determined); critical or important function check; access review (money or privileged access); offshoring check; subcontractor check; site access; material spend review (value from ${eur(T.materialityMin)}); non-preferred supplier; single-source justification (a named supplier with a reason, unless it is to be included in a competition); risk questionnaire.`),
+    table(["Rule","Decides","Rows","Test cases","Mode"], Object.values(RULES).map(r=>[`${r.id} ${r.name}`, r.decides, String(r.rows.length), String((r.tests||[]).length), r.mode])),
+    p(`**Checks for everything but a catalogue order** (rules R07 and R08, from lists on the admin page): a service the bank does not buy from third parties (${(LISTS.prohibited_services||[]).length} entries), and a country that needs a vendor office review (${(LISTS.review_countries||[]).length} entries, found in the request, the work location, the data location or the supplier). A hit is a review flag naming the division's vendor office; the lists in this version are test data.`),
     p("**Bank checks by category** (review flags, never extra questions): auditor independence (consulting, audit and tax); instructed through Legal, after a conflict check (legal); gifts and hospitality approval (client events, a warning when public officials may attend); data licence (market data); record keeping (trading voice and call recording); data transfer (client data may be stored outside the EU for an EU entity)."));
 
   const catNames=fn=>CATEGORIES.filter(fn).map(c=>c.name).join(", "), lineNames=b=>b.map(([L])=>L).join(" / ");
   B.push(h(2,"6. What is asked, and when"),
     p("Questions come in stages; only stages with open questions for the route appear. The order within a stage is fixed, and anything already said is never asked again."),
     table(["Step","Stage","What the chat says"], STAGES.map((st,i)=>[String(i+1), st.name, st.intro||""])),
+    h(3,"Ownership questions by division (new demand)"),
+    p("New demand asks which division it is for. The division names its vendor office and decides which ownership questions are asked (R required, C conditional and asked, – not asked). Catalogue orders, existing contracts and small purchases are not asked."),
+    table(["Division","Vendor office", ...["demand_owner","sponsor","spend_type"].map(k=>FACTS[k].label)], DIVISIONS.map(d=>[d.name, d.vendor_office, ...["demand_owner","sponsor","spend_type"].map(k=>({R:"R",C:"C","-":"–"})[(QUESTION_APPLIES[k]||{})[d.id]]||"R")])),
     h(3,"Kinds of work"),
     p("The stages and the facts are the same for every request. The wording, the suggested lines and a few questions follow the kind of work (`kindOf`). A project with set deliverables is one-off whatever its length; words such as “ongoing”, “managed service”, “run our…”, “service desk” or “maintain” make it an ongoing service."),
     table(["Kind","Categories","Who it is for (lines)","Benefits (lines)","Success (lines)","Also"], [
@@ -5392,6 +5400,8 @@ function specModel(withCurrent){
     ul([`**Service description:** for new demand a headline (${ex.limits.headMin}–${ex.limits.head} words for an RFP, ${exQuote.limits.headMin}–${exQuote.limits.head} for three quotes), an executive description (${ex.limits.execMin}–${ex.limits.exec} words; ${exQuote.limits.execMin}–${exQuote.limits.exec}) and a summary table (${EXEC_ROWS.map(r=>r[1]).join(", ")}). Other routes get a short description. It never contains amounts, dates, places, suppliers, the route or risk answers.`,
       "**Captured for procurement:** the record table with the route, Level 4, budget, how many (items, users of software, or people; a service has none), timing, supplier, entity, data access, outsourcing, ICT, critical function. Reviews such as the material spend review (value of €1,000,000 or more) are listed on the route card, not repeated here.",
       "**Purchase request** (catalogue order, small purchase): a short summary and the record, built from the answers without an AI call.",
+      "**Suggestions name their source:** drafted by the AI from the requester's answers, or built from the answers and the category or operations guidance. The request records which accepted suggestions came from where.",
+      "**Decision log on submit:** the rule rows that decided (catalogue, existing contract, who leads, buying channel, prohibited services, country review), the configuration version and the typed facts they read.",
       `**Switched off for now, to save tokens:** the detailed service description (${DETAIL_SECTIONS.length} sections), the business requirements document and the sourcing request text. They are still built from the answers and sent with the request (JSON), but not shown, and the AI does not write them.`,
       `**JSON on submit:** ${ex.payloadKeys}.`]));
 
@@ -5409,10 +5419,13 @@ function specModel(withCurrent){
     table(["Category","Type","Keywords (first five)","Framework contract"], CATEGORIES.map(c=>[c.name, DEMAND_TYPES[c.type]||c.type, c.kw.slice(0,5).join(", "), [...new Set(frameworks.filter(x=>x.themes.includes(c.id)).map(x=>x.supplier))].join(", ")||"–"])),
     p(`**Level 4 list** (${TAXONOMY.version}): ${L4.length} entries, ${TAXONOMY.suppliers.length} suppliers with their preferred Level 4 entries, ${TAXONOMY.contracts.length} framework contracts, ${CATALOGUE.length} catalogue entries (${CATALOGUE.filter(c=>c.kind==="shop").length} punch-out shops). They live in the JSON block \`taxonomy-data\` of this page and are written by an import script from CSV files (the Excel sheets saved as CSV): code, name, Level 1–3, category, description, search terms. Every Level 4 belongs to one category, which decides the questions and the outsourcing check; the import refuses rows without one.`),
     table(["Category","Level 4 entries","Examples"], CATEGORIES.map(c=>{ const es=L4.filter(e=>e.cat===c.id); return [c.name, String(es.length), es.slice(0,3).map(e=>`${e.code} ${e.name}`).join("; ")||"–"]; })),
-    p("The Level 4 list, suppliers, contracts and the catalogue in this version are realistic test data; the legal entities are mock data. Replace them with your own."));
+    p("The Level 4 list, suppliers, contracts and the catalogue in this version are realistic test data; the legal entities are mock data. Replace them with your own."),
+    table(["Review list","Entries","Maintained by"], Object.entries(LISTS).map(([k,items])=>[k==="prohibited_services"?"Services the bank does not buy from third parties":k==="review_countries"?"Countries that need a vendor office review":k, items.map(x=>x.name).join("; "), k==="prohibited_services"?"Compliance (test data)":"Risk function (test data)"])),
+    p("Thresholds, channel names and days, category flags, the rules, question texts, guidance, divisions and the review lists are changed on the admin page and take effect for new conversations within a minute of publishing."));
 
   B.push(h(2,"12. To rebuild it"),
     ol(["**Reference data:** categories with keywords, the Level 4 list, catalogue, framework contracts, preferred suppliers, legal entities.",
+      "**Rules as data:** the decision tables and their test cases (section 5), the configuration document and the engine that runs them; an admin page to edit, test and publish versions.",
       "**Rules:** category and Level 4, the route (section 5), the questions per route and their order, worded for the kind of work (section 6), facts worked out from answers, reviews, outsourcing per the group standard (section 8), answer checks and the quality score (section 9).",
       "**The conversation loop** in section 4, with a rule-based reader as a backup for every AI step.",
       "**Prompts A–E** (section 7) with their JSON shapes. Always validate and override the AI's output as described.",
@@ -5460,7 +5473,7 @@ function dtBand(y, h, n, title, sub){
 }
 // the whole tree on one page: SVG for the panel and the picture download, Mermaid for the Markdown download
 function treeFigure(){
-  const T=CONFIG.thresholds, CH=CHANNELS, eur=v=>money(v), W=1000, H=1664, g=[];
+  const T=CONFIG.thresholds, CH=CHANNELS, eur=v=>money(v), W=1000, H=1688, g=[];
   const routeAt=(k,cy)=>dtNode("route",680,cy-32,292,64,CH[k].name,`${CH[k].days} working days · ${DT_HOW[k]}`);
   const flag=(x,y,trigger,name)=>`<text x="${x}" y="${y}" font-size="13"><tspan fill="${DTC.ink2}">${esc(trigger)} → </tspan><tspan font-weight="700" fill="${DTC.warnInk}">${esc(name)}</tspan></text>`;
   // 1. what is being bought
@@ -5487,9 +5500,9 @@ function treeFigure(){
     dtNode("info",30,754,220,80,CH.catalogue.name,"how many, or the order value; when; where"),
     dtNode("info",262,754,230,80,CH.contract.name,"the scope or a role profile; when; how long; value; data access"),
     dtNode("info",504,754,230,80,"Small, simple purchase","business-led, short form: what; value; what it is for; when; where; supplier"),
-    dtNode("info",746,754,226,80,"Business-led and procurement-led","in stages, from the need to a final check"));
+    dtNode("info",746,754,226,80,"Business-led and procurement-led","in stages; the division decides the ownership questions"));
   // 4. which checks apply: flags for the reviewers
-  g.push(dtBand(862,514,4,"Which checks apply?","The rules raise flags; reviewers decide"),
+  g.push(dtBand(862,538,4,"Which checks apply?","The rules raise flags; reviewers decide"),
     dtNode("q",30,908,240,78,"Technology involved?","software, systems, IT support, data feeds"), dtArrow([[270,947],[304,947]],"Yes",287,940),
     dtNode("flag",304,908,190,78,"ICT review (DORA)","likely if ongoing, possibly if one-off"),
     dtNode("q",514,908,250,78,"Clients, payments or regulators hit if it is late?"), dtArrow([[764,947],[796,947]],"Yes",780,940),
@@ -5501,22 +5514,23 @@ function treeFigure(){
     dtNode("flag",806,1026,166,78,"Outsourcing assessment","to be determined if not sure"),
     dtArrow([[145,1104],[145,1132]],"Yes",153,1123,"start"), dtArrow([[392,1104],[392,1132]],"No",400,1123,"start"), dtArrow([[649,1104],[649,1132]],"No",657,1123,"start"),
     dtNode("none",30,1132,744,50,"Not outsourcing (likely)","software we install and run ourselves is not outsourcing, but still an ICT service under DORA"),
-    `<g class="dt-node" data-pad="0"><rect x="30" y="1200" width="942" height="160" rx="10" fill="#fff" stroke="${DTC.warn}" stroke-width="1.2"/>`
+    `<g class="dt-node" data-pad="0"><rect x="30" y="1200" width="942" height="184" rx="10" fill="#fff" stroke="${DTC.warn}" stroke-width="1.2"/>`
     +`<text x="46" y="1226" font-size="15" font-weight="700" fill="${DTC.navy}">Other flags, raised from the answers</text>`
     +[["Personal or client data","Data protection review"],["Money access or admin rights","Access review"],["Work from another country","Offshoring check"],[`${eur(T.materialityMin)} or more`,"Material spend review"]].map(([a,b],i)=>flag(46,1254+i*24,a,b)).join("")
     +[["Named supplier not preferred","Non-preferred supplier"],["One named supplier for an RFP","Single-source justification"],["EU entity, data outside the EU","Data transfer check"],["Work on our premises","Site access"]].map(([a,b],i)=>flag(500,1254+i*24,a,b)).join("")
-    +flag(46,1350,"By category","auditor independence · instructed through Legal · gifts and hospitality · data licence · record keeping")+`</g>`);
-  // 5. what goes to procurement
-  g.push(dtBand(1388,218,5,"What goes to procurement?","New demand is checked first; the other routes submit directly"),
+    +flag(46,1350,"A service on the list","Prohibited service check")+flag(500,1350,"A country on the list","Country review")
+    +flag(46,1374,"By category","auditor independence · instructed through Legal · gifts and hospitality · data licence · record keeping")+`</g>`);
+  // 5. what goes to procurement (moved down for the fifth row of flags)
+  g.push(`<g transform="translate(0,24)">`,dtBand(1388,218,5,"What goes to procurement?","New demand is checked first; the other routes submit directly"),
     dtNode("choice",30,1434,250,72,"Is this right?","the check step: confirm or correct"), dtArrow([[280,1470],[314,1470]],"Yes",297,1463),
     dtNode("q",314,1434,230,72,`Quality ${T.qualityMin} or more?`,"out of 100"), dtArrow([[544,1470],[586,1470]],"Yes",565,1463),
     dtNode("route",586,1438,386,64,"Submit with the document and the record","purchase request · short service description · service description"),
     dtArrow([[429,1506],[429,1532]],"No",437,1523,"start"), dtNode("none",314,1532,230,58,"Improvement round","up to 8 points that lift the score"),
-    dtArrow([[544,1561],[779,1561],[779,1502]],"Submit anyway",662,1555));
+    dtArrow([[544,1561],[779,1561],[779,1502]],"Submit anyway",662,1555), `</g>`);
   // legend: the shape says what kind of step it is, the colour repeats it
-  const hexAt=(x,kind)=>{ const [f,s]=DT_KIND[kind]; return `<path d="M${x+10} 1624H${x+38}L${x+48} 1636L${x+38} 1648H${x+10}L${x} 1636Z" fill="${f}" stroke="${s}" stroke-width="1.6"/>`; };
-  const boxAt=(x,kind)=>{ const [f,s]=DT_KIND[kind]; return `<rect x="${x}" y="1624" width="48" height="24" rx="6" fill="${f}" stroke="${s}" stroke-width="1.4"/>`; };
-  const key=(x,label)=>`<text x="${x}" y="1641" font-size="13" fill="${DTC.ink2}">${esc(label)}</text>`;
+  const hexAt=(x,kind)=>{ const [f,s]=DT_KIND[kind]; return `<path d="M${x+10} 1648H${x+38}L${x+48} 1660L${x+38} 1672H${x+10}L${x} 1660Z" fill="${f}" stroke="${s}" stroke-width="1.6"/>`; };
+  const boxAt=(x,kind)=>{ const [f,s]=DT_KIND[kind]; return `<rect x="${x}" y="1648" width="48" height="24" rx="6" fill="${f}" stroke="${s}" stroke-width="1.4"/>`; };
+  const key=(x,label)=>`<text x="${x}" y="1665" font-size="13" fill="${DTC.ink2}">${esc(label)}</text>`;
   g.push(hexAt(30,"q"),key(86,"A question the rules answer"), hexAt(290,"choice"),key(346,"A choice the requester makes"), boxAt(572,"route"),key(628,"A route or result"), boxAt(770,"flag"),key(826,"A flag for a reviewer"));
   const label="Decision tree: what is bought, how it is bought, what is asked, which checks apply and what goes to procurement.";
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="Inter,Arial,sans-serif" role="img" aria-label="${esc(label)}"><title>${esc(label)}</title>`
@@ -5541,7 +5555,7 @@ function treeFigure(){
     `    I1{"Clients, payments or regulators hit if it is late?"} -->|Yes| IF["Critical or important function check"]`,
     `    O1{"Excluded under §28?"} -->|No| O2{"Ongoing? §26"}`, `    O2 -->|Yes| O3{"Could the bank do it itself? §26"}`, `    O3 -->|Yes or not sure| OF["Outsourcing assessment"]`,
     `    O1 -->|Yes| ON["Not outsourcing (likely)"]`, `    O2 -->|No| ON`, `    O3 -->|No| ON`,
-    `    FL["Other flags: data protection, access, offshoring, material spend from ${eur(T.materialityMin)}, supplier, data transfer, site access, category checks"]`,
+    `    FL["Other flags: data protection, access, offshoring, material spend from ${eur(T.materialityMin)}, supplier, data transfer, site access, prohibited service, country review, category checks"]`,
     `  end`, `  K --> B4`,
     `  subgraph B5["5 · What goes to procurement? New demand is checked first"]`,
     `    CS{{"Is this right? The check step"}} -->|Yes| QS{"Quality ${T.qualityMin} or more?"}`,
@@ -5569,7 +5583,7 @@ function treeModel(){
   const B=[];
 
   B.push(h(1,"Decision tree: how a request is decided"),
-    p(`Generated ${new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})} from the rules of this page, for business readers. The thresholds are set by procurement in the code; the outsourcing group standard is **${R.current.id}**. Every rule and prompt in technical detail is in **How it works**.`),
+    p(`Generated ${new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})} from the rules of this page, for business readers. The thresholds, rules and lists are set by procurement on the admin page (Rules and settings); the outsourcing group standard is **${R.current.id}**. Every rule and prompt in technical detail is in **How it works**.`),
     ul(["**The rules decide** the buying route, the questions and the checks. **The requester decides** the category and whether to use an existing contract, and confirms what the rules worked out. **Reviewers decide** the outcome of every check: the app only raises flags.",
       "**The AI never decides.** It phrases the questions, reads the answers and writes the text. Without AI, the same rules run with standard questions.",
       "**Every answer can be corrected at any point** (“the budget is 80k, not 30k”). The whole tree runs again, and the chat says what changed."]));
@@ -5665,6 +5679,8 @@ function treeModel(){
       ["Instructed through Legal","Legal services: Legal engages the firm after a conflict check","The category","All but catalogue"],
       ["Gifts and hospitality approval","Client events and gifts; Compliance approves first when public officials may attend","The request and the category","Any"],
       ["Data licence check","Market data: the price and permitted use depend on who uses the data and how","The category","All but catalogue"],
+      ["Prohibited service check","The request names a service the bank does not buy from third parties (rule R07, a list on the admin page)","The request","All but catalogue"],
+      ["Country review","The work, the data or the supplier involves a country that needs a vendor office review (rule R08)",`“${q.location}”, “${q.data_details}” and “${q.supplier}”`,"All but catalogue"],
       ["Record-keeping check","Trading voice and call recording must be complete and retrievable","The request","All but catalogue"],
       ["Risk questionnaire, pre-filled","Services, software and external workers beyond a small purchase","The answers so far","Existing contract, new demand"]]));
 
@@ -5684,6 +5700,7 @@ function treeModel(){
     p("Every question that changes a decision, in the chat's own words."),
     table(["Question","Answers that matter","Decisions it changes"],[
       ["The first message: “Describe what you need…”","What, how much, how long, where, which supplier","The category candidates; the catalogue and framework match; technology; the entity; who runs software. Anything it answers is not asked again"],
+      [`“${FACTS.division.q(S.f)}” (new demand)`,"One of the divisions","The vendor office named in the record and the flags; which ownership questions follow (demand owner, sponsor, spend type)"],
       [`“${q.l4_pick}”`,"One of 2–3 candidates, or “None of these”","Category and type; frameworks, catalogue and preferred suppliers; the kind of work; the outsourcing exclusions"],
       [`“${q.value}”`,`${eur(T.simpleMax)} or less · under ${eur(T.formMin)} a year · ${eur(T.formMin)} to under ${eur(T.leadMin)} a year · ${eur(T.leadMin)} a year or more, or not known · ${eur(T.materialityMin)} or more`,"The route (questions 1, 3 and 4) and the short form; the material spend review"],
       [`“${q.item}” / “${q.quantity}”`,"A catalogue item, and how many","Whether the catalogue price explains the value (question 1)"],
@@ -5791,6 +5808,7 @@ applyConfig(DEFAULTS);
   render(); await detectServer(); resolveProvider();
   if(SERVER && SERVER.accessRequired) await accessGate(); else $("#gate").hidden=true;
   await loadConfig();
+  if(BACKEND) $("#adminLink").hidden=false;   // the admin page needs the server (and the admin code)
   render(); $("#inp").focus();
   window.__ready=true;   // start-up is complete (the tests wait for it)
 })();

@@ -85,3 +85,22 @@ test("the lists and the applicability are configuration: changing them changes w
   expect(await page.evaluate((t) => withExampleState(t, () => { S.f.division = "corporate"; refresh(); return S.req.filter((k) => ["division", "demand_owner", "sponsor", "spend_type"].includes(k)); }), DINNER))
     .toEqual(["division", "demand_owner", "spend_type"]);
 });
+
+test("the header links to the admin page when the page has its server; How it works and the Decision tree describe rules, divisions and checks", async ({ page }) => {
+  const errors = await openApp(page);
+  await expect(page.locator("#adminLink")).toBeVisible();
+  await expect(page.locator("#adminLink")).toHaveAttribute("href", "admin.html");
+  await page.click("#howBtn");
+  const how = page.locator("#specPaper");
+  for (const t of ["Rules as data", "Admin page", "Decision log", "R07 Prohibited services", "R08 Country review", "Ownership questions by division", "Corporate banking vendor office", "Suggestions name their source", "Countries that need a vendor office review"])
+    await expect(how).toContainText(t);
+  await page.keyboard.press("Escape");
+  await page.click("#treeBtn");
+  const tree = page.locator("#specPaper");
+  for (const t of ["set by procurement on the admin page", "Prohibited service check", "Country review", "Which division is this for?"]) await expect(tree).toContainText(t);
+  const svg = await page.locator("#specPaper svg").first().evaluate((el) => ({ h: el.getAttribute("height"), text: el.textContent }));
+  expect(svg.h).toBe("1688");
+  expect(svg.text).toContain("Prohibited service check");
+  expect(svg.text).toContain("Country review");
+  expect(errors).toEqual([]);
+});
