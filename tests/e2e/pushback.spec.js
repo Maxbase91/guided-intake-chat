@@ -35,7 +35,7 @@ test("pushback on the route explains it and offers the options; the question sta
   await start(page, DINNER);
   await say(page, "we don't want three quotes, can we just book a restaurant directly?");
   const last = await msgsSince(page, 1);
-  expect(last).toMatch(/under the €50,000 threshold/);
+  expect(last).toMatch(/under the €100,000 threshold/);
   expect(last).toMatch(/single source/);
   expect(await page.evaluate(() => S.f.background)).toBeNull();
 });
@@ -123,7 +123,7 @@ test("rules behind the findings: suppliers, entities, data location, officials, 
   const got = await page.evaluate(() => {
     const r = {};
     S.f.supplier = "Lakeshore Advisory and Blue Yonder Partners";
-    r.nonPreferred = controlsFor("sourcing", null).some((c) => c[1] === "Non-preferred supplier");
+    r.nonPreferred = controlsFor("procurement", null).some((c) => c[1] === "Non-preferred supplier");
     r.workday = cleanSupplier("Workday maybe");
     S.f.supplier = "Workday"; S.f.supplier_reason = "market leader I guess, but happy to compare";
     r.sole = soleSupplier(S.f);

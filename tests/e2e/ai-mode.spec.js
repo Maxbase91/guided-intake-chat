@@ -35,16 +35,16 @@ test("a full new-demand conversation runs on the AI and the documents are writte
   const errors = await openApp(page, { kind: "ai" });
   await start(page, HR);
   await answerUntilDone(page, ANSWERS);
-  await expect(page.locator(".rec-h h2")).toHaveText("New demand: procurement-led sourcing");
+  await expect(page.locator(".rec-h h2")).toHaveText("Procurement-led demand");
   // the AI's description is used; the route still comes from the rules
   await expect(page.locator('.sd-h [data-sd="title"]')).toHaveText("Mock HR and payroll platform");
   await expect(page.locator(".sd .desc")).toContainText("managed HR and payroll platform");
   // no sourcing request text and no document button: the description, the record and the quality check only
   await expect(page.locator(".sd .srq, .sd [data-act=brd]")).toHaveCount(0);
-  await expect(page.locator(".card .sec").filter({ hasText: "Why" })).toContainText("above the €50,000 threshold");
+  await expect(page.locator(".card .sec").filter({ hasText: "Why" })).toContainText("between €100,000 and €500,000, so the Category Manager decides");
   const { data } = await downloadJSON(page, async () => { await page.locator("[data-act=more]").last().click(); await page.locator(".more [data-act=json]").last().click(); });
   expect(data.source).toBe("server");
-  expect(data.decision.route).toBe("sourcing");
+  expect(data.decision.route).toBe("procurement");
   expect((await calls(request)).length).toBeGreaterThan(5);
   expect(errors).toEqual([]);
 });
@@ -65,7 +65,7 @@ test("when every provider is down the chat carries on with standard questions", 
   await expect(page.locator("#msgs")).toContainText("using standard questions");
   await expect(lastAssistant(page)).toContainText("Roughly what will this cost in total?");
   await say(page, "About 400k");
-  await expect(page.locator("#side .route")).toHaveText("New demand: procurement-led sourcing");
+  await expect(page.locator("#side .route")).toHaveText("Procurement-led demand");
   expect(errors).toEqual([]);
 });
 
@@ -129,7 +129,7 @@ test("an amount the AI returns as text ('€400k') is read as 400,000", async ({
   await openApp(page, { kind: "ai" });
   await mock(request, { nextChat: { facts: { value: "€400k", value_is_estimate: false } } });
   await start(page, "A new HR system to replace our payroll tool.");
-  await expect(page.locator("#side .route")).toHaveText("New demand: procurement-led sourcing", { timeout: 2000 });
+  await expect(page.locator("#side .route")).toHaveText("Procurement-led demand", { timeout: 2000 });
 });
 
 test("a place in the answer about where data is stored does not become the work location", async ({ page, request }) => {
@@ -173,7 +173,7 @@ test("'No, look wider' leaves the framework even when the AI records the answer 
   expect(got.contract).toBeNull();
   expect(got.supplier).not.toBe("Lakeshore Advisory");
   expect(got.declined).toBe(true);
-  await expect(page.locator("#side .route")).not.toContainText("Contract call-off");
+  await expect(page.locator("#side .route")).not.toContainText("Existing contract");
   expect(errors).toEqual([]);
 });
 
@@ -199,7 +199,7 @@ test("a clear keyword category beats the AI's category on the first message (KYC
   await openApp(page, { kind: "ai" });
   await mock(request, { nextChat: { facts: { category: "legal", demand_type: "services", l4: "L4-2201" } } });
   await start(page, "KYC periodic reviews for our corporate clients by an external provider for 2 years, around 600k");
-  expect(await page.evaluate(() => [S.f.category, S.det.route, S.f.l4 === "L4-2201"])).toEqual(["bpo", "sourcing", false]);
+  expect(await page.evaluate(() => [S.f.category, S.det.route, S.f.l4 === "L4-2201"])).toEqual(["bpo", "procurement", false]);
 });
 
 test("a question back is answered by the AI, nothing is recorded, and the same question comes back with its buttons", async ({ page, request }) => {

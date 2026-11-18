@@ -13,18 +13,18 @@ const ANSWERS = [
   [/Where should it be delivered/i, "Frankfurt office"],
 ];
 
-test("a budget correction mid-way re-routes across the €50,000 threshold", async ({ page }) => {
+test("a budget correction mid-way re-routes across the €100,000 threshold", async ({ page }) => {
   const errors = await openApp(page);
   await start(page, DINNER);
-  await expect(routeInPanel(page)).toHaveText("New demand: business-led sourcing");
-  await say(page, "sorry, the budget is 80k not 30k");
-  await expect(lastAssistant(page)).toContainText("Changed: budget from €30,000 to €80,000");
-  await expect(lastAssistant(page)).toContainText("New demand: procurement-led sourcing");
+  await expect(routeInPanel(page)).toHaveText("Business-led demand");
+  await say(page, "sorry, the budget is 150k not 30k");
+  await expect(lastAssistant(page)).toContainText("Changed: budget from €30,000 to €150,000");
+  await expect(lastAssistant(page)).toContainText("Procurement-led demand");
   await expect(lastAssistant(page)).toContainText("Back to where we were");
-  await expect(routeInPanel(page)).toHaveText("New demand: procurement-led sourcing");
+  await expect(routeInPanel(page)).toHaveText("Procurement-led demand");
   await expect(page.locator("#stepbar")).toContainText("Success and steering");   // an event is a project: measured and steered, not run
   // the correction is not taken as the answer to the open question
-  expect((await sideFacts(page))["Problem to solve"]).not.toMatch(/80k/);
+  expect((await sideFacts(page))["Problem to solve"]).not.toMatch(/150k/);
   expect(errors).toEqual([]);
 });
 
@@ -33,7 +33,7 @@ test("changing the category in words re-routes to the framework contract", async
   await start(page, DINNER);
   await say(page, "change the category to management consulting");
   await expect(lastAssistant(page)).toContainText("Changed: category from Marketing and events to Management consulting");
-  await expect(routeInPanel(page)).toHaveText("Contract call-off");
+  await expect(routeInPanel(page)).toHaveText("Existing contract");
 });
 
 test("an unclear correction is confirmed before anything changes", async ({ page }) => {
@@ -58,7 +58,7 @@ test("a captured detail edited in the side panel updates the route", async ({ pa
   await page.click("#side [data-esave]");
   await idle(page);
   await expect(page.locator("#msgs")).toContainText("Changed: budget from €30,000 to €250,000");
-  await expect(routeInPanel(page)).toHaveText("New demand: procurement-led sourcing");
+  await expect(routeInPanel(page)).toHaveText("Procurement-led demand");
   // an invalid value is refused and the editor stays open
   await page.click('#side [data-edit="value"]');
   await page.fill("#edv", "lots");
@@ -131,13 +131,13 @@ test("an example on the welcome screen starts the conversation, and New starts o
   await expect(page.locator("#inp")).toBeFocused();
 });
 
-test("a lower sourcing threshold re-routes the current request; there is no Rules panel for requesters", async ({ page }) => {
+test("a lower sourcing request threshold re-routes the current request; there is no Rules panel for requesters", async ({ page }) => {
   await openApp(page);
   await start(page, DINNER);
-  await expect(routeInPanel(page)).toHaveText("New demand: business-led sourcing");
+  await expect(routeInPanel(page)).toHaveText("Business-led demand");
   await expect(page.locator("#cfgBtn")).toHaveCount(0);
-  await setThreshold(page, "quickQuoteMax", 20000);
-  await expect(routeInPanel(page)).toHaveText("New demand: procurement-led sourcing");
+  await setThreshold(page, "formMin", 20000);
+  await expect(routeInPanel(page)).toHaveText("Procurement-led demand");
 });
 
 test("a route override is recorded with its justification in the JSON payload", async ({ page }) => {
@@ -145,13 +145,13 @@ test("a route override is recorded with its justification in the JSON payload", 
   await start(page, "We need 15 laptops for new joiners in Frankfurt.");
   await answerUntilDone(page, [[/When (do you need it|should it start)/i, "15 December 2026"]]);
   await page.click("[data-act=more]");
-  await page.selectOption("#ovr", "sourcing");
+  await page.selectOption("#ovr", "procurement");
   await expect(page.locator(".ovr")).toContainText("A stricter route than needed");
   await page.fill("#just", "Group IT wants a tender for all laptop purchases this year");
   const { data } = await downloadJSON(page, () => page.click(".more [data-act=json]"));
-  expect(data.decision).toMatchObject({ route: "catalogue", chosen: "sourcing", override: true, justification: "Group IT wants a tender for all laptop purchases this year" });
+  expect(data.decision).toMatchObject({ route: "catalogue", chosen: "procurement", override: true, justification: "Group IT wants a tender for all laptop purchases this year" });
   await page.click("[data-act=submit]");
-  await expect(lastAssistant(page)).toContainText("New demand: procurement-led sourcing");
+  await expect(lastAssistant(page)).toContainText("Procurement-led demand");
 });
 
 test("below the quality threshold the chat offers an improvement round, and submitting anyway is recorded", async ({ page }) => {
@@ -245,5 +245,5 @@ test("the welcome screen leads with new-demand examples, then one per other rout
   await expect(page.locator(".welcome .tries").nth(1).locator("[data-try]")).toHaveCount(3);
   await page.locator("[data-try]", { hasText: "ESG ratings data feed" }).click();
   await idle(page);
-  await expect(routeInPanel(page)).toHaveText("New demand: procurement-led sourcing");
+  await expect(routeInPanel(page)).toHaveText("Procurement-led demand");
 });

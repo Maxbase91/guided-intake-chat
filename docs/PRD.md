@@ -4,7 +4,7 @@
 |---|---|
 | Product | Guided Intake Chat, the procurement front door of a European bank (prototype) |
 | Status | Working prototype on https://guided-intake-chat.vercel.app, behind an access code. It runs on test data. |
-| Last updated | 14 October 2026 |
+| Last updated | 18 November 2026 |
 | Related | [Architecture](ARCHITECTURE.md) · [Design](DESIGN.md) · the in-app **How it works** panel and **Decision tree** (both generated from the code) |
 
 ## 1. Problem
@@ -40,14 +40,20 @@ The AI holds the conversation and writes the text. **It never decides the route,
 |---|---|---|
 | **Catalogue order**, fixed-price item | A catalogue item of the request's category is named, and the value fits its price | How many, when, where |
 | **Catalogue order**, punch-out shop | A supplier's shop covers the request's Level 4 (florist, catering, office supplies, print, gifts, books, courier…), up to the shop's maximum order | Order value, when, where |
-| **Contract call-off** | An active framework covers the request's Level 4. External workers go through the staffing framework | Scope, when, how long, value, data |
-| **Low-value purchase** | Value ≤ €5,000; no catalogue entry or framework; not software or external workers; no technology service; no access to our data or systems; not an ongoing service over 12 months | What, how many (goods), value, what it is for, when, where, supplier, data access (services) |
-| **New demand: business-led** | Value ≤ €50,000 | Short service description (three quotes) |
-| **New demand: procurement-led** | Above €50,000 or value unknown | Full service description (RFP) |
+| **Existing contract** | An active framework covers the request's Level 4. External workers go through the staffing framework | Scope, when, how long, value, data |
+| **Procurement-led demand** | A market data renewal (through the renewals calendar, no sourcing request form); or an annual value of €500,000 or more; or €100,000 or more in a category the Category Manager must handle. From €100,000 to under €500,000 in any other category the Category Manager decides whether procurement leads, and the request counts as procurement-led until then. An unknown value counts as procurement-led until a figure is given | Full service description (RFP) |
+| **Business-led demand** | An annual value under €100,000: the division leads, no sourcing request form | Short service description (three quotes) |
+| **Business-led demand**, small purchase | Value ≤ €5,000; not software or external workers; no technology service; no access to our data or systems; not an ongoing service over 12 months | The short form: what, how many (goods), value, what it is for, when, where, supplier, data access (services) |
+
+There are four buying channels: catalogue order, existing contract, business-led demand and procurement-led demand.
+The thresholds apply to the **annual value**: the total divided by the years of the term. Without a term of more than a
+year the stated figure counts as annual. One need must not be split to stay under a threshold.
 
 The thresholds are set in the code by procurement (`CONFIG.thresholds`):
-- low-value €5,000;
-- business-led €50,000;
+- small, simple purchase (short form) €5,000;
+- catalogue order without a quantity €50,000;
+- sourcing request form from €100,000 a year;
+- procurement leads from €500,000 a year;
 - material spend review €1,000,000;
 - quality minimum 75;
 - per-answer tip at 5/10.
@@ -111,8 +117,8 @@ Requesters cannot change them.
 | Route | Output |
 |---|---|
 | New demand | **Executive service description**: headline, executive description, summary table. It never contains amounts, dates, places, suppliers, the route or risk answers |
-| Catalogue, low-value | **Purchase request**: short summary, no AI call |
-| Call-off | Short description |
+| Catalogue, small purchase | **Purchase request**: short summary, no AI call |
+| Existing contract | Short description |
 | All | **Captured for procurement** record, route card with reason, reviews and next steps, quality check ("Still to clarify"), JSON payload on submit |
 
 **Switched off for now, to save tokens:**
@@ -170,7 +176,7 @@ They are still built from the answers (no AI) and travel in the JSON payload.
 | Right Level 4, rules only (60 realistic requests) | 73% (category 87%) |
 | Right Level 4 with AI (32 live requests) | 78% |
 | Right entry among the AI's candidates | 88–93% |
-| Questions for a small purchase | 2 (catalogue shop) to 4 (low-value) |
+| Questions for a small purchase | 2 (catalogue shop) to 4 (short form) |
 | Tokens per new-demand conversation | ~40k input |
 
 ## 7. Known gaps and risks

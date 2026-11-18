@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Last updated | 14 October 2026 |
+| Last updated | 18 November 2026 |
 | Related | [PRD](PRD.md) · [Design](DESIGN.md) · the in-app **How it works** panel, which documents every rule and prompt, and the in-app **Decision tree** for business readers; both are generated from the code |
 
 ## 1. Overview
@@ -40,11 +40,11 @@ suppliers, frameworks and catalogue (§7).
 
 | # | Section | Contents |
 |---|---|---|
-| 1 | Configuration | `CONFIG`: provider mode, access code, `?ai=` test override, currency, `thresholds` (`lowValueMax`, `quickQuoteMax`, `materialityMin`, `qualityMin`, `answerTip`) |
+| 1 | Configuration | `CONFIG`: provider mode, access code, `?ai=` test override, currency, `thresholds` (`simpleMax`, `catalogueNoQtyMax`, `formMin`, `leadMin`, `materialityMin`, `qualityMin`, `answerTip`) |
 | 2 | Reference data | `CATEGORIES` (20 buying categories with type and keywords), `L4`, `CONTRACTS`, `PREFERRED_L4`, `CATALOGUE` (from the data block), legal entities, rule sets (EBA/GL/2019/02, EBA/GL/2026/09) |
 | 3 | Routes | `CHANNELS`, `FACTS` (every question: label, wording, example, choices), `requiredFor(route, f)`, `STAGES`, kind-of-work rules (`kindOf`, `isOngoing`) |
 | 4 | State | One global `S`: messages, facts `S.f`, derived facts, route `S.det`, open questions `S.missing`, suggestions, quality, description `S.sd` |
-| 5 | Rules engine | Category and Level 4 matching, `determine()` (route), `controlsFor()` (reviews), `nextSteps()`, ICT and outsourcing decision tree, answer checks (`findIssue`), dates, money, suppliers |
+| 5 | Rules engine | Category and Level 4 matching, `determine()` (route and channel), `whoLeads()` (who leads new demand, on the annual value), `controlsFor()` (reviews), `nextSteps()`, ICT and outsourcing decision tree, answer checks (`findIssue`), dates, money, suppliers |
 | 6 | AI client | `callLLM()` (POST to `/api/llm`, 58 s timeout, short retries on a fast 429), chat system prompt and state block |
 | 7 | Conversation loop | `handleTurn()`: corrections, questions back, suggestion edits, the AI call or rules-only reading, screening, merging, checks, next question |
 | 8 | Results | `determine`'s route card, `buildDoc()` (description or purchase request), quality score, submit and JSON payload |
@@ -89,7 +89,11 @@ A change of category, value or supplier therefore re-routes on the spot.
 | C. Documents | New demand or call-off, once all details are in | Conversation, facts, category, ICT and outsourcing results, route, up to 5 Level 4 candidates | Description fields (hard word limits), the Level 4 re-check (new demand), up to 2 quality remarks |
 | D. Document change | "Make it shorter" once a description exists | The current description and the request | The updated description |
 
-There is no AI call for catalogue orders and low-value purchases: the purchase request is built from the answers.
+There is no AI call for catalogue orders and small, simple purchases: the purchase request is built from the answers.
+
+**Routes and channels.** `determine()` returns a route, which is the question profile: `catalogue`, `contract`, `simple`,
+`business` or `procurement`. The buying channel shown to the requester is one of four (`CHANNELS`): a small, simple
+purchase (`simple`) is business-led demand with the short form (`channelOf`, `chan`).
 
 Typical new-demand conversation: about 15 requests and 40k input tokens. The prompt size doesn't depend on the size of
 the Level 4 list.

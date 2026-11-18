@@ -47,8 +47,8 @@ test("suggestion edits, accepted suggestions, data answers, suppliers and the de
     r.aboutSupplier = [replyAsksAbout("supplier", "Got it. Any other risks you'd flag, like regulatory or operational ones?"), replyAsksAbout("supplier", "Thanks. Do you already have a supplier in mind?")];
     S.f.supplier = "Murex, Calypso, or a SaaS player";
     r.names = supplierNames(S.f.supplier);
-    r.asksWhy = requiredFor("sourcing", S.f).includes("supplier_reason");
-    r.np = controlsFor("sourcing", null).find((c) => c[1] === "Non-preferred supplier")[2];
+    r.asksWhy = requiredFor("procurement", S.f).includes("supplier_reason");
+    r.np = controlsFor("procurement", null).find((c) => c[1] === "Non-preferred supplier")[2];
     S.f.entity = "EU"; S.f.data_details = "client names, ID documents; stored in Frankfurt for Murex or Calypso, in the US for the SaaS option";
     r.transfer = bankChecks(S.f).some((c) => c[1] === "Data transfer check");
     S.f.scope_out = "Migration of trade history older than 5 years";

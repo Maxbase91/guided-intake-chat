@@ -71,10 +71,10 @@ test("contract call-off: more support from the framework supplier", async ({ pag
   await start(page, "More support from Lakeshore Advisory for our operations team.");
   await expect(page.locator("#msgs")).toContainText("Operations consulting framework with Lakeshore Advisory");
   await answerUntilDone(page, ANSWERS);
-  await expect(page.locator(".rec-h h2")).toHaveText("Contract call-off");
+  await expect(page.locator(".rec-h h2")).toHaveText("Existing contract");
   await expect(page.locator(".card .sec").filter({ hasText: "Why" })).toContainText("No new competition is needed");
   await expect(page.locator(".sd .record")).toContainText("Lakeshore Advisory");
-  await finishAndSubmit(page, "Contract call-off");
+  await finishAndSubmit(page, "Existing contract");
   expect(errors).toEqual([]);
 });
 
@@ -83,11 +83,11 @@ test("external workers: contractors go through the staffing contract", async ({ 
   await start(page, "Two Java developers as contractors for 9 months.");
   await expect(page.locator("#msgs")).toContainText("IT contractors");
   await answerUntilDone(page, ANSWERS);
-  await expect(page.locator(".rec-h h2")).toHaveText("Contract call-off");
+  await expect(page.locator(".rec-h h2")).toHaveText("Existing contract");
   await expect(page.locator(".card .sec").filter({ hasText: "Why" })).toContainText("External workers MSP with Tailspin Talent");
   const facts = await sideFacts(page);
   expect(facts).toMatchObject({ Role: "Java developer", People: "2", Duration: "9 months" });
-  await finishAndSubmit(page, "Contract call-off");
+  await finishAndSubmit(page, "Existing contract");
   expect(errors).toEqual([]);
 });
 
@@ -148,14 +148,14 @@ test("new demand under the threshold: business-led sourcing with three quotes", 
   await start(page, "An agency for a client dinner for 40 people, around 30k.");
   await expect(page.locator("#msgs")).toContainText("Events and hospitality");
   await answerUntilDone(page, ANSWERS);
-  await expect(page.locator(".rec-h h2")).toHaveText("New demand: business-led sourcing");
+  await expect(page.locator(".rec-h h2")).toHaveText("Business-led demand");
   await expect(page.locator(".card .sec").filter({ hasText: "Why" })).toContainText("at least three quotes");
   await expect(page.locator(".rec-h .meta")).toContainText("€30,000");
-  await finishAndSubmit(page, "New demand: business-led sourcing");
+  await finishAndSubmit(page, "Business-led demand");
   expect(errors).toEqual([]);
 });
 
-test("new demand over the threshold: procurement-led RFP with the full service description", async ({ page }) => {
+test("new demand between the thresholds: procurement-led until the Category Manager decides, with the full service description", async ({ page }) => {
   const errors = await openApp(page);
   await start(page, "A new HR system to replace our payroll tool.");
   await expect(page.locator("#msgs")).toContainText("HR and payroll software");
@@ -163,8 +163,8 @@ test("new demand over the threshold: procurement-led RFP with the full service d
 
   // the check step lists what the rules worked out and was confirmed
   await expect(page.locator("#msgs")).toContainText("Here's what I've worked out from your answers");
-  await expect(page.locator(".rec-h h2")).toHaveText("New demand: procurement-led sourcing");
-  await expect(page.locator(".card .sec").filter({ hasText: "Why" })).toContainText("RFP");
+  await expect(page.locator(".rec-h h2")).toHaveText("Procurement-led demand");
+  await expect(page.locator(".card .sec").filter({ hasText: "Why" })).toContainText("the Category Manager decides whether procurement leads");
   // executive format: headline, executive description, summary table; no sourcing request text and no document (switched off)
   await expect(page.locator(".sd")).toContainText("1. Service description headline");
   await expect(page.locator(".sd")).toContainText("2. Executive service description");
@@ -174,7 +174,7 @@ test("new demand over the threshold: procurement-led RFP with the full service d
   // the record: software counts users, no materiality unless it applies, no "Future rule set" or "Checked by you"
   await expect(page.locator(".sd .record")).not.toContainText(/Future rule set|Checked by you|Materiality|Quantity/);
 
-  await finishAndSubmit(page, "New demand: procurement-led sourcing");
+  await finishAndSubmit(page, "Procurement-led demand");
   expect(errors).toEqual([]);
 });
 
@@ -311,7 +311,7 @@ test("'trading desk', 'service desk' and 'help desk' are teams, not office furni
 test("a service no keyword knows is new demand, not a call-off on the consulting framework", async ({ page }) => {
   await openApp(page);
   await start(page, "Translation of our annual report into five languages, around 25k.");
-  await expect(page.locator("#side .route")).toHaveText("New demand: business-led sourcing");
+  await expect(page.locator("#side .route")).toHaveText("Business-led demand");
   await expect(page.locator("#msgs")).not.toContainText("This sounds like management consulting");
   await expect(page.locator("#msgs")).not.toContainText("Lakeshore");
 });

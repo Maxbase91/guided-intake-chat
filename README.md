@@ -2,8 +2,8 @@
 
 A conversational procurement intake for a European bank, built as a prototype. A colleague describes what they need in
 plain words, and the chat:
-- finds the buying route with fixed rules (catalogue, contract call-off, low-value purchase, or new demand with three
-  quotes or an RFP);
+- finds the buying channel with fixed rules: catalogue order, existing contract, business-led demand (three quotes) or
+  procurement-led demand (an RFP);
 - asks only what that route needs, one question at a time;
 - lets the requester choose the Level 4 category from 2–3 candidates, then classifies the request (ICT service under
   DORA, outsourcing under EBA/GL/2019/02);
@@ -70,8 +70,10 @@ cannot be changed by requesters:
 
 | Setting | Value |
 |---|---|
-| Low-value limit | €5,000 |
-| Business-led sourcing limit | €50,000 |
+| Small, simple purchase (short form) up to | €5,000 |
+| Catalogue order without a quantity up to | €50,000 |
+| Sourcing request form from (annual value) | €100,000 |
+| Procurement leads from (annual value) | €500,000 |
 | Material spend review | €1,000,000 |
 | Quality minimum | 75 |
 | Level 4 candidates shown from | 75% match (2–3 shown, the requester chooses) |

@@ -1015,7 +1015,7 @@ const CONFIG = {
   accessCode: "",                         // only if ACCESS_CODE is set on Vercel
   forceProvider: new URLSearchParams(location.search).get("ai") || "",   // testing: ?ai=mistral uses only that provider
   currency: "EUR",
-  thresholds: { lowValueMax: 5000, quickQuoteMax: 50000, materialityMin: 1000000, qualityMin: 75, answerTip: 5, l4Match: 75 }
+  thresholds: { simpleMax: 5000, catalogueNoQtyMax: 50000, formMin: 100000, leadMin: 500000, materialityMin: 1000000, qualityMin: 75, answerTip: 5, l4Match: 75 }
 };
 
 /* =========================================================
@@ -1106,12 +1106,16 @@ function supplierKey(name){
    3. ROUTES — what each one is, and what must be known for it
    ========================================================= */
 const CHANNELS = {
-  catalogue: {name:"Catalogue order",                       short:"Catalogue",           days:"1–3",   doc:"Request summary"},
-  lowvalue:  {name:"Low-value purchase",                    short:"Low-value purchase",  days:"1–3",   doc:"Purchase request"},
-  contract:  {name:"Contract call-off",                     short:"Contract call-off",   days:"3–7",   doc:"Scope of work"},
-  quote:     {name:"New demand: business-led sourcing",     short:"New demand",          days:"7–15",  doc:"Service description"},
-  sourcing:  {name:"New demand: procurement-led sourcing",  short:"New demand",          days:"30–60", doc:"Service description"}
+  catalogue:   {name:"Catalogue order",        days:"1–3",   doc:"Purchase request"},
+  contract:    {name:"Existing contract",      days:"3–7",   doc:"Scope of work"},
+  business:    {name:"Business-led demand",    days:"7–15",  doc:"Service description"},
+  procurement: {name:"Procurement-led demand", days:"30–60", doc:"Service description"}
 };
+// A route is the question profile: catalogue, contract, simple, business, procurement. The buying channel is one of the
+// four above: a small, simple purchase ("simple") is business-led demand with the short form.
+const ROUTES = ["catalogue","contract","simple","business","procurement"];
+const channelOf = r => r==="simple" ? "business" : r;
+const chan = r => r==="simple" ? {...CHANNELS.business, days:"1–3", doc:"Purchase request"} : CHANNELS[r];
 
 // Facts the chat can collect. q = plain question, ex = example, why = optional reason, choices = shortcuts for closed questions.
 const DELIV_EX = {
@@ -1166,8 +1170,8 @@ const FACTS = {
   deliverables:   {label:"Deliverables",    q:f=>f.demand_type==="contingent_labour"?"What will they work on?":"What should the supplier deliver?", ex:f=>f.demand_type==="contingent_labour"?"For example: \"building the new payments API with our team\".":`For example: ${DELIV_EX[f.category]||DELIV_EX._}.`},
   duration:       {label:"Duration",        q:f=>f.wants_renewal?"How long should the renewed contract run?":"How long will the work run?", ex:()=>"", choices:["Under 3 months","3–6 months","6–12 months","Over a year"]},
   purpose:        {label:"What it is for", q:()=>"What is it for?", ex:()=>"For example: \"a farewell gift for a colleague\" or \"our team offsite in March\"."},
-  needed_by:      {label:"Start / delivery",q:f=>["goods","software"].includes(f.demand_type)||shopOrder()||(S.det&&S.det.route==="lowvalue")?"When do you need it?":"When should it start?", ex:()=>"A date or \"as soon as possible\" is fine."},
-  location:       {label:"Where and how",   q:f=>["goods","software"].includes(f.demand_type)||shopOrder()?"Where should it be delivered?":S.det&&S.det.route==="lowvalue"?"Where should it be delivered, or where will it take place?":"Where and how will the work be done?", ex:f=>["goods","software"].includes(f.demand_type)||shopOrder()||(S.det&&S.det.route==="lowvalue")?"An office or building is enough.":"For example: \"remotely from the provider's offices in Poland\" or \"on our premises in London\".", choices:f=>["goods","software"].includes(f.demand_type)?null:["Remote","On our premises","At the provider's site","Offshore or another country"]},
+  needed_by:      {label:"Start / delivery",q:f=>["goods","software"].includes(f.demand_type)||shopOrder()||(S.det&&S.det.route==="simple")?"When do you need it?":"When should it start?", ex:()=>"A date or \"as soon as possible\" is fine."},
+  location:       {label:"Where and how",   q:f=>["goods","software"].includes(f.demand_type)||shopOrder()?"Where should it be delivered?":S.det&&S.det.route==="simple"?"Where should it be delivered, or where will it take place?":"Where and how will the work be done?", ex:f=>["goods","software"].includes(f.demand_type)||shopOrder()||(S.det&&S.det.route==="simple")?"An office or building is enough.":"For example: \"remotely from the provider's offices in Poland\" or \"on our premises in London\".", choices:f=>["goods","software"].includes(f.demand_type)?null:["Remote","On our premises","At the provider's site","Offshore or another country"]},
   supplier:       {label:"Supplier",        q:f=>S.det&&S.det.route==="contract"&&S.det.contract&&!hasSupplier(f)?`We already have the ${S.det.contract.title} with ${S.det.contract.supplier} for this kind of work. Are you happy to use them?`:"Do you already have a supplier in mind?", ex:f=>S.det&&S.det.route==="contract"&&!hasSupplier(f)?"That's usually the quickest way, because no new competition is needed.":`It's fine to say no.${preferredFor(f).length?` Our preferred ones for this are ${someNames(preferredFor(f))}.`:""}`, choices:f=>S.det&&S.det.route==="contract"&&!hasSupplier(f)?["Yes, use them","No, someone else"]:["No preference"]},
   supplier_reason:{label:"Why this supplier",q:f=>`Why ${f.supplier} in particular?`, ex:()=>"For example: they built the current system, or nobody else offers it.", why:()=>"Without a reason, a purchase this size needs competing offers."},
   personal_data:  {label:"Data and system access", q:()=>"Will the provider see or access any of our or our clients' data, systems, money or accounts? If so, which, and with what access?", ex:f=>{ const d=bankDomain(f); return d&&d.personal ? `For example: "read access to ${d.personal} in our systems, stored in the EU", or simply "no access".` : "For example: \"read access to employee names and salaries in our HR test system, stored in the EU\", or simply \"no access\"."; }, choices:["No access","Not sure"]},
@@ -1265,17 +1269,17 @@ function routeFacts(route, f){
   const impact = () => on(!S.asked.background,"impact_delay");
   switch(route){
     case "catalogue":  return shopOrder() ? ["value","needed_by","location"] : ["item","quantity","needed_by","location"];
-    // the essentials only; a yes on data leaves the low-value path
-    case "lowvalue":   return f.demand_type==="goods" ? ["item","quantity","value","purpose","needed_by","location","supplier"] : ["item","value","purpose","needed_by","location","supplier","personal_data"];
+    // the short form: the essentials only; a yes on data leaves it
+    case "simple":   return f.demand_type==="goods" ? ["item","quantity","value","purpose","needed_by","location","supplier"] : ["item","value","purpose","needed_by","location","supplier","personal_data"];
     case "contract":   return cont ? [...role(),"deliverables",...on(!contractAgreed(f),"contract_ok"),"needed_by","duration","location","day_rate","system_access",...on(REL.pd(f),"data_details")]
                        : g ? ["item","quantity",...on(!contractAgreed(f),"contract_ok"),"value","needed_by"]
                            : ["deliverables",...on(!contractAgreed(f),"contract_ok"),"needed_by","duration","value","personal_data",...on(yes(f.personal_data)&&!known(f.data_details),"data_details")];
     // business-led: the same structure, lighter (profile points bundled into one suggestion)
-    case "quote":      return g
+    case "business":      return g
       ? ["item",...on(!sw,"quantity"),"value",...on(sw,"must_haves"),"background",...on(sw,"quantity"),"profile",...on(sw,"scope_out"),"acceptance_pack","needed_by",...on(!sw,"location"),"supplier",...access(),...classif(),"confirm_derived"]
       : [...role(),"value",...on(f.category!=="marketing","duration"),"background","profile","scope_in","scope_out","acceptance_pack",...on(REL.volume(f),"volume"),"needed_by","location",...on(cont,"day_rate"),"supplier",...access(),...classif(),"confirm_derived"];
     // procurement-led: full depth
-    case "sourcing":   return g
+    case "procurement":   return g
       ? ["item",...on(!sw,"quantity"),"value","background",...impact(),"audience_fn",...on(sw,"current_solution"),"value_props","must_haves",...on(sw,"scope_out"),"acceptance_pack",...on(sw,"kpis_pack"),...on(ictOng,"service_model"),
          "needed_by",...on(!sw,"location"),"budget_approved","supplier",...on(oneSupplier(f),["supplier_reason","supplier_terms"]),...access(),...classif(),...on(sw,"deps_pack"),"other_risks","confirm_derived"]
       : [...role(),"value",...on(f.category!=="marketing","duration"),"background",...impact(),"audience_fn","current_solution","value_props","scope_in","scope_out","acceptance_pack",...on(!cont&&f.category!=="marketing","qualifications"),...on(REL.volume(f),"volume"),
@@ -1368,17 +1372,31 @@ const catalogueMatches = f => { const t=userText(), v=known(f.value)?Number(f.va
   return CATALOGUE.filter(i=>{ const inCat=!known(f.category)||i.cat===f.category, hit=i.kw.some(k=>kwHit(t,k));
     return i.kind==="shop" ? inCat && (hit || (f.l4===i.l4 && v!=null && sureL4)) : inCat && hit && i.type===f.demand_type; }); };
 // a stated budget the catalogue price cannot explain means something else is being bought: items at most twice price × quantity,
-// and with no quantity yet, no more than the business-led sourcing threshold; a shop up to its maximum order value
+// and with no quantity yet, no more than the catalogue limit without a quantity; a shop up to its maximum order value
 const catalogueFits = (f, items) => {
   const v=known(f.value)?Number(f.value):NaN, q=parseInt(f.quantity);
   if(isNaN(v)) return true;
   if(items.every(i=>i.kind==="shop")) return v <= Math.max(...items.map(i=>i.max_order||0));
-  return q>0 ? v <= 2*q*items.reduce((s,i)=>s+(i.price||0),0) : v <= CONFIG.thresholds.quickQuoteMax;
+  return q>0 ? v <= 2*q*items.reduce((s,i)=>s+(i.price||0),0) : v <= CONFIG.thresholds.catalogueNoQtyMax;
 };
-// below the low-value limit a purchase is bought directly, unless it needs the checks of the standard path (described in the Decision tree)
-const lowValueFits = (f, v) => v!=null && v<=CONFIG.thresholds.lowValueMax && !["contingent_labour","software"].includes(f.demand_type)
+// a small, simple purchase is bought directly with the short form, unless it needs the checks of the standard path (described in the Decision tree)
+const simpleFits = (f, v) => v!=null && v<=CONFIG.thresholds.simpleMax && !["contingent_labour","software"].includes(f.demand_type)
   && !yes(f.tech_service) && !yes(f.personal_data) && !yes(f.system_access) && !(isOngoing(f) && known(f.duration) && monthsOf(f.duration)>12);
 const daysTo = d => (new Date(d) - new Date())/864e5;
+// Who leads the sourcing (rule R11; described in How it works and the Decision tree). The thresholds apply to the annual value:
+// the total divided by the years of the term; without a term of more than a year the stated figure counts as annual.
+const annualValue = f => { if(!known(f.value)) return null; const v=Number(f.value), m=known(f.duration)&&!isTBD(f.duration)?monthsOf(f.duration):0; return m>12 ? Math.round(v/(m/12)) : v; };
+const cmMandatory = f => !!(catById(f.category)||{}).cm;
+const isExtension = () => { const t=userText(); return /\b(extend|extension|prolong)/.test(t) && !/\brenew/.test(t); };
+function whoLeads(f){
+  const T=CONFIG.thresholds, annual=annualValue(f);
+  if(f.category==="market-data" && f.wants_renewal && !isExtension()) return {lead:"procurement", row:"renewal", status:"decided", annual, form:false};
+  if(annual==null) return {lead:"procurement", row:"pending_value", status:"pending_value", annual, form:true};
+  if(annual>=T.leadMin) return {lead:"procurement", row:"lead_threshold", status:"decided", annual, form:true};
+  if(annual>=T.formMin) return cmMandatory(f) ? {lead:"procurement", row:"cm_mandatory", status:"decided", annual, form:true}
+    : {lead:"category_manager", row:"cm_decides", status:"pending_category_manager", annual, form:true};
+  return {lead:"division", row:"division", status:"decided", annual, form:false};
+}
 
 function contractFor(f){
   if(f.decline_contract || f.contract_ok===false) return null;   // "No, look wider"
@@ -1396,27 +1414,37 @@ function determine(){
   const all = catalogueMatches(f), items = all.filter(i=>i.kind!=="shop"), shops = all.filter(i=>i.kind==="shop"), ctr = contractFor(f);
   // fixed-price items first; a shop when no item fits
   const cat = items.length && catalogueFits(f, items) ? items : shops.length && catalogueFits(f, shops) ? shops.slice(0,1) : [];
-  let route, why;
+  let route, why, L=null;
   const declined=(f.decline_contract||f.contract_ok===false) && CONTRACTS.some(c=>contractCovers(c,f) && new Date(c.expires)>new Date());   // "No, look wider"
-  const lead=`This is new demand${declined?" (you chose to look wider than the existing framework)":" with no contract in place"}.`;
+  const intro=`This is new demand${declined?" (you chose to look wider than the existing framework)":" with no contract in place"}.`;
   if(cat.length && cat[0].kind==="shop"){ route="catalogue"; why=`The ${cat[0].name.toLowerCase()} of ${cat[0].supplier} is in the catalogue for orders up to ${money(cat[0].max_order)}, so you order there directly at the agreed prices.`; }
   else if(cat.length){ route="catalogue"; why=`${cat.map(i=>i.name).join(" and ")} ${cat.length>1?"are":"is"} in the catalogue, so you can order directly at the agreed price.`; }
   else if(ctr){ route="contract"; why = f.demand_type==="contingent_labour"
       ? `External workers come through the ${ctr.title} with ${ctr.supplier}, so this is a call-off with a role profile. No new competition is needed.`
       : `The ${ctr.title} with ${ctr.supplier} already covers this, with ${money(ctr.remaining)} left until ${fmtDate(ctr.expires)}. No new competition is needed.`; }
-  else if(lowValueFits(f, v)){ route="lowvalue"; why=`At ${money(v)}${f.value_is_estimate?" (estimated)":""} it is under the ${money(T.lowValueMax)} low-value limit and no catalogue item or framework covers it, so you buy it directly: a purchase order with one quote, or your corporate card where the card policy allows.`; }
-  else if(v!=null && v<=T.quickQuoteMax){ route="quote"; why=`${lead} At ${money(v)}${f.value_is_estimate?" (estimated)":""} it is under the ${money(T.quickQuoteMax)} threshold, so the business leads the sourcing: you collect at least three quotes, with procurement's guidance.`; }
-  else { route="sourcing"; why = v==null ? `${lead} The value is not known yet, so I assume procurement-led sourcing until it is.` : `${lead} At ${money(v)}${f.value_is_estimate?" (estimated)":""} it is above the ${money(T.quickQuoteMax)} threshold, so procurement leads the sourcing with an RFP.`; }
-  return {route, why, contract:ctr, catalogue:cat, controls:controlsFor(route,ctr,cat), steps:nextSteps(route,cat,ctr)};
+  else { L=whoLeads(f); const est=f.value_is_estimate?" (estimated)":"", yr = L.annual!=null && L.annual!==v ? `${money(L.annual)} a year (${money(v)} over the full term)` : v!=null ? `${money(v)}${est}` : "";
+    if(L.lead==="division" && simpleFits(f, v)){ route="simple"; why=`At ${money(v)}${est} it is a small, simple purchase and no catalogue item or framework covers it, so you buy it directly: a purchase order with one quote, or your corporate card where the card policy allows.`; }
+    else if(L.lead==="division"){ route="business"; why=`${intro} At ${yr} it is under the ${money(T.formMin)} threshold, so your division leads the sourcing: you collect at least three quotes, with procurement's guidance. No sourcing request form is needed.`; }
+    else { route="procurement";
+      why = L.row==="renewal" ? "This is a market data renewal. It goes through the renewals calendar, so procurement leads it and no sourcing request form is needed."
+        : L.row==="pending_value" ? `${intro} The value is not known yet, so I assume procurement-led demand until it is.`
+        : L.row==="lead_threshold" ? `${intro} At ${yr} it is at or above the ${money(T.leadMin)} threshold, so procurement leads the sourcing with an RFP.`
+        : L.row==="cm_mandatory" ? `${intro} At ${yr} it is at or above ${money(T.formMin)} in a category the Category Manager must handle, so procurement leads the sourcing with an RFP.`
+        : `${intro} At ${yr} it is between ${money(T.formMin)} and ${money(T.leadMin)}, so the Category Manager decides whether procurement leads. Until then I treat it as procurement-led demand.`; } }
+  return {route, channel:channelOf(route), lead:L, why, contract:ctr, catalogue:cat, controls:controlsFor(route,ctr,cat), steps:nextSteps(route,cat,ctr)};
 }
 
 // described in How it works (specModel) and the Decision tree (treeModel, treeFigure)
 function controlsFor(route, ctr, cat=[]){
   const f=S.f, T=CONFIG.thresholds, v=known(f.value)?Number(f.value):null, out=[];
-  if(route==="sourcing") out.push(["i","Approval to source","Budget owner confirms need and budget before the RFP starts."]);
-  if(route==="quote") out.push(["i","Three quotes","The business collects at least three comparable quotes; procurement reviews the choice."]);
+  const L = route==="procurement" || route==="business" ? whoLeads(f) : null;
+  if(route==="procurement") out.push(["i","Approval to source","Budget owner confirms need and budget before the RFP starts."]);
+  if(route==="procurement" && L.status==="pending_category_manager") out.push(["i","Category Manager decision","The Category Manager decides whether procurement leads. If not, your divisional vendor office may lead."]);
+  if(route==="procurement" && L.form) out.push(["i","Sourcing request form","Raised with the request once it is submitted."]);
+  if(route==="business") out.push(["i","No splitting",`One need must not be split into several requests to stay under ${money(T.formMin)}.`]);
+  if(route==="business") out.push(["i","Three quotes","The business collects at least three comparable quotes; procurement reviews the choice."]);
   if(route==="contract") out.push(["i","Confirm contract use","Contract owner confirms the scope fits."]);
-  if(route==="lowvalue") out.push(["i","One quote","One written quote or a published price is enough; keep it with the order."], ["i","No splitting",`One need must not be split into several orders to stay under ${money(T.lowValueMax)}.`]);
+  if(route==="simple") out.push(["i","One quote","One written quote or a published price is enough; keep it with the order."], ["i","No splitting",`One need must not be split into several orders to stay under ${money(T.simpleMax)}.`]);
   if(accessFlags(f).personal) out.push(["w","Data protection review","The provider will see personal or client data."]);
   if(yes(f.tech_service) && (NEW_DEMAND(route)||f.demand_type==="contingent_labour")) out.push(["w","ICT review (DORA)", REL.ongoingSvc(f)?`Likely an ICT service: ${ictType(f)}.`:`Possibly an ICT service: ${ictType(f)}. The review confirms.`]);
   if(NEW_DEMAND(route) && f.demand_type!=="goods"){ const o=outsourcing(f);
@@ -1432,7 +1460,7 @@ function controlsFor(route, ctr, cat=[]){
   if(hasSupplier(f) && NEW_DEMAND(route)){   // each named supplier on its own: "Lakeshore and Blue Yonder Partners" are both preferred
     const pref=preferredFor(f).map(p=>p.toLowerCase()), other=supplierNames(f.supplier).filter(n=>!pref.some(p=>p.includes(n.toLowerCase())||n.toLowerCase().includes(p)));
     if(other.length) out.push(["b","Non-preferred supplier",`${listJoin(other)} ${other.length>1?"are not preferred suppliers":"is not a preferred supplier"} for this category.`]); }
-  if(route==="sourcing" && soleSupplier(f)) out.push(["b","Single-source justification","You asked for one named supplier. Procurement checks the reason."]);
+  if(route==="procurement" && soleSupplier(f)) out.push(["b","Single-source justification","You asked for one named supplier. Procurement checks the reason."]);
   if(!LIGHT(route) && f.demand_type!=="goods") out.push(["i","Risk questionnaire, pre-filled","Answers come from this conversation. You only confirm them."]);
   return out;
 }
@@ -1457,12 +1485,12 @@ function nextSteps(route, cat, ctr){
     case "catalogue": return cat.length && cat[0].kind==="shop"
       ? [`Open the ${cat[0].name.toLowerCase()} (${cat[0].supplier}) from the catalogue and add what you need, up to ${money(cat[0].max_order)}.`, `Delivery to ${f.location||"your office"}${known(f.needed_by)?`, needed ${f.needed_by}`:""}.`, "Submit the basket. It goes to your budget owner for approval."]
       : [`Add ${cat.map(i=>i.name).join(" and ")} to your basket${known(f.quantity)?` (${f.quantity})`:""}.`, `Delivery to ${f.location||"your office"}${known(f.needed_by)?`, needed ${f.needed_by}`:""}.`, "Submit. Standard items go straight through."];
-    case "lowvalue":  return [`Get one quote${hasSupplier(f)?` from ${f.supplier}`:preferredFor(f).length?`, ideally from ${someNames(preferredFor(f))}`:""}.`, "Raise a purchase order with the quote attached, or pay with your corporate card where the card policy allows.", "When it arrives, confirm receipt so the invoice can be paid."];
+    case "simple":  return [`Get one quote${hasSupplier(f)?` from ${f.supplier}`:preferredFor(f).length?`, ideally from ${someNames(preferredFor(f))}`:""}.`, "Raise a purchase order with the quote attached, or pay with your corporate card where the card policy allows.", "When it arrives, confirm receipt so the invoice can be paid."];
     case "contract":  return f.demand_type==="contingent_labour"
       ? [`The role profile goes to ${ctr.supplier} under ${ctr.id}.`, "They shortlist candidates for you to interview.", "Onboarding and system access follow after selection."]
       : [`A call-off is raised against ${ctr.id} with ${ctr.supplier}.`, "The scope of work from this conversation is attached.", "The contract owner confirms, then the order goes out."];
-    case "quote":     return [`You ask at least 3 suppliers for a quote${preferredFor(f).length?`, ideally including ${someNames(preferredFor(f))}`:""}, using the service description.`, "Procurement checks the quotes and the supplier before you choose.", "The purchase request is raised with the chosen quote attached."];
-    case "sourcing":  return ["Submit. A procurement-led sourcing project is created with the service description attached.", "A buyer contacts you within 2 working days to plan the RFP and the evaluation team.", "Risk, ICT and supplier checks run in parallel with the RFP."];
+    case "business":     return [`You ask at least 3 suppliers for a quote${preferredFor(f).length?`, ideally including ${someNames(preferredFor(f))}`:""}, using the service description.`, "Procurement checks the quotes and the supplier before you choose.", "The purchase request is raised with the chosen quote attached."];
+    case "procurement":  return ["Submit. A procurement-led sourcing project is created with the service description attached.", "A buyer contacts you within 2 working days to plan the RFP and the evaluation team.", "Risk, ICT and supplier checks run in parallel with the RFP."];
   }
   return [];
 }
@@ -1881,12 +1909,12 @@ function parseWhen(str){
 }
 // the answer to "a day rate or a total budget?": €5,000 or more is the total, so it is never printed as a day rate
 const rateIsTotal = r => (parseMoney(r)||0) >= 5000;
-const LEAD_DAYS={catalogue:3,lowvalue:3,contract:7,quote:14,sourcing:45};
-// a catalogue order or a low-value purchase: a short purchase request, no service description
-const LIGHT = r => r==="catalogue" || r==="lowvalue";
+const LEAD_DAYS={catalogue:3,simple:3,contract:7,business:14,procurement:45};
+// a catalogue order or a small, simple purchase: a short purchase request, no service description
+const LIGHT = r => r==="catalogue" || r==="simple";
 const docName = () => S.det && LIGHT(S.det.route) ? "purchase request" : "service description";
 const shopOrder = () => !!(S.det && S.det.route==="catalogue" && S.det.catalogue.length && S.det.catalogue.every(i=>i.kind==="shop"));
-const NEW_DEMAND = r => r==="quote"||r==="sourcing";
+const NEW_DEMAND = r => r==="business"||r==="procurement";
 const words = v => String(v||"").trim().split(/\s+/).filter(Boolean).length;
 const VAGUE=/^(tbd|tbc|n\/?a|not sure|don'?t know|idk|stuff|things|everything|various|whatever|same|as usual|-|\?+|ok|okay|yes|no|see above|as above|same as (?:above|before)|as (?:discussed|mentioned|said)(?: before| above)?|use (?:the |your )?examples?(?: given)?)\.?$/i;
 
@@ -1973,7 +2001,7 @@ function findIssue(changed){
       const d=parseWhen(v); if(!d) continue;
       const days=Math.round((d-new Date())/864e5);
       if(days< -1) return {fact:k, issue:"date in the past", message:`${v} seems to be in the past. When should it start?`};
-      if(days < (LEAD_DAYS[route]||0)) return {fact:k, issue:`tight: ${CHANNELS[route].name} usually takes ${CHANNELS[route].days} working days`, message:`That's ${days<=1?"very soon":`in about ${days} days`}. ${CHANNELS[route].name} usually takes ${CHANNELS[route].days} working days. Is ${/\((?:asap|as soon as possible|immediately|urgent(?:ly)?|right away|now)\)$/i.test(v)?"that":String(v).replace(/\s*\([^)]*\)$/,"")} a fixed deadline, or can it move a little?`, choices:["It's fixed","It can move"], kind:"date"};
+      if(days < (LEAD_DAYS[route]||0)) return {fact:k, issue:`tight: ${chan(route).name} usually takes ${chan(route).days} working days`, message:`That's ${days<=1?"very soon":`in about ${days} days`}. ${chan(route).name} usually takes ${chan(route).days} working days. Is ${/\((?:asap|as soon as possible|immediately|urgent(?:ly)?|right away|now)\)$/i.test(v)?"that":String(v).replace(/\s*\([^)]*\)$/,"")} a fixed deadline, or can it move a little?`, choices:["It's fixed","It can move"], kind:"date"};
     }
   }
   return null;
@@ -1997,9 +2025,9 @@ function computeQuality(aiRemarks){
   req.filter(k=>(f[k]==="Not given"||f[k]==="unsure") && k!=="budget_approved" && !S.flags.some(x=>x.fact===k&&x.status==="unanswered")).forEach(k=>pts.push(swCount(k)?{lvl:"info",text:"Number of users: to confirm with suppliers."}:{lvl:"warn",text:`${label(k)}: still to be clarified.`}));
   if(givenText(f.data_details) && !saysWhere(f.data_details)) pts.push({lvl:"warn",text:"Data involved: where the data is stored is not given."});
   if(f.value_is_estimate && !["catalogue"].includes(route)) pts.push({lvl:"info",text:`The budget of ${money(Number(f.value))} is an estimate.`});
-  if(route==="sourcing" && f.budget_approved==="unsure") pts.push({lvl:"info",text:"Whether the budget is approved isn't known yet. Sourcing can only start once it is."});
-  else if(route==="sourcing" && f.budget_approved && f.budget_approved!=="yes") pts.push({lvl:"warn",text:`Budget ${f.budget_approved==="partly"?"only partly":"not yet"} approved. Sourcing can only start once it is.`});
-  if(known(f.needed_by) && !S.flags.some(x=>x.fact==="needed_by")){ const d=parseWhen(f.needed_by); if(d){ const days=(d-new Date())/864e5; if(days<(LEAD_DAYS[route]||0)) pts.push({lvl:"info",text:`Tight timeline: ${CHANNELS[route].name} usually takes ${CHANNELS[route].days} working days.`}); } }
+  if(route==="procurement" && f.budget_approved==="unsure") pts.push({lvl:"info",text:"Whether the budget is approved isn't known yet. Sourcing can only start once it is."});
+  else if(route==="procurement" && f.budget_approved && f.budget_approved!=="yes") pts.push({lvl:"warn",text:`Budget ${f.budget_approved==="partly"?"only partly":"not yet"} approved. Sourcing can only start once it is.`});
+  if(known(f.needed_by) && !S.flags.some(x=>x.fact==="needed_by")){ const d=parseWhen(f.needed_by); if(d){ const days=(d-new Date())/864e5; if(days<(LEAD_DAYS[route]||0)) pts.push({lvl:"info",text:`Tight timeline: ${chan(route).name} usually takes ${chan(route).days} working days.`}); } }
   (aiRemarks||[]).filter(x=>typeof x==="string"&&x.trim()&&!/^(none|n\/a|no (issues|concerns|remarks)|nothing)\b/i.test(x.trim())).slice(0,2).forEach(x=>pts.push({lvl:"info",text:x.trim().replace(/\.?$/,".")}));
   const answered=req.filter(k=>known(f[k])&&f[k]!=="Not given"&&f[k]!=="unsure").length, complete=req.length?Math.round(answered/req.length*100):100;
   const warn=pts.filter(p=>p.lvl==="warn").length, info=pts.filter(p=>p.lvl==="info").length;
@@ -2141,7 +2169,7 @@ const chatUser = (transcript, text, pend) => `${transcript?`Conversation so far:
 function stateBlock(pend){
   const f=S.f, still=S.missing.filter(k=>k!=="l4_pick").map((k,i)=>i<3?{key:k,label:FACTS[k].label,stage:STAGES[stageOf(k)].name,ask:FACTS[k].q(f),example:(FACTS[k].ex(f)||""),...(isSug(k)?{suggest:true}:{}),...(bundleOf(k)?{lines:bundleOf(k).map(([L])=>L)}:{})}:{key:k,label:FACTS[k].label});
   return `\n\n[STATE]\nknown_facts: ${JSON.stringify(Object.fromEntries(Object.entries(f).filter(([k,v])=>known(v)&&v!==false)))}\n`+
-    (S.det?`route_so_far: ${CHANNELS[S.det.route].name}\n`:"")+
+    (S.det?`route_so_far: ${chan(S.det.route).name}\n`:"")+
     `already_checked: ${JSON.stringify(Object.keys(S.challenged||{}))}\n`+
     (pend?`pending_check: ${JSON.stringify({fact:pend.fact,issue:pend.issue,previous_value:pend.prev})}\n`:"")+
     `still_needed (ask the first unknown one): ${JSON.stringify(still)}`;
@@ -2321,7 +2349,7 @@ async function afterChanges(done, cid, opts={}){
   refresh();
   const route=S.det.route, added=S.missing.filter(k=>!prevMissing.includes(k)), dropped=prevMissing.filter(k=>!S.missing.includes(k)&&!known(S.f[k]));
   let msg=opts.lead || `Changed: ${done.join("; ")}.`;
-  if(prevRoute && route!==prevRoute) msg+=` That changes the route from ${CHANNELS[prevRoute].name} to **${CHANNELS[route].name}**.`;
+  if(prevRoute && route!==prevRoute) msg+= channelOf(prevRoute)===channelOf(route) ? (route==="simple" ? " That makes it a small purchase with the short form." : " That is more than a small purchase, so it needs the full questions.") : ` That changes the route from ${chan(prevRoute).name} to **${chan(route).name}**.`;
   const nq=n=>n===1?"one question":`${n} questions`;
   const qa = dropped.length&&added.length ? [`${nq(dropped.length)} ${dropped.length===1?"is":"are"} no longer needed and ${added.length===1?"one is":`${added.length} are`} added`]
     : dropped.length ? [`${nq(dropped.length)} ${dropped.length===1?"is":"are"} no longer needed`] : added.length ? [`I need ${added.length===1?"one more answer":`${added.length} more answers`} for this`] : [];
@@ -2394,10 +2422,10 @@ function whyCheck(text){
 }
 function routeOptions(){
   const r=S.det&&S.det.route, T=CONFIG.thresholds;
-  return r==="sourcing" ? `Up to ${money(T.quickQuoteMax)} you could collect three quotes yourself. If only one supplier can do it, tell me why, and procurement can approve a single source. If the value or the need is different, just say so.`
-    : r==="quote" ? "Three quotes keep the price fair. If only one supplier can do it, tell me why, and procurement can approve a single source."
+  return r==="procurement" ? `Under ${money(T.formMin)} a year your division could lead and collect three quotes itself. If only one supplier can do it, tell me why, and procurement can approve a single source. If the value or the need is different, just say so.`
+    : r==="business" ? "Three quotes keep the price fair. If only one supplier can do it, tell me why, and procurement can approve a single source."
     : r==="contract" ? "Using the existing contract is the quickest way. If you'd rather look wider, just say so."
-    : r==="lowvalue" ? `Under ${money(T.lowValueMax)} one quote is enough and no service description is needed. If it will cost more, or the supplier will see our data, just say so.` : "";
+    : r==="simple" ? `Under ${money(T.simpleMax)} one quote is enough and no service description is needed. If it will cost more, or the supplier will see our data, just say so.` : "";
 }
 // a suggestion for a question that has none of its own: the AI's, or else the question's example
 async function adhocSuggest(k, cid){
@@ -2764,10 +2792,10 @@ async function handleTurn(text, cid, opts={}){
   // the route changed and needs more stages: say why, briefly
   const added=S.stageIds.filter(id=>!prevStages.includes(id)&&id!=="review"&&S.missing.some(k=>factsOf(stageById(id)).includes(k)));
   if(prevStages.length && added.length && S.msgs.filter(m=>m.role==="user").length>1 && S.missing[0]!=="l4_pick")
-    S.msgs.push({role:"assistant",kind:"sys",text:`This is now ${CHANNELS[S.det.route].name.replace(/^New demand: /,"new demand with ")}, so I've added a few questions on ${listJoin(added.map(id=>stageById(id).name.toLowerCase()))}.`});
+    S.msgs.push({role:"assistant",kind:"sys",text:`This is now ${chan(S.det.route).name.toLowerCase()}, so I've added a few questions on ${listJoin(added.map(id=>stageById(id).name.toLowerCase()))}.`});
   // the amount made it a small purchase: say so, and that the long questions are gone
   if(prevRoute && prevRoute!==S.det.route && LIGHT(S.det.route) && !LIGHT(prevRoute) && S.missing[0]!=="l4_pick" && S.routeIntro)
-    S.msgs.push({role:"assistant",kind:"sys",text: shopOrder() ? `You can order this from the ${S.det.catalogue[0].name.toLowerCase()} of ${S.det.catalogue[0].supplier} in our catalogue, so I only need a few details.` : `At ${money(Number(S.f.value))} this is a low-value purchase: no service description, just a few details.`});
+    S.msgs.push({role:"assistant",kind:"sys",text: shopOrder() ? `You can order this from the ${S.det.catalogue[0].name.toLowerCase()} of ${S.det.catalogue[0].supplier} in our catalogue, so I only need a few details.` : `At ${money(Number(S.f.value))} this is a small purchase: no service description, just a few details.`});
 
   if(!S.missing.length){
     const lead = S.completed ? `Updated. Here are the revised ${docName()} and route.` : S.improveRound ? "Thanks, that makes it stronger. I'm updating the service description now." : `${complete && reply && !aiCheck ? reply.replace(/\s*$/,"") : wrapUp()} ${LIGHT(S.det.route)?"I'm writing the purchase request now. Below it you'll find the route I recommend. Please check them before you submit.":"I'm writing the service description now. Below it you'll find the route I recommend. Please check them before you submit."}`;
@@ -3854,7 +3882,7 @@ function offlineQuestion(k, prevRoute, stageChanged){
     if(S.det.contract && hasSupplier(f)) intro += `We have the ${S.det.contract.title} with ${S.det.contract.supplier}, which makes this quicker. `;
     if(shopOrder()) intro += `Good news: you can order this from the ${S.det.catalogue[0].name.toLowerCase()} of ${S.det.catalogue[0].supplier} in our catalogue, for orders up to ${money(S.det.catalogue[0].max_order)}. `;
     else if(S.det.route==="catalogue") intro += `Good news: ${S.det.catalogue.map(i=>i.name).join(" and ")} ${S.det.catalogue.length>1?"are":"is"} in our catalogue. `;
-    else if(S.det.route==="lowvalue") intro += `At this amount it's a low-value purchase, so I only need a few details. `;
+    else if(S.det.route==="simple") intro += `At this amount it's a small purchase, so I only need a few details. `;
     const req=requiredFor(S.det.route,f), got=req.filter(k=>k!=="l4_pick" && known(f[k]) && !(k in S.derived) && f[k]!=="Not given");
     if(got.length>=3) intro += `Thanks for the detail, I've already noted the ${listJoin(got.slice(0,6).map(k=>FACTS[k].label.toLowerCase()))}${got.length>6?" and more":""}. ${S.missing.length===1?"Just one more thing.":S.missing.length<=6?`Just ${S.missing.length} more things.`:""} `;
   } else {
@@ -3991,7 +4019,7 @@ function clipWords(t, n){
   const cut=t.split(/\s+/).slice(0,n).join(" "), at=Math.max(cut.lastIndexOf(";"), cut.lastIndexOf(","), cut.lastIndexOf("."));
   return (at>cut.length/2 ? cut.slice(0,at) : cut).replace(/[\s,;:]+(?:and|or|with|for|of|the|a)?$/i,"").trim();
 }
-const execLimits = () => S.det&&S.det.route==="sourcing" ? {head:100, exec:250, headMin:50, execMin:150} : {head:70, exec:150, headMin:40, execMin:90};
+const execLimits = () => S.det&&S.det.route==="procurement" ? {head:100, exec:250, headMin:50, execMin:150} : {head:70, exec:150, headMin:40, execMin:90};
 function clampWords(t, max){
   const paras=String(t||"").split(/\n{2,}/).map(p=>p.replace(/\s+/g," ").trim()).filter(Boolean); let n=0; const out=[];
   for(const p of paras){ const kept=[]; for(const sen of p.split(/(?<=[.!?])\s+/)){ const w=words(sen); if(n+w>max) break; kept.push(sen); n+=w; } if(kept.length) out.push(kept.join(" ")); if(n>=max) break; }
@@ -4089,7 +4117,7 @@ function intakeRecord(){
   const supplier = hasSupplier(f) ? `${f.supplier}${givenText(f.supplier_reason)?` (${f.supplier_reason})`:""}` : nd ? "Open"+(preferredFor(f).length?`, preferred: ${someNames(preferredFor(f))}`:"") : null;
   const ini=(S.l4Initial||[])[0], fin=(S.sd&&S.sd.l4Final) || (f.l4&&ini&&f.l4!==ini.code&&l4ByCode(f.l4) ? finalL4(null) : null);
   const ch=S.l4Chosen && S.l4Chosen.code===f.l4 && (!fin || fin.code===f.l4) && l4ByCode(f.l4) ? S.l4Chosen : null;
-  const rows=[["Buying route",CHANNELS[route].name],
+  const rows=[["Buying route",chan(route).name],
     ["Category (Level 4)", ch ? `${l4ByCode(ch.code).name} (${ch.code}), ${ch.how==="kept"?"suggested and kept":"chosen by you"}` : fin ? `${fin.name} (${fin.code})${ini?(ini.code===fin.code?", initial classification confirmed":`, changed from ${ini.name}`):""}` : ini ? `${ini.name} (${ini.code}), ${ini.match}% match` : null],
     ["Budget",known(f.value)?money(Number(f.value))+(f.value_is_estimate?" (estimate)":""):null], ["Budget approved",v("budget_approved")],
     // how many, in the words of the kind of purchase: items, users of software, people; a service has no quantity
@@ -4281,15 +4309,15 @@ function offlineBRD(risk){
   const W={ "Best price":[["Price",50],["Quality of approach",30],["Relevant experience",20]], "Best quality":[["Quality of approach",50],["Relevant experience",30],["Price",20]],
             "Fastest delivery":[["Delivery time",40],["Quality of approach",30],["Price",30]], "A balance":[["Quality of approach",40],["Price",40],["Relevant experience",20]] };
   const evaluation = f.demand_type==="contingent_labour" ? [["Skills match",50],["Day rate",30],["Availability",20]].map(([criterion,w])=>({criterion,weight:w+"%"}))
-    : ["quote","sourcing"].includes(route) ? (W[g("evaluation_priority")]||W["A balance"]).map(([criterion,w])=>({criterion,weight:w+"%"})) : [];
+    : ["business","procurement"].includes(route) ? (W[g("evaluation_priority")]||W["A balance"]).map(([criterion,w])=>({criterion,weight:w+"%"})) : [];
   // stakeholders
   const stakeholders=[{role:"Requester",who:"You (business owner of the need)"},{role:"Budget owner",who:"The requester's budget owner"},
-    {role:"Procurement",who:{catalogue:"Not needed, standard catalogue",contract:f.demand_type==="contingent_labour"?"Managed service provider and contract owner":"Contract owner",quote:"Business leads; procurement reviews the quotes",sourcing:"Category buyer (leads the RFP)"}[route]}];
+    {role:"Procurement",who:{catalogue:"Not needed, standard catalogue",contract:f.demand_type==="contingent_labour"?"Managed service provider and contract owner":"Contract owner",simple:"Business buys directly with one quote",business:"Business leads; procurement reviews the quotes",procurement:"Category buyer (leads the RFP)"}[route]}];
   if(yes(f.personal_data)||yes(f.system_access)) stakeholders.push({role:"Data protection",who:"Data protection officer"});
   if(yes(f.ict_outsourcing)||yes(f.system_access)) stakeholders.push({role:"IT security",who:"Information security team"});
   if(yes(f.tech_service) && NEW_DEMAND(route)) stakeholders.push({role:"ICT third-party risk",who:"ICT review (DORA)"});
   if(NEW_DEMAND(route)?outsourcing(f).code!=="no"&&f.demand_type!=="goods":yes(f.ict_outsourcing)) stakeholders.push({role:"Outsourcing",who:"Outsourcing review"});
-  if(["sourcing","contract"].includes(route)) stakeholders.push({role:"Legal",who:"Contract review"});
+  if(["procurement","contract"].includes(route)) stakeholders.push({role:"Legal",who:"Contract review"});
   const scope_out=["Anything not listed under in scope", ...({consulting:["Implementing the new design, unless agreed separately (proposed)"],"it-services":["Support after handover, unless agreed separately (proposed)"],
     software:["Migrating historic data, unless agreed separately (proposed)"],marketing:["Guest travel and accommodation, unless stated (proposed)"],training:["Travel costs for participants (proposed)"]}[f.category]||[])];
   const assumptions=[...(f.value_is_estimate?[`The value of ${money(Number(f.value))} is an estimate and will be confirmed by quotes.`]:[]),"Prices exclude VAT.",...(goods?[]:["The supplier provides all tools and equipment they need, unless agreed otherwise."])];
@@ -4354,7 +4382,7 @@ ${S.det&&NEW_DEMAND(S.det.route)?execSpec():`1. "description": the SERVICE DESCR
    STRICT: the description must NOT contain amounts or budgets, dates, timing or duration, delivery location, supplier names or preferences, budget approval, cost centres,
    the buying route, contracts or frameworks, or risk answers (personal data, system access, outsourcing, criticality, subcontracting). These are captured separately.
    Never copy the user's raw wording such as "I don't know" or typos. Use only what the conversation supports; leave a field "" (or []) when there is nothing to say. Never invent facts.
-   For a simple catalogue order or a low-value purchase, fill only name, summary and, if given, problem.`}
+   For a simple catalogue order or a small purchase, fill only name, summary and, if given, problem.`}
 ${S.det&&NEW_DEMAND(S.det.route)?`2. "l4_final": re-check the Level 4 classification against the full description: {"code":"one code from the list","match":0-100,"reason":"short plain reason","uncertainty":""}.`:""}
 Length is a hard limit: count the words. audience, functions, problem, usp and regulatory: at most 25 words each. Each item of capabilities, benefits and kpis: at most 12 words, at most 5 items. Shorter is better. Never list teams, user numbers or percentages the user did not give.
 Plain language, short sentences, no marketing words, no jargon. Do not use internal labels such as "contingent labour" or category ids.
@@ -4410,7 +4438,7 @@ function docUser(){
         `ICT service (DORA): ${cl.ict?cl.ict.text:"not assessed"}\nOutsourcing: ${cl.out?cl.out.text:"not assessed"}\n`+
         (NEW_DEMAND(S.det.route)?`Critical or important function: ${isImportant(S.f)?"may apply (flag only)":"no indication"}\nProvisioning legal entity: ${(entityById(S.f.entity)||{}).name||"to be determined"}\nDerived facts checked by the requester: ${known(S.f.confirm_derived)&&!isTBD(S.f.confirm_derived)?S.f.confirm_derived:"no"}\n`+
           `Initial Level 4 classification: ${(S.l4Initial||[]).map(x=>`${x.code} ${x.name} (${x.match}%)`).join("; ")}\n${S.l4Chosen&&l4ByCode(S.l4Chosen.code)?`Level 4 ${S.l4Chosen.how==="kept"?"suggested and kept":"chosen by the requester from the suggestions"}: ${S.l4Chosen.code} ${l4ByCode(S.l4Chosen.code).name}\n`:""}Level 4 candidates: ${[...new Set([S.f.l4,...(S.l4Initial||[]).map(x=>x.code),...classifyL4(S.f).map(x=>x.code)].filter(Boolean))].slice(0,5).map(c=>l4ByCode(c)).filter(Boolean).map(e=>`${e.code} ${e.name}: ${e.desc}`).join(" | ")}\n`:"")+
-        `Recommended route: ${CHANNELS[S.det.route].name}.`;
+        `Recommended route: ${chan(S.det.route).name}.`;
 }
 // the message sent to change the documents on request
 const refineUser = (current, text) => `Current service description: ${JSON.stringify(current)}\nChange request: ${text}\nReturn the full updated JSON in the same shape. The description rules still apply.`;
@@ -4428,7 +4456,7 @@ async function refineSD(text){
 }
 function submit(){ S.holdScroll=false;
   if(!S.sd) return;
-  const id="REQ-"+Math.floor(1e5+Math.random()*9e5), ch=CHANNELS[S.override||S.det.route].name;
+  const id="REQ-"+Math.floor(1e5+Math.random()*9e5), ch=chan(S.override||S.det.route).name;
   S.submitted=id; S.brdEdited=null; S.offerImprove=null; S.choices=[];
   S.belowThreshold = !!(S.quality && NEW_DEMAND(S.det.route) && S.quality.score<CONFIG.thresholds.qualityMin);
   S.msgs.push({role:"assistant",text:`Submitted. Request **${id}** goes to **${ch}** with ${LIGHT(S.override||S.det.route)?"the purchase request and the captured details":"the service description and the captured details"} attached.${S.belowThreshold?` It is marked as submitted below the quality threshold (${S.quality.rating}, ${S.quality.score}/100), so the buyer will look at the open points first.`:""} You'll get an update at each step.\n(Prototype: nothing was sent anywhere.)`});
@@ -4437,7 +4465,7 @@ function submit(){ S.holdScroll=false;
 function payload(){
   return {created:new Date().toISOString(), facts:S.f, category_name:catById(S.f.category).name,
     conversation:S.msgs.filter(m=>!m.kind).map(m=>({role:m.role,text:m.text})),
-    decision:S.det?{route:S.det.route, chosen:S.override||S.det.route, override:!!S.override, justification:($("#just")||{}).value||null, why:S.det.why,
+    decision:S.det?{route:S.det.route, channel:S.det.channel, lead:S.det.lead, chosen:S.override||S.det.route, override:!!S.override, justification:($("#just")||{}).value||null, why:S.det.why,
       required_facts:requiredFor(S.det.route,S.f), contract:S.det.contract?.id||null, controls:S.det.controls.map(c=>c[1]), next_steps:S.det.steps, thresholds:CONFIG.thresholds}:null,
     l4_candidates:(S.l4Cands||[]).map(c=>({code:c.code, name:c.name, path:[c.l1,c.l2,c.l3].filter(Boolean).join(" › "), match:c.match, weaker:!!c.weak})), l4_choice:S.l4Chosen||null,
     quality:S.quality||null, quality_threshold:CONFIG.thresholds.qualityMin, submitted_below_threshold:!!S.belowThreshold, answer_checks:S.flags,
@@ -4462,7 +4490,7 @@ const TRIES=[
   ["New demand","Offshore","An offshore team in Poland to run accounts payable invoice processing for 3 years, about 900k."],
   ["New demand","Over €1 million","Replace our core treasury management system, budget 2.5 million over 5 years."],
   ["New demand","Market data","An ESG ratings data feed for our research team, around 120k a year."],
-  ["New demand","Under €50k","An agency for a client dinner for 40 people, around 30k."],
+  ["New demand","Under €100k","An agency for a client dinner for 40 people, around 30k."],
   ["Other routes","Catalogue","We need 15 laptops for new joiners in Frankfurt."],
   ["Other routes","Call-off","More support from Lakeshore Advisory for our operations team."],
   ["Other routes","External workers","Two Java developers as contractors for 9 months."]
@@ -4562,17 +4590,17 @@ function msgHTML(m,i,lastRec,lastSd){
       return `<li class="cr${mine?" picked":""}"><div class="ct"><b>${esc(x.name)}</b> <span class="cc">${esc(x.code)}</span> <span class="cm${x.weak?" weak":""}">${x.match}% ${x.weak?"· weaker match":"match"}</span>${j===0&&m.cands?' <span class="cs">Suggested</span>':""}${mine?' <span class="cy">✓ Your choice</span>':""}</div><div class="cp">${esc([e.l1,e.l2,e.l3].filter(Boolean).join(" › "))}</div><div class="cx">${esc(x.reason)}${x.uncertainty?` <i>${esc(x.uncertainty)}</i>`:""}</div>${open?`<button class="cb" data-act="pickl4" data-i="${j}" aria-label="Choose ${esc(x.name)}">Choose</button>`:""}</li>`; }).join("")}</ol>${open?'<div class="cf">Choose one, or “None of these” below and tell me in a few words what it is.</div>':""}</div></div>`; }
   if(m.kind==="stage"){ const st=stageById(m.stage); return `<div class="stagemark"><span><b>Step ${m.idx} of ${m.total} · ${esc(st.name)}</b><br>${esc(st.intro)}</span></div>`; }
   if(m.kind==="recap"){ const lastRecap=S.msgs.map((x,j)=>x.kind==="recap"?j:-1).filter(j=>j>=0).pop(); return `<div class="m a"><div class="av">G</div>${recapHTML(m, i===lastRecap)}</div>`; }
-  if(m.kind==="rec") return `<div class="m a"><div class="av">G</div><div class="wide">${i===lastRec?recHTML(m.rec):`<div class="card old">Earlier recommendation: ${esc(CHANNELS[m.rec.route].name)}. Updated below.</div>`}</div></div>`;
+  if(m.kind==="rec") return `<div class="m a"><div class="av">G</div><div class="wide">${i===lastRec?recHTML(m.rec):`<div class="card old">Earlier recommendation: ${esc(chan(m.rec.route).name)}. Updated below.</div>`}</div></div>`;
   if(m.kind==="sd")  return i===lastSd?`<div class="m a" id="sdcard"><div class="av">G</div><div class="wide">${sdHTML()}</div></div>`:"";
   if(m===TYPE.cur) return `<div class="m a"><div class="av">G</div><div class="bub${m.check?" qchk":""}" data-typing title="Click to show it all"></div></div>`;
   return `<div class="m a"><div class="av">G</div><div class="bub${m.check?" qchk":""}">${md(m.text)}</div></div>`;
 }
 function recHTML(R){
-  const c=CHANNELS[R.route], f=R.f;
-  const ovr=S.override&&S.override!==R.route;
-  const faster={catalogue:0,lowvalue:1,contract:2,quote:3,sourcing:4};
+  const c=chan(R.route), f=R.f;
+  const ovr=S.override&&S.override!==channelOf(R.route);
+  const faster={catalogue:0,simple:1,contract:2,business:3,procurement:4};
   return `<div class="card">
-    <div class="rec-h"><div class="eyebrow">Recommended route</div><h2>${c.name}</h2>
+    <div class="rec-h"><div class="eyebrow">Recommended route</div><h2>${esc(c.name)}</h2>
       <div class="meta">Typically ${c.days} working days${known(f.value)?` · ${money(Number(f.value))}${f.value_is_estimate?" estimated":""}`:""}</div></div>
     <div class="sec"><h4>Why</h4>${esc(R.why)}</div>
     <div class="acts">
@@ -4581,7 +4609,7 @@ function recHTML(R){
     </div>
     ${S.showMore?`<div class="more">
       <label class="muted">Use a different route</label>
-      <select class="inp" id="ovr" style="margin-top:6px"><option value="">Keep ${esc(c.name)}</option>${Object.entries(CHANNELS).filter(([k])=>k!==R.route).map(([k,v])=>`<option value="${k}" ${S.override===k?"selected":""}>${v.name}</option>`).join("")}</select>
+      <select class="inp" id="ovr" style="margin-top:6px"><option value="">Keep ${esc(c.name)}</option>${Object.entries(CHANNELS).filter(([k])=>k!==channelOf(R.route)).map(([k,v])=>`<option value="${k}" ${S.override===k?"selected":""}>${esc(v.name)}</option>`).join("")}</select>
       ${ovr?`<div class="ovr">${faster[S.override]<faster[R.route]?"This skips the standard route. It adds an exception approval and a procurement review, about 7 to 12 extra working days.":"A stricter route than needed. Allowed, but slower."}<textarea class="inp" id="just" rows="2" style="margin-top:8px" placeholder="Why does the standard route not work?"></textarea></div>`:""}
       <div style="margin-top:10px"><button class="lnk" data-act="json">Download the request as JSON</button></div>
     </div>`:""}
@@ -4710,7 +4738,7 @@ const DOC_CSS=`.brd{font-family:Inter,Arial,sans-serif;color:#141b2d;font-size:1
 
 function brdHTML(){
   if(S.sd.detail) return detailHTML();
-  const d=S.sd, B=d.brd, f=S.f, D=S.det, route=S.override||D.route, ch=CHANNELS[route];
+  const d=S.sd, B=d.brd, f=S.f, D=S.det, route=S.override||D.route, ch=chan(route);
   const L=a=>(a||[]).filter(Boolean), ul=a=>L(a).length?`<ul>${L(a).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:"";
   let n=0; const H=t=>`<h2>${++n}. ${t}</h2>`;
   const sec=(t,body)=>body&&body.replace(/<[^>]+>/g,"").trim()?H(t)+body:"";
@@ -4722,7 +4750,7 @@ function brdHTML(){
   <table class="kv" style="margin-top:12px">
     <tr><td>Reference</td><td>${esc(S.submitted||"Draft, not yet submitted")}</td></tr><tr><td>Version and status</td><td>${S.submitted?"1.0, submitted":"0.1, draft for review"}</td></tr>
     <tr><td>Date</td><td>${date}</td></tr><tr><td>Category</td><td>${esc(catById(f.category).name)} (${esc(DEMAND_TYPES[f.demand_type]||"")})</td></tr>
-    <tr><td>Recommended route</td><td>${esc(ch.name)}${S.override?` (override, standard route: ${esc(CHANNELS[D.route].name)})`:""}</td></tr>
+    <tr><td>Recommended route</td><td>${esc(ch.name)}${S.override?` (override, standard route: ${esc(chan(D.route).name)})`:""}</td></tr>
     <tr><td>Estimated value</td><td>${known(f.value)?money(Number(f.value))+(f.value_is_estimate?" (estimate)":""):"To be confirmed"}</td></tr>
   </table>
   ${H("Service description")}<div class="lead">${descHTML(false)}</div>
@@ -4747,7 +4775,7 @@ function brdHTML(){
   </div>`;
 }
 function detailHTML(){
-  const d=S.sd, X=d.detail, B=d.brd, f=S.f, D=S.det, route=S.override||D.route, ch=CHANNELS[route], cl=classify(f), o=cl.o, fin=d.l4Final||{}, ini=(S.l4Initial||[])[0];
+  const d=S.sd, X=d.detail, B=d.brd, f=S.f, D=S.det, route=S.override||D.route, ch=chan(route), cl=classify(f), o=cl.o, fin=d.l4Final||{}, ini=(S.l4Initial||[])[0];
   const L=a=>[].concat(a||[]).filter(Boolean), val=v=>{ const a=L(v); if(!a.length) return `<p class="tbd">To be determined</p>`; return a.length>1?`<ul>${a.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:`<p>${esc(a[0])}</p>`; };
   const date=(d._date?new Date(d._date):new Date()).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"});
   const kv=rows=>`<table class="kv">${rows.filter(r=>r&&r[1]!==undefined&&r[1]!==null&&r[1]!=="").map(([k,v])=>`<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}</table>`;
@@ -4849,7 +4877,7 @@ function renderSide(){
   }).join("");
   $("#side").innerHTML=`${closeBtn}<div class="panel">
       <div class="eyebrow">Route ${S.missing.length?"so far":""}</div>
-      <div class="route">${CHANNELS[S.override||D.route].name}</div>
+      <div class="route">${chan(S.override||D.route).name}</div>
       <div class="prov">${S.missing.length?"May change as you answer":"Ready"} · ${esc((l4ByCode(f.l4)||{}).name || catById(f.category).name)} <button class="ed" data-edit="category" title="Change the category" aria-label="Change the category">✎</button></div>
       ${S.editing==="category"?`<div class="fact editing">${editorHTML("category")}</div>`:""}
       <div class="prog"><i style="width:${pct}%"></i></div>
@@ -4962,16 +4990,16 @@ const specExample = label => (TRIES.find(x=>x[1]===label)||TRIES[0])[2];
 
 function specModel(withCurrent){
   const {h,p,ul,ol,table,prompt}=SB, T=CONFIG.thresholds, eur=v=>money(v), R=RULESETS, B=[];
-  const main=specExample("Software, RFP"), cat=specExample("Catalogue"), quote=specExample("Under €50k");
+  const main=specExample("Software, RFP"), cat=specExample("Catalogue"), quote=specExample("Under €100k");
   // the user's own conversation, read only (panel only, never in the download)
   const current = withCurrent && S.det ? {
     system: specTry(()=>chatSystem()),
     user: specTry(()=>chatUser(S.msgs.filter(m=>!m.kind).slice(-8).map(m=>`${m.role==="user"?"User":"Assistant"}: ${m.text}`).join("\n"), "(your next message)", S.pending)),
-    route: CHANNELS[S.det.route].name } : null;
+    route: chan(S.det.route).name } : null;
   // everything that depends on a request, taken from the real code run on the welcome examples
   const ex = withExampleState(main, ()=>{
     const req=specOrder(S.req||[]), sug=req.find(k=>bundleOf(k)&&isSug(k))||req.find(k=>isSug(k));
-    return { route:CHANNELS[S.det.route].name, limits:execLimits(),
+    return { route:chan(S.det.route).name, limits:execLimits(),
       rows:req.map(k=>{ const F=FACTS[k]||{}, ch=typeof F.choices==="function"?F.choices(S.f):F.choices;
         return k==="confirm_derived" ? ["Check step","The list of what the rules worked out (see below)","","",'"Yes, that\'s right", "Something\'s wrong"',""]
           : [F.label, specTry(()=>F.q(S.f)), specTry(()=>F.ex?F.ex(S.f):""), isSug(k)?"Yes":"", (ch||[]).join(", "), known(S.f[k])?"✓ not asked":""]; }),
@@ -4980,9 +5008,9 @@ function specModel(withCurrent){
       docSys:specTry(()=>DOC_SYSTEM()), docMsg:specTry(()=>docUser()),
       payloadKeys:specTry(()=>Object.keys(payload()).join(", "), "created, facts, conversation, decision, quality, …") };
   });
-  const exCat = withExampleState(cat, ()=>({ route:CHANNELS[S.det.route].name, docSys:specTry(()=>DOC_SYSTEM()) }));
+  const exCat = withExampleState(cat, ()=>({ route:chan(S.det.route).name, docSys:specTry(()=>DOC_SYSTEM()) }));
   const exQuote = withExampleState(quote, ()=>({ limits:execLimits() }));
-  const flows = TRIES.map(([g,lab,text])=>withExampleState(text, ()=>[`${lab} (${g.toLowerCase()})`, `“${text}”`, S.det?CHANNELS[S.det.route].name:"–", specOrder(S.req||[]).map(k=>(known(S.f[k])?"✓ ":"")+specLabel(k)).join(" → ")]));
+  const flows = TRIES.map(([g,lab,text])=>withExampleState(text, ()=>[`${lab} (${g.toLowerCase()})`, `“${text}”`, S.det?chan(S.det.route).name:"–", specOrder(S.req||[]).map(k=>(known(S.f[k])?"✓ ":"")+specLabel(k)).join(" → ")]));
   const frameworks = CONTRACTS.filter(c=>new Date(c.expires)>new Date());
 
   B.push(h(1,"How Guided Intake works"),
@@ -5035,11 +5063,10 @@ function specModel(withCurrent){
 
   B.push(h(2,"5. Routes and reviews"),
     p("The rules check in this order; the first that fits wins:"),
-    ol([`**Catalogue order**: a catalogue item of the request's category is named (whole word) and the value fits its price: at most twice price × quantity, or without a quantity at most ${eur(T.quickQuoteMax)}. Or a punch-out shop (a supplier's shop for a whole Level 4): its words are named, or the request's Level 4 is the shop's and the value is known; the value must stay within the shop's maximum order. A shop order asks only the value, the date and the delivery place.`,
-      "**Contract call-off**: an active framework contract covers the request's Level 4, unless the requester declines it or the category is only a guess.",
-      `**Low-value purchase**: value up to ${eur(T.lowValueMax)}, no catalogue entry or framework, not software or external workers, no technology service, no access to our data or systems, and not an ongoing service over 12 months. One quote or a corporate card; no splitting. It asks only what, how many (goods), the value, what it is for (unless the request says), when, where, the supplier and, for services, data access; a yes on data moves it to the standard path.`,
-      `**New demand: business-led sourcing**: value up to ${eur(T.quickQuoteMax)}; the business collects three quotes.`,
-      "**New demand: procurement-led sourcing**: everything else, including an unknown value; procurement runs an RFP."]),
+    ol([`**Catalogue order**: a catalogue item of the request's category is named (whole word) and the value fits its price: at most twice price × quantity, or without a quantity at most ${eur(T.catalogueNoQtyMax)}. Or a punch-out shop (a supplier's shop for a whole Level 4): its words are named, or the request's Level 4 is the shop's and the value is known; the value must stay within the shop's maximum order. A shop order asks only the value, the date and the delivery place.`,
+      "**Existing contract**: an active framework contract covers the request's Level 4, unless the requester declines it or the category is only a guess.",
+      `**Procurement-led demand**: a market data renewal (through the renewals calendar, no sourcing request form); or an annual value of ${eur(T.leadMin)} or more; or ${eur(T.formMin)} or more in a category the Category Manager must handle. From ${eur(T.formMin)} to under ${eur(T.leadMin)} in any other category the Category Manager decides whether procurement leads, and the request is treated as procurement-led until then. An unknown value counts as procurement-led until a figure is given. Procurement runs an RFP. The annual value is the total divided by the years of the term; without a term of more than a year the stated figure counts as annual.`,
+      `**Business-led demand**: an annual value under ${eur(T.formMin)}. The division leads and collects three quotes; no sourcing request form. A small, simple purchase uses the short form: value up to ${eur(T.simpleMax)}, not software or external workers, no technology service, no access to our data or systems, and not an ongoing service over 12 months. One quote or a corporate card; no splitting. The short form asks only what, how many (goods), the value, what it is for (unless the request says), when, where, the supplier and, for services, data access; a yes on data moves it to the full questions.`]),
     table(["Route","Typical working days","A start date counts as tight under"], Object.entries(CHANNELS).map(([k,c])=>[c.name, c.days, `${LEAD_DAYS[k]} days`])),
     table(["Category with a framework contract","Contract","Supplier","Level 4 entries covered","Ends"], frameworks.map(c=>[c.themes.map(x=>catById(x).name).join(", "), c.title, c.supplier, String(c.l4.length), fmtDate(c.expires)])),
     p(`**Reviews added to the result:** data protection review (personal or client data); ICT review under DORA (a technology service, for new demand or external workers); outsourcing assessment (outsourcing likely or to be determined); critical or important function check; access review (money or privileged access); offshoring check; subcontractor check; site access; material spend review (value from ${eur(T.materialityMin)}); non-preferred supplier; single-source justification (a named supplier with a reason, unless it is to be included in a competition); risk questionnaire.`),
@@ -5113,14 +5140,16 @@ function specModel(withCurrent){
   B.push(h(2,"10. What comes out"),
     ul([`**Service description:** for new demand a headline (${ex.limits.headMin}–${ex.limits.head} words for an RFP, ${exQuote.limits.headMin}–${exQuote.limits.head} for three quotes), an executive description (${ex.limits.execMin}–${ex.limits.exec} words; ${exQuote.limits.execMin}–${exQuote.limits.exec}) and a summary table (${EXEC_ROWS.map(r=>r[1]).join(", ")}). Other routes get a short description. It never contains amounts, dates, places, suppliers, the route or risk answers.`,
       "**Captured for procurement:** the record table with the route, Level 4, budget, how many (items, users of software, or people; a service has none), timing, supplier, entity, data access, outsourcing, ICT, critical function. Reviews such as the material spend review (value of €1,000,000 or more) are listed on the route card, not repeated here.",
-      "**Purchase request** (catalogue order, low-value purchase): a short summary and the record, built from the answers without an AI call.",
+      "**Purchase request** (catalogue order, small purchase): a short summary and the record, built from the answers without an AI call.",
       `**Switched off for now, to save tokens:** the detailed service description (${DETAIL_SECTIONS.length} sections), the business requirements document and the sourcing request text. They are still built from the answers and sent with the request (JSON), but not shown, and the AI does not write them.`,
       `**JSON on submit:** ${ex.payloadKeys}.`]));
 
   B.push(h(2,"11. Settings and reference data"),
     table(["Setting (in the code, set by procurement)","Value","Effect"],[
-      ["Low-value purchase up to", eur(T.lowValueMax), "Bought directly with one quote or a corporate card, with a short purchase request instead of a service description"],
-      ["Business-led sourcing up to", eur(T.quickQuoteMax), "Three quotes up to it, RFP above; also the most a catalogue order can be without a quantity"],
+      ["Small, simple purchase up to", eur(T.simpleMax), "Business-led demand with the short form: one quote or a corporate card, and a purchase request instead of a service description"],
+      ["Catalogue order without a quantity up to", eur(T.catalogueNoQtyMax), "The most a catalogue order can be when no quantity is given"],
+      ["Sourcing request form from (annual value)", eur(T.formMin), "Below it the division leads with three quotes; from it the Category Manager decides, or procurement leads in mandatory categories"],
+      ["Procurement leads from (annual value)", eur(T.leadMin), "Procurement leads the sourcing with an RFP"],
       ["Material spend review from", eur(T.materialityMin), "Adds the material spend review"],
       ["Quality needed before submitting", String(T.qualityMin), "Below it the chat offers an improvement round"],
       ["Tips for thin answers", String(T.answerTip), "One tip when a new-demand answer rates this or lower (0 = off)"],
@@ -5140,14 +5169,14 @@ function specModel(withCurrent){
   return B;
 }
 /* ---------- Decision tree: the same rules, told as the decisions a business reader cares about ----------
-   Thresholds, routes, questions and the worked examples are read from the code; the prose describes determine, lowValueFits,
+   Thresholds, routes, questions and the worked examples are read from the code; the prose describes determine, whoLeads, simpleFits,
    controlsFor, bankChecks, techFromRules, outsourcing, excludedType, isImportant and kindOf — update it when you change them. */
 const DTC={navy:"#0f2147",navy3:"#2c4a8a",amber:"#f2a900",amberSoft:"#fff4d6",amberInk:"#8a5d00",ok:"#11845b",okSoft:"#e5f5ee",okInk:"#0b5e41",
   warn:"#b4570b",warnSoft:"#fdf0e3",warnInk:"#7a3a05",ink:"#141b2d",ink2:"#4a5470",ink3:"#7c859e",line:"#d5dae6",band:"#f8f9fc",grey:"#eef0f5"};
 // fill, outline, title colour, second-line colour
 const DT_KIND={start:[DTC.navy,DTC.navy,"#fff","#d6deef"], q:["#fff",DTC.navy3,DTC.navy,DTC.ink2], choice:[DTC.amberSoft,DTC.amber,DTC.amberInk,DTC.ink2],
   route:[DTC.okSoft,DTC.ok,DTC.okInk,DTC.ink2], flag:[DTC.warnSoft,DTC.warn,DTC.warnInk,DTC.ink2], none:[DTC.grey,"#b9c0cf",DTC.ink2,DTC.ink3], info:["#fff","#c9cfdc",DTC.navy,DTC.ink2]};
-const DT_HOW={catalogue:"order directly", lowvalue:"one quote or card", contract:"no new competition", quote:"three quotes", sourcing:"an RFP"};
+const DT_HOW={catalogue:"order directly", contract:"no new competition", business:"three quotes", procurement:"an RFP"};
 // the words that fit a width at a font size: Inter runs about 0.55 em a character, 0.6 in bold
 function dtWrap(t, w, size, bold){
   const max=Math.max(6,Math.floor(w/(size*(bold?0.6:0.55)))), out=[]; let cur="";
@@ -5187,7 +5216,7 @@ function treeFigure(){
     dtNode("start",30,64,230,64,"The requester describes the need","in plain words"), dtArrow([[260,96],[296,96]]),
     dtNode("choice",296,58,330,76,"Which category fits best?","The requester picks 1 of 2–3 Level 4 candidates"), dtArrow([[626,96],[662,96]]),
     dtNode("info",662,56,310,80,"Sets the category, type and kind of work","goods · product · project · ongoing service · external workers"));
-  // 2. how it is bought: four questions, the first yes wins
+  // 2. how it is bought: four questions, the first yes wins; the last two are the who-leads rule
   g.push(dtBand(160,536,2,"How is it bought?","The rules ask in this order; the first yes wins"),
     dtNode("q",30,206,360,70,"In the catalogue, and it fits?","a catalogue item at its price, or a supplier's shop within its order limit"),
     dtArrow([[390,241],[680,241]],"Yes",535,234), routeAt("catalogue",241), dtArrow([[210,276],[210,304]],"No",200,294,"end"),
@@ -5195,17 +5224,18 @@ function treeFigure(){
     dtArrow([[390,339],[426,339]],"Yes",408,332), dtNode("choice",426,300,218,78,"Use the existing contract?","the requester decides"),
     dtArrow([[644,339],[680,339]],"Yes",662,332), routeAt("contract",339),
     dtArrow([[535,378],[535,397],[214,397]],"No, look wider",372,413), dtArrow([[210,374],[210,420]],"No",200,392,"end"),
-    dtNode("q",30,420,360,78,`${eur(T.lowValueMax)} or less, and simple?`,"not software or external workers; no technology, no access to our data or systems, no ongoing service over 12 months"),
-    dtArrow([[390,459],[680,459]],"Yes",535,452), routeAt("lowvalue",459), dtArrow([[210,498],[210,526]],"No",200,516,"end"),
-    dtNode("q",30,526,360,62,`${eur(T.quickQuoteMax)} or less?`,"the whole value, over the full term"),
-    dtArrow([[390,557],[680,557]],"Yes",535,550), routeAt("quote",557),
-    dtArrow([[210,588],[210,648],[680,648]],"No, or not known yet",222,641,"start"), routeAt("sourcing",648));
+    dtNode("q",30,420,360,78,`${eur(T.leadMin)} a year or more?`,"also a market data renewal, and a value that is not known yet"),
+    dtArrow([[390,459],[680,459]],"Yes",535,452), routeAt("procurement",459), dtArrow([[210,498],[210,526]],"No",200,516,"end"),
+    dtNode("q",30,526,360,62,`${eur(T.formMin)} a year or more?`,"the total divided by the years of the term"),
+    dtArrow([[390,557],[426,557]],"Yes",408,550), dtNode("info",426,522,218,70,"The Category Manager decides","mandatory categories: procurement leads"),
+    dtArrow([[644,557],[826,557],[826,491]]),
+    dtArrow([[210,588],[210,648],[680,648]],"No",222,641,"start"), routeAt("business",648));
   // 3. what must we know
   g.push(dtBand(708,142,3,"What must we know?","Only what the route needs, one question at a time"),
     dtNode("info",30,754,220,80,CH.catalogue.name,"how many, or the order value; when; where"),
     dtNode("info",262,754,230,80,CH.contract.name,"the scope or a role profile; when; how long; value; data access"),
-    dtNode("info",504,754,230,80,CH.lowvalue.name,"what; value; what it is for; when; where; supplier; data access"),
-    dtNode("info",746,754,226,80,"New demand","in stages, from the need to a final check; an RFP asks the most"));
+    dtNode("info",504,754,230,80,"Small, simple purchase","business-led, short form: what; value; what it is for; when; where; supplier"),
+    dtNode("info",746,754,226,80,"Business-led and procurement-led","in stages, from the need to a final check"));
   // 4. which checks apply: flags for the reviewers
   g.push(dtBand(862,514,4,"Which checks apply?","The rules raise flags; reviewers decide"),
     dtNode("q",30,908,240,78,"Technology involved?","software, systems, IT support, data feeds"), dtArrow([[270,947],[304,947]],"Yes",287,940),
@@ -5247,13 +5277,13 @@ function treeFigure(){
     `  end`,
     `  subgraph B2["2 · How is it bought? The first yes wins"]`,
     `    Q1{"In the catalogue, and it fits?"}`, `    Q2{"A framework contract covers it?"}`, `    C2{{"Use the existing contract?"}}`,
-    `    Q3{"${eur(T.lowValueMax)} or less, and simple?"}`, `    Q4{"${eur(T.quickQuoteMax)} or less?"}`,
-    ...["catalogue","contract","lowvalue","quote","sourcing"].map((k,i)=>`    R${i+1}["${CH[k].name} · ${CH[k].days} working days"]`),
+    `    Q3{"${eur(T.leadMin)} a year or more, a market data renewal, or the value is not known?"}`, `    Q4{"${eur(T.formMin)} a year or more?"}`, `    C4["The Category Manager decides; mandatory categories: procurement leads"]`,
+    ...["catalogue","contract","procurement","business"].map((k,i)=>`    R${i+1}["${CH[k].name} · ${CH[k].days} working days"]`),
     `    Q1 -->|Yes| R1`, `    Q1 -->|No| Q2`, `    Q2 -->|Yes| C2`, `    C2 -->|Yes| R2`, `    C2 -->|No, look wider| Q3`, `    Q2 -->|No| Q3`,
-    `    Q3 -->|Yes| R3`, `    Q3 -->|No| Q4`, `    Q4 -->|Yes| R4`, `    Q4 -->|No, or not known yet| R5`,
+    `    Q3 -->|Yes| R3`, `    Q3 -->|No| Q4`, `    Q4 -->|Yes| C4`, `    C4 --> R3`, `    Q4 -->|No| R4`,
     `  end`, `  A2 --> Q1`,
     `  subgraph B3["3 · What must we know?"]`, `    K["Only the questions the route needs, one at a time"]`, `  end`,
-    `  R1 & R2 & R3 & R4 & R5 --> K`,
+    `  R1 & R2 & R3 & R4 --> K`,
     `  subgraph B4["4 · Which checks apply? The rules raise flags; reviewers decide"]`,
     `    T1{"Technology involved?"} -->|Yes| TF["ICT review (DORA)"]`,
     `    I1{"Clients, payments or regulators hit if it is late?"} -->|Yes| IF["Critical or important function check"]`,
@@ -5273,16 +5303,16 @@ function treeQuestions(){
     const q={}; ["l4_pick","value","item","quantity","contract_ok","duration","tech_service","personal_data","data_details","system_access","hosting","in_house","background","impact_delay","entity","location","supplier","budget_approved","confirm_derived"].forEach(k=>q[k]=specTry(()=>FACTS[k].q(S.f)));
     q.supplier_reason=specTry(()=>FACTS.supplier_reason.q({...S.f, supplier:"this supplier"})); return q; });
 }
-const LOWVALUE_EX="Repair of the coffee machine in our Munich office, about 800 euros.";   // the welcome screen has no low-value example
+const LOWVALUE_EX="Repair of the coffee machine in our Munich office, about 800 euros.";   // the welcome screen has no small-purchase example
 function treeModel(){
   const {h,p,ul,table,tree,figure}=SB, T=CONFIG.thresholds, eur=v=>money(v), R=RULESETS, CH=CHANNELS, fig=treeFigure(), q=treeQuestions();
-  const catNames=fn=>CATEGORIES.filter(fn).map(c=>c.name).join(", "), lv=CH.lowvalue.name.toLowerCase(), ORDER=Object.keys(CH);
+  const catNames=fn=>CATEGORIES.filter(fn).map(c=>c.name).join(", "), ORDER=ROUTES;
   const frameworks=CONTRACTS.filter(c=>new Date(c.expires)>new Date()), shops=CATALOGUE.filter(c=>c.kind==="shop").slice(0,6).map(c=>c.name.replace(/ shop$/,"").toLowerCase());
   const stages=withExampleState(specExample("Software, RFP"), ()=>STAGES.filter(st=>st.id!=="review").map(st=>st.name.toLowerCase()));
   // what each route asks after the first message, from the real rules
-  const asked=text=>withExampleState(text, ()=>{ const left=specOrder(S.req||[]).filter(k=>!known(S.f[k])); return [CH[S.det.route].name, `“${text}”`, left.map(specLabel).join(" → "), String(left.length)]; });
-  const perRoute=[specExample("Catalogue"), specExample("Call-off"), specExample("External workers"), LOWVALUE_EX, specExample("Under €50k"), specExample("Outsourcing"), specExample("Software, RFP")].map(asked);
-  const examples=[...TRIES.map(x=>x[2]), LOWVALUE_EX].map(text=>withExampleState(text, ()=>S.det ? {o:ORDER.indexOf(S.det.route), row:[`“${text}”`, CH[S.det.route].name, S.det.why, S.det.controls.map(c=>c[1]).join(", ")||"None"]} : {o:9, row:[`“${text}”`,"–","",""]}))
+  const asked=text=>withExampleState(text, ()=>{ const left=specOrder(S.req||[]).filter(k=>!known(S.f[k])); return [chan(S.det.route).name, `“${text}”`, left.map(specLabel).join(" → "), String(left.length)]; });
+  const perRoute=[specExample("Catalogue"), specExample("Call-off"), specExample("External workers"), LOWVALUE_EX, specExample("Under €100k"), specExample("Outsourcing"), specExample("Software, RFP")].map(asked);
+  const examples=[...TRIES.map(x=>x[2]), LOWVALUE_EX].map(text=>withExampleState(text, ()=>S.det ? {o:ORDER.indexOf(S.det.route), row:[`“${text}”`, chan(S.det.route).name, S.det.why, S.det.controls.map(c=>c[1]).join(", ")||"None"]} : {o:9, row:[`“${text}”`,"–","",""]}))
     .sort((a,b)=>a.o-b.o).map(x=>x.row);
   const B=[];
 
@@ -5320,18 +5350,18 @@ function treeModel(){
   B.push(h(2,"2. How it is bought: the buying route"),
     p("The rules ask four questions in a fixed order, and the first “yes” decides the route. The requester never picks the route from a list: the route card states the reason in plain words."),
     tree([
-      {q:"Is it in the catalogue, and does the value fit?", detail:`A catalogue item of this category is named, and the value is at most twice price × quantity (without a quantity, at most ${eur(T.quickQuoteMax)}). Or a supplier's shop covers this category (${shops.join(", ")} …) and the order stays within the shop's limit.`,
+      {q:"Is it in the catalogue, and does the value fit?", detail:`A catalogue item of this category is named, and the value is at most twice price × quantity (without a quantity, at most ${eur(T.catalogueNoQtyMax)}). Or a supplier's shop covers this category (${shops.join(", ")} …) and the order stays within the shop's limit.`,
         yes:{title:CH.catalogue.name, sub:`${CH.catalogue.days} working days · purchase request`, items:["Ordered directly at the agreed prices.","A shop basket goes to the budget owner for approval; standard items go straight through."]}},
       {q:"Does an active framework contract cover it?", detail:`A framework that has not expired covers the chosen Level 4, or the named supplier's framework covers the category. External workers always go through the staffing framework. ${frameworks.length} frameworks are active today.`,
         yes:{kind:"choice", title:`The requester decides: “${q.contract_ok}”`, items:[`**Yes, use it** → **${CH.contract.name}**, ${CH.contract.days} working days, a short service description. The contract owner confirms the scope fits.`, "**No, look wider** → question 3."]}},
-      {q:`Is it ${eur(T.lowValueMax)} or less, and simple?`, detail:"All of these must be true: not software, not external workers, no technology service, no access to our data or systems, and not an ongoing service over 12 months.",
-        yes:{title:CH.lowvalue.name, sub:`${CH.lowvalue.days} working days · purchase request`, items:["One written quote or a published price, or the corporate card where the card policy allows.",`No splitting: one need must not be split into several orders to stay under ${eur(T.lowValueMax)}.`]}},
-      {q:`Is it ${eur(T.quickQuoteMax)} or less?`, detail:"The value of the whole need over the full term: an annual or monthly amount counts for the whole term.",
-        yes:{title:CH.quote.name, sub:`${CH.quote.days} working days · service description`, items:["The business collects at least three comparable quotes, with procurement's guidance.","Procurement checks the quotes and the supplier before the choice."]}, no:"No, or the value is not known yet"}],
-      {label:"Then", title:CH.sourcing.name, sub:`${CH.sourcing.days} working days · service description`, items:["Procurement runs an RFP.","**Approval to source:** the budget owner confirms the need and the budget before the RFP starts.","A buyer gets in touch within 2 working days; risk, ICT and supplier checks run alongside the RFP."]}),
+      {q:`Is it a market data renewal, or ${eur(T.leadMin)} a year or more?`, detail:"The annual value is the total divided by the years of the term; without a term of more than a year the stated figure counts as annual. A market data renewal (not an extension) goes through the renewals calendar. A value that is not known yet counts as procurement-led until a figure is given.",
+        yes:{title:CH.procurement.name, sub:`${CH.procurement.days} working days · service description`, items:["Procurement runs an RFP.","**Approval to source:** the budget owner confirms the need and the budget before the RFP starts.","A sourcing request form is raised with the request, except for a market data renewal.","A buyer gets in touch within 2 working days; risk, ICT and supplier checks run alongside the RFP."]}},
+      {q:`Is it ${eur(T.formMin)} a year or more?`, detail:"Between the two thresholds the category decides who leads.",
+        yes:{kind:"choice", title:"The Category Manager decides who leads", items:[`**A category the Category Manager must handle** → **${CH.procurement.name}**.`, `**Any other category** → the Category Manager decides whether procurement leads; until then the request is treated as ${CH.procurement.name.toLowerCase()}. If procurement does not lead, the divisional vendor office may.`]}, no:"No"}],
+      {label:"Then", title:CH.business.name, sub:`${CH.business.days} working days · service description`, items:["The division leads and collects at least three comparable quotes, with procurement's guidance.","No sourcing request form is needed.",`No splitting: one need must not be split into several requests to stay under ${eur(T.formMin)}.`,`**A small, simple purchase** (${eur(T.simpleMax)} or less; not software or external workers; no technology service, no access to our data or systems, not an ongoing service over 12 months) uses the short form: one quote or the corporate card, and a purchase request instead of a service description.`]}),
     h(3,"What can move a request to another route"),
     ul(["**A different value** (“it's 80k, not 30k”): the tree runs again and the chat names the new route.",
-      `**A yes on technology, data or system access** takes a request off the ${lv} route.`,
+      `**A yes on technology, data or system access** takes a small purchase off the short form.`,
       "**“No, look wider”** on an existing contract makes it new demand.",
       "**An unknown value** counts as procurement-led until a figure is given.",
       "**A different category**, at the check step or in the summary, can bring a framework or the catalogue into play.",
@@ -5347,7 +5377,7 @@ function treeModel(){
     p("The rules work these out from the answers and show them back at the check step. They are **flags for the reviewers, never final determinations**."),
     h(3,"4a. ICT service under DORA (the EU rules for technology services to banks)"),
     tree([{q:"Is technology involved?", detail:`Always for ${catNames(c=>TECH_CATS.includes(c.id))}. Goods: only when bought as a service or leased. External workers: when the role or skills are technical. Otherwise it is read from the request, and when the rules can't tell, the chat asks: “${q.tech_service}”`,
-      yes:{kind:"flag", title:"ICT service: flag for the ICT review (DORA)", items:["Ongoing: “likely an ICT service”; one-off: “possibly”, and the review confirms.","The type is proposed from the words: cloud software (SaaS), software licensing, cloud capacity, development, IT help desk, data feeds, network…","The ICT review is added for new demand and external workers.",`It also rules out the ${lv} route.`]}, no:"Otherwise"}],
+      yes:{kind:"flag", title:"ICT service: flag for the ICT review (DORA)", items:["Ongoing: “likely an ICT service”; one-off: “possibly”, and the review confirms.","The type is proposed from the words: cloud software (SaaS), software licensing, cloud capacity, development, IT help desk, data feeds, network…","The ICT review is added for new demand and external workers.","It also rules out the short form for small purchases."]}, no:"Otherwise"}],
       {label:"No", kind:"none", title:"No ICT flag", sub:"“Not sure” stays open, and the ICT review confirms."}),
     h(3,`4b. Outsourcing under the group standard ${R.current.id}`),
     p("Checked for new demand that is not goods. The legal entity is captured for the contract but does not change the result."),
@@ -5374,7 +5404,7 @@ function treeModel(){
       ["Outsourcing assessment","Outsourcing likely, or to be determined (4b)",`“${q.hosting}”, “${q.in_house}” and the duration`,"New demand"],
       ["Critical or important function check","See 4c",`“${q.impact_delay}”`,"New demand"],
       ["Offshoring check","The work is done outside the entity's country",`“${q.location}” and “${q.entity}”`,"Any"],
-      ["Site access","Work on our premises",`“${q.location}”`,"Call-off, new demand"],
+      ["Site access","Work on our premises",`“${q.location}”`,"Existing contract, new demand"],
       ["Subcontractor check","The supplier may use subcontractors","Only when the requester says so","Any"],
       ["Material spend review",`A value of ${eur(T.materialityMin)} or more`,`“${q.value}”`,"Any"],
       ["Non-preferred supplier","A named supplier is not preferred for this category",`“${q.supplier}”`,"New demand"],
@@ -5384,15 +5414,15 @@ function treeModel(){
       ["Gifts and hospitality approval","Client events and gifts; Compliance approves first when public officials may attend","The request and the category","Any"],
       ["Data licence check","Market data: the price and permitted use depend on who uses the data and how","The category","All but catalogue"],
       ["Record-keeping check","Trading voice and call recording must be complete and retrievable","The request","All but catalogue"],
-      ["Risk questionnaire, pre-filled","Services, software and external workers beyond a small purchase","The answers so far","Call-off, new demand"]]));
+      ["Risk questionnaire, pre-filled","Services, software and external workers beyond a small purchase","The answers so far","Existing contract, new demand"]]));
 
   B.push(h(2,"5. What goes to procurement"),
     table(["Route","Document","What happens next"],[
       [CH.catalogue.name,"Purchase request: a short summary and the record","The basket is submitted; a shop basket goes to the budget owner"],
-      [CH.lowvalue.name,"Purchase request","One quote, then a purchase order or the corporate card; receipt is confirmed so the invoice can be paid"],
+      ["Small, simple purchase (business-led)","Purchase request","One quote, then a purchase order or the corporate card; receipt is confirmed so the invoice can be paid"],
       [CH.contract.name,"Short service description","A call-off against the framework; the contract owner confirms. External workers: the role profile goes to the framework supplier, who shortlists candidates"],
-      [CH.quote.name,"Service description: a headline, an executive description and a summary table","The requester asks at least 3 suppliers for a quote; procurement checks the quotes and the supplier"],
-      [CH.sourcing.name,"Service description, in the same form and longer","A sourcing project; a buyer gets in touch within 2 working days"]]),
+      [CH.business.name,"Service description: a headline, an executive description and a summary table","The requester asks at least 3 suppliers for a quote; procurement checks the quotes and the supplier"],
+      [CH.procurement.name,"Service description, in the same form and longer","A sourcing project; a buyer gets in touch within 2 working days"]]),
     p("Every route also gets the **route card** (route, reason, reviews and next steps) and **Captured for procurement**, the record of every answer. The service description itself never contains amounts, dates, places, suppliers, the route or risk answers."),
     h(3,"Before submitting (new demand)"),
     ul([`**The check step:** “${q.confirm_derived}” The requester sees, in plain words, what the rules worked out (Level 4, entity, ongoing or one-off, could the bank do it itself, technology, critical function, access, offshoring) and what it means (the outsourcing result and the reviews). “Yes” confirms it; a correction in words changes it and runs the tree again.`,
@@ -5403,12 +5433,12 @@ function treeModel(){
     table(["Question","Answers that matter","Decisions it changes"],[
       ["The first message: “Describe what you need…”","What, how much, how long, where, which supplier","The category candidates; the catalogue and framework match; technology; the entity; who runs software. Anything it answers is not asked again"],
       [`“${q.l4_pick}”`,"One of 2–3 candidates, or “None of these”","Category and type; frameworks, catalogue and preferred suppliers; the kind of work; the outsourcing exclusions"],
-      [`“${q.value}”`,`${eur(T.lowValueMax)} or less · ${eur(T.quickQuoteMax)} or less · more, or not known · ${eur(T.materialityMin)} or more`,"The route (questions 1, 3 and 4); the material spend review"],
+      [`“${q.value}”`,`${eur(T.simpleMax)} or less · under ${eur(T.formMin)} a year · ${eur(T.formMin)} to under ${eur(T.leadMin)} a year · ${eur(T.leadMin)} a year or more, or not known · ${eur(T.materialityMin)} or more`,"The route (questions 1, 3 and 4) and the short form; the material spend review"],
       [`“${q.item}” / “${q.quantity}”`,"A catalogue item, and how many","Whether the catalogue price explains the value (question 1)"],
-      [`“${q.contract_ok}”`,"Yes, use it · No, look wider","Contract call-off, or new demand"],
-      [`“${q.duration}”`,"Under 3 months · 3–6 months · 6–12 months · over a year",`Ongoing or one-off (outsourcing); an ongoing service over 12 months is not a ${lv}; project steering from 6 months`],
-      [`“${q.tech_service}”`,"Yes · No · Not sure",`The ICT review (DORA); rules out the ${lv} route`],
-      [`“${q.personal_data}”`,"No access · which data, systems or money, with what access",`Data protection review; access review; rules out the ${lv} route`],
+      [`“${q.contract_ok}”`,"Yes, use it · No, look wider","Existing contract, or new demand"],
+      [`“${q.duration}”`,"Under 3 months · 3–6 months · 6–12 months · over a year",`Ongoing or one-off (outsourcing); the annual value for the thresholds; an ongoing service over 12 months does not get the short form; project steering from 6 months`],
+      [`“${q.tech_service}”`,"Yes · No · Not sure","The ICT review (DORA); rules out the short form for small purchases"],
+      [`“${q.personal_data}”`,"No access · which data, systems or money, with what access","Data protection review; access review; rules out the short form for small purchases"],
       [`“${q.data_details}”`,"Where the data is stored","Data transfer check"],
       [`“${q.system_access}” (external workers)`,"Yes · No · Not sure","Data protection review"],
       [`“${q.hosting}”`,"The provider · we install and run it · not sure","Cloud software (SaaS) or licensing; outsourcing question 2"],
@@ -5422,7 +5452,7 @@ function treeModel(){
       [`“${q.confirm_derived}”`,"Yes · a correction","Confirms or changes everything the rules worked out; the tree runs again"]]));
 
   B.push(h(2,"7. Worked examples"),
-    p("The welcome examples, and one low-value purchase, run through the same rules after their first message. Later answers can add or remove flags."),
+    p("The welcome examples, and one small purchase, run through the same rules after their first message. Later answers can add or remove flags."),
     table(["Request","Route","Why, as the route card says","Flags and controls so far"], examples));
   return B;
 }

@@ -45,7 +45,7 @@ test("consulting is a project: sponsor, outcomes and steering, never selling poi
   // the case from a real run; a monthly status report does not make a project an ongoing service
   const asked = await run(page, "Consultancy support to fill a procurement knowledge gap, about 200k for 6-12 months, no technology involved.",
     [[/exactly must the provider do/i, "A current-state assessment and a target operating model, with a monthly status report"]]);
-  expect(await page.evaluate(() => [S.det.route, S.f.category, kindOf(S.f), yes(S.f.tech_service)])).toEqual(["sourcing", "consulting", "project", false]);
+  expect(await page.evaluate(() => [S.det.route, S.f.category, kindOf(S.f), yes(S.f.tech_service)])).toEqual(["procurement", "consulting", "project", false]);
   const keys = asked.map((a) => a.key), all = asked.map((a) => a.text).join("\n");
   expect(textOf(asked, "audience_fn")).toMatch(/Who sponsors this/);
   expect(textOf(asked, "audience_fn")).toContain("Sponsor and stakeholders:");
@@ -82,7 +82,7 @@ test("the AI gets the project wording, the project lines and the kind of work", 
 test("legal advice asks who in Legal instructs the firm, with matter updates and the Legal flag", async ({ page }) => {
   await openApp(page);
   const asked = await run(page, "External counsel for a regulatory investigation, around 300k.");
-  expect(await page.evaluate(() => [S.det.route, S.f.category, kindOf(S.f)])).toEqual(["sourcing", "legal", "project"]);
+  expect(await page.evaluate(() => [S.det.route, S.f.category, kindOf(S.f)])).toEqual(["procurement", "legal", "project"]);
   expect(textOf(asked, "audience_fn")).toMatch(/who in Legal will instruct the firm/);
   expect(textOf(asked, "governance")).toContain("Matter update with our instructing lawyer");
   expect(asked.map((a) => a.text).join("\n")).not.toMatch(/selling point|Which service levels/i);
@@ -104,7 +104,7 @@ test("a client event asks about guests and public officials, skips staff qualifi
 test("a client dinner under the threshold gets the project profile: guests, outcomes and success measures", async ({ page }) => {
   await openApp(page);
   const asked = await run(page, "An agency for a client dinner for 40 people, around 30k.");
-  expect(await page.evaluate(() => S.det.route)).toBe("quote");
+  expect(await page.evaluate(() => S.det.route)).toBe("business");
   const profile = textOf(asked, "profile");
   for (const line of ["Guests:", "Hosting teams:", "Expected outcomes:", "Success measures:"]) expect(profile).toContain(line);
   expect(profile).not.toMatch(/Target audience|selling point/i);
@@ -151,7 +151,7 @@ test("bank categories: app builds, security testing, audit and tax, recruitment,
     await page.click("#newBtn");
     await start(page, first);
     got.push(await page.evaluate(() => [S.f.category, kindOf(S.f)]));
-    const extra = await page.evaluate(() => ({ req: requiredFor("sourcing", S.f), qual: offlineSuggest("qualifications"), out: outsourcing(S.f).ex || "", ctl: S.det.controls.map((c) => c[1]) }));
+    const extra = await page.evaluate(() => ({ req: requiredFor("procurement", S.f), qual: offlineSuggest("qualifications"), out: outsourcing(S.f).ex || "", ctl: S.det.controls.map((c) => c[1]) }));
     if (/onboarding app/.test(first)) { expect(extra.req).not.toContain("volume"); expect(extra.qual).not.toMatch(/ACAMS|due diligence/); }
     if (/penetration/.test(first)) expect(extra.req).not.toContain("service_model");
     if (/Statutory audit/.test(first)) expect(extra.out).toMatch(/28\(a\)/);
