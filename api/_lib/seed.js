@@ -43,4 +43,4 @@ function validateConfig(cfg) {
   return errors;
 }
 
-module.exports = { PARTS, SEED, bodyOf, checksumOf, configFrom, buildConfig, validateConfig };
+module.exports = { PARTS, SEED, bodyOf, canon, checksumOf, configFrom, buildConfig, validateConfig };

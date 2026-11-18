@@ -5,6 +5,8 @@
 !/.gitignore
 !/index.html
 !/engine.js
+!/admin.html
+!/admin.js
 !/db/
 !/api/
 !/vercel.json

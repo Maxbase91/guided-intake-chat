@@ -1,7 +1,7 @@
 // Shared helpers for the end-to-end tests.
 const { expect } = require("@playwright/test");
 
-const PORTS = { offline: 4310, ai: 4311, gated: 4312 };
+const PORTS = { offline: 4310, ai: 4311, gated: 4312, admin: 4313 };
 const urlFor = (kind) => `http://localhost:${PORTS[kind]}/`;
 // a fixed "today" so date checks ("that date is in the past") are deterministic
 const TODAY = new Date("2026-10-12T09:00:00Z");

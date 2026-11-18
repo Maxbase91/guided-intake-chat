@@ -58,29 +58,23 @@
       {"key": "division", "label": "The division leads", "lead": "division", "status": "decided", "form": false}
     ],
     "rows": [
-      {"when": [{"fact": "cat_renewals_calendar", "op": "is", "value": true}, {"fact": "request_type", "op": "is", "value": "renewal"}], "then": "renewal",
-       "text": "This is a market data renewal. It goes through the renewals calendar, so procurement leads it and no sourcing request form is needed."},
-      {"when": [{"fact": "value_known", "op": "is", "value": false}], "then": "pending_value",
-       "text": "{intro} The value is not known yet, so I assume procurement-led demand until it is."},
-      {"when": [{"fact": "annual_value", "op": "gte", "value": {"param": "leadMin"}}], "then": "lead_threshold",
-       "text": "{intro} At {amount} it is at or above the {lead_threshold} threshold, so procurement leads the sourcing with an RFP."},
-      {"when": [{"fact": "annual_value", "op": "gte", "value": {"param": "formMin"}}, {"fact": "cat_cm_mandatory", "op": "is", "value": true}], "then": "cm_mandatory",
-       "text": "{intro} At {amount} it is at or above {form_threshold} in a category the Category Manager must handle, so procurement leads the sourcing with an RFP."},
-      {"when": [{"fact": "annual_value", "op": "gte", "value": {"param": "formMin"}}], "then": "cm_decides",
-       "text": "{intro} At {amount} it is between {form_threshold} and {lead_threshold}, so the Category Manager decides whether procurement leads. Until then I treat it as procurement-led demand."},
-      {"when": [], "then": "division",
-       "text": "{intro} At {amount} it is under the {form_threshold} threshold, so your division leads the sourcing: you collect at least three quotes, with procurement's guidance. No sourcing request form is needed."}
+      {"when": [{"fact": "cat_renewals_calendar", "op": "is", "value": true}, {"fact": "request_type", "op": "is", "value": "renewal"}], "then": "renewal", "text": "This is a market data renewal. It goes through the renewals calendar, so procurement leads it and no sourcing request form is needed."},
+      {"when": [{"fact": "value_known", "op": "is", "value": false}], "then": "pending_value", "text": "{intro} The value is not known yet, so I assume procurement-led demand until it is."},
+      {"when": [{"fact": "annual_value", "op": "gte", "value": {"param": "leadMin"}}], "then": "lead_threshold", "text": "{intro} At {amount} it is at or above the {lead_threshold} threshold, so procurement leads the sourcing with an RFP."},
+      {"when": [{"fact": "annual_value", "op": "gte", "value": {"param": "formMin"}}, {"fact": "cat_cm_mandatory", "op": "is", "value": true}], "then": "cm_mandatory", "text": "{intro} At {amount} it is at or above {form_threshold} in a category the Category Manager must handle, so procurement leads the sourcing with an RFP."},
+      {"when": [{"fact": "annual_value", "op": "gte", "value": {"param": "formMin"}}], "then": "cm_decides", "text": "{intro} At {amount} it is between {form_threshold} and {lead_threshold}, so the Category Manager decides whether procurement leads. Until then I treat it as procurement-led demand."},
+      {"when": [], "then": "division", "text": "{intro} At {amount} it is under the {form_threshold} threshold, so your division leads the sourcing: you collect at least three quotes, with procurement's guidance. No sourcing request form is needed."}
     ],
     "tests": [
-      {"name": "Market data renewal", "given": {"cat_renewals_calendar": true, "request_type": "renewal", "value_known": true, "annual_value": 60000, "cat_cm_mandatory": false}, "expect": "renewal"},
-      {"name": "Market data extension follows the thresholds", "given": {"cat_renewals_calendar": true, "request_type": "extension", "value_known": true, "annual_value": 60000, "cat_cm_mandatory": false}, "expect": "division"},
+      {"name": "Market data renewal", "given": {"cat_renewals_calendar": true, "request_type": "renewal", "value_known": true, "annual_value": {"param": "formMin", "plus": -1}, "cat_cm_mandatory": false}, "expect": "renewal"},
+      {"name": "Market data extension follows the thresholds", "given": {"cat_renewals_calendar": true, "request_type": "extension", "value_known": true, "annual_value": {"param": "formMin", "plus": -1}, "cat_cm_mandatory": false}, "expect": "division"},
       {"name": "Value not known yet", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": false, "cat_cm_mandatory": false}, "expect": "pending_value"},
-      {"name": "At the upper threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": 500000, "cat_cm_mandatory": false}, "expect": "lead_threshold"},
-      {"name": "Just under the upper threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": 499999, "cat_cm_mandatory": false}, "expect": "cm_decides"},
-      {"name": "Mandatory category between the thresholds", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": 250000, "cat_cm_mandatory": true}, "expect": "cm_mandatory"},
-      {"name": "At the lower threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": 100000, "cat_cm_mandatory": false}, "expect": "cm_decides"},
-      {"name": "Just under the lower threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": 99999, "cat_cm_mandatory": false}, "expect": "division"},
-      {"name": "Mandatory category under the lower threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": 60000, "cat_cm_mandatory": true}, "expect": "division"}
+      {"name": "At the upper threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": {"param": "leadMin"}, "cat_cm_mandatory": false}, "expect": "lead_threshold"},
+      {"name": "Just under the upper threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": {"param": "leadMin", "plus": -1}, "cat_cm_mandatory": false}, "expect": "cm_decides"},
+      {"name": "Mandatory category between the thresholds", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": {"param": "formMin", "plus": 1}, "cat_cm_mandatory": true}, "expect": "cm_mandatory"},
+      {"name": "At the lower threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": {"param": "formMin"}, "cat_cm_mandatory": false}, "expect": "cm_decides"},
+      {"name": "Just under the lower threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": {"param": "formMin", "plus": -1}, "cat_cm_mandatory": false}, "expect": "division"},
+      {"name": "Mandatory category under the lower threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": {"param": "formMin", "plus": -1}, "cat_cm_mandatory": true}, "expect": "division"}
     ]
   },
   {
@@ -108,10 +102,10 @@
       {"name": "Catalogue item", "given": {"r01": "covered_item", "r02": "not_covered"}, "expect": "catalogue"},
       {"name": "Catalogue wins over a contract", "given": {"r01": "covered_shop", "r02": "use_contract"}, "expect": "catalogue"},
       {"name": "Existing contract", "given": {"r01": "not_covered", "r02": "use_contract"}, "expect": "contract"},
-      {"name": "Small, simple purchase", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "division", "simple_eligible": true, "total_value": 800}, "expect": "simple"},
-      {"name": "Small but not simple", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "division", "simple_eligible": false, "total_value": 800}, "expect": "business"},
-      {"name": "Division leads", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "division", "simple_eligible": true, "total_value": 60000}, "expect": "business"},
-      {"name": "Category Manager decides", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "cm_decides", "simple_eligible": true, "total_value": 250000}, "expect": "procurement"},
+      {"name": "Small, simple purchase", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "division", "simple_eligible": true, "total_value": {"param": "simpleMax", "plus": -1}}, "expect": "simple"},
+      {"name": "Small but not simple", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "division", "simple_eligible": false, "total_value": {"param": "simpleMax", "plus": -1}}, "expect": "business"},
+      {"name": "Division leads", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "division", "simple_eligible": true, "total_value": {"param": "simpleMax", "plus": 1}}, "expect": "business"},
+      {"name": "Category Manager decides", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "cm_decides", "simple_eligible": true, "total_value": {"param": "formMin", "plus": 1}}, "expect": "procurement"},
       {"name": "Value not known", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "pending_value", "simple_eligible": true}, "expect": "procurement"}
     ]
   }

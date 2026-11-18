@@ -71,9 +71,14 @@
     return String(template || "").replace(/\{(\w+)\}/g, (m, k) => (values && isKnown(values[k]) ? String(values[k]) : m));
   }
 
+  // a test case can name a threshold instead of a number, so it follows the threshold when that changes:
+  // { param: "formMin" } is the threshold itself, { param: "formMin", plus: -1 } is just under it
+  function given(g, params) {
+    return Object.fromEntries(Object.entries(g || {}).map(([k, v]) => [k, v && typeof v === "object" && "param" in v ? Number(params ? params[v.param] : NaN) + (Number(v.plus) || 0) : v]));
+  }
   function runTests(rule, params) {
     return ((rule && rule.tests) || []).map((t) => {
-      const got = evaluate(rule, t.given || {}, params).outcome;
+      const got = evaluate(rule, given(t.given, params), params).outcome;
       return { name: t.name, expect: t.expect, got, ok: got === t.expect };
     });
   }
@@ -112,8 +117,12 @@
     if (rows.length && (rows[rows.length - 1].when || []).length) say('the last row must be the "otherwise" row, without conditions');
     rows.slice(0, -1).forEach((row, i) => { if (!(row.when || []).length) say(`row ${i + 1} has no conditions, so the rows below it can never apply`); });
     (rule.tests || []).forEach((t) => { if (!outcomes.has(t.expect)) say(`test "${t.name}": expects "${t.expect}", which is not an outcome`); });
+    (rule.tests || []).forEach((t) => Object.entries(t.given || {}).forEach(([k, v]) => {
+      if (registry && !registry[k]) say(`test "${t.name}": unknown fact "${k}"`);
+      if (v && typeof v === "object" && params && !(v.param in params)) say(`test "${t.name}": unknown threshold "${v.param}"`);
+    }));
     return errors;
   }
 
-  return { OPS, holds, evaluate, fill, runTests, validateRule };
+  return { OPS, holds, evaluate, fill, given, runTests, validateRule };
 });

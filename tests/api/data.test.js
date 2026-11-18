@@ -113,7 +113,8 @@ test("Postgres: migrate, seed once, read the published configuration, and keep t
     await assert.rejects(store.getPublished(), { code: "not_seeded" });
     assert.equal((await call(load("config.js"))).body.code, "not_seeded");
     assert.deepEqual(await seed(url), { seeded: true, version: 1 });
-    assert.deepEqual(await seed(url), { seeded: false, version: 1 });
+    assert.deepEqual(await seed(url), { seeded: false, version: 1, reason: "published" });
+    assert.deepEqual(await seed(url, { update: true }), { seeded: false, version: 1, reason: "same" });
 
     await store.close();
     store = load(path.join("_lib", "store.js")).getStore();

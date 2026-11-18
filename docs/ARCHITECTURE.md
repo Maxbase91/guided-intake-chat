@@ -250,6 +250,31 @@ configuration document; `api/_lib/http.js` holds the access code, rate limit and
 nothing when a version is already published. Both read `DATABASE_URL_UNPOOLED` (or `DATABASE_URL`) from the
 environment or a local `.env`. See [ADR 0001](adr/0001-rules-and-configuration-in-the-database.md).
 
+### `api/admin.js` and the admin page
+
+`admin.html` + `admin.js` are the admin page: thresholds, channel names, category flags and the decision tables. It
+loads `engine.js`, so the rule rows and their test cases are checked in the browser as they are edited.
+
+| Request | Purpose |
+|---|---|
+| `GET /api/admin` | The draft, its revision, the published version, the problems the draft has, the last 20 versions |
+| `GET /api/admin?view=audit` / `decisions` / `version&v=n` | The change log, the decision log with counts, one published version |
+| `POST {action:"save", doc, revision, actor}` | Saves the draft. `sanitize()` (`api/_lib/validate.js`) rebuilds the document from known items and fields only |
+| `POST {action:"publish", revision, note, actor}` | Publishes the draft as the next version, if it is valid and every rule passes its own test cases (422 with the problems otherwise) |
+| `POST {action:"discard"}` / `{action:"restore", version}` | Makes the draft a copy of the published version, or of an earlier one |
+
+- **Access:** `ADMIN_CODE` in the header `x-admin-code`. Without `ADMIN_CODE` the endpoint answers 503 to everything.
+  A wrong code is delayed and counted per IP in the database; five within 15 minutes lock that IP out.
+- **Draft and versions:** a save names the revision it started from, so two people cannot overwrite each other (409).
+  A published version is never changed; going back means loading it into the draft and publishing a new version.
+- **What can be edited:** threshold values, channel names and days, category names and the two flags, and for each
+  rule its name, source, mode, rows, reason texts and test cases. Which thresholds, channels, categories, facts and
+  rules exist, and the attributes of a rule's outcomes, come from the seed.
+- **Test cases follow thresholds:** a given value can be a threshold reference (`{param, plus}`), shown as "just under"
+  or "exactly", so lowering a threshold does not break the rule's own tests.
+- **The page itself** has no inline script, builds everything with DOM nodes and `textContent`, and is served with its
+  own Content-Security-Policy (`vercel.json`): scripts and connections from the same origin only, no framing, no index.
+
 **In the page:** `loadConfig()` runs at start-up after the access gate: the server's configuration, else the last copy
 in `localStorage`, else the built-in defaults (`CFG.source`: `database`, `cached`, `builtin`). `sendDecisions()` runs
 on submit.

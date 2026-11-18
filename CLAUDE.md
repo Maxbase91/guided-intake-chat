@@ -11,12 +11,13 @@ Dummy data only.
   `node scripts/build_defaults.js` writes them into the `config-defaults` block of `index.html`; run it after every seed change.
 - `api/llm.js`: Vercel Node serverless function (CommonJS). LLM proxy: Gemini → Groq → Mistral → OpenRouter `:free`.
 - `vercel.json`: function timeout (60 s) and security headers.
+- `admin.html` + `admin.js`: the admin page (draft, test, publish). `api/admin.js`: its endpoint, behind `ADMIN_CODE`.
 - `api/config.js`, `api/decisions.js`: the published configuration and the decision log (`api/_lib/`: shared helpers,
   the store, the seed). `db/migrations/*.sql`: the schema.
 - One dependency is deployed: `pg` (Postgres driver).
 
 ## What is in Git
-`.gitignore` is an allow-list: the app (`index.html`, `engine.js`, `db/`, `api/`, `vercel.json`, `.vercelignore`,
+`.gitignore` is an allow-list: the app (`index.html`, `engine.js`, `admin.html`, `admin.js`, `db/`, `api/`, `vercel.json`, `.vercelignore`,
 `.env.example`), docs (`README.md`, `CLAUDE.md`, `docs/`,
 `LICENSE`, `NOTICE`) and what runs the tests from a fresh clone (`tests/`, `scripts/dev-server.js`,
 `scripts/mock-providers.js`, `scripts/import_taxonomy.py`, `scripts/build_defaults.js`, `scripts/db-migrate.js`, `scripts/db-seed.js`, `package.json`, `package-lock.json`, `playwright.config.js`,
@@ -33,7 +34,8 @@ access codes, keys or personal data.
 - `npm run start:mock`: same with mock providers (no keys, no network).
 - `npm run test:api`: `node:test` tests for the functions, the engine and the seed. With `TEST_DATABASE_URL` set the
   store tests also run against that Postgres (it is wiped: never point it at Neon).
-- `npm run test:e2e`: Playwright against three local servers (ports 4310–4312, mock providers).
+- `npm run test:e2e`: Playwright against four local servers (ports 4310–4313, mock providers; 4313 is the admin
+  server, whose published configuration the admin tests change).
   If the pinned browser is missing, set `CHROMIUM_PATH` to an installed Chromium/headless shell.
 - `npm test`: both. No lint, typecheck or build step exists.
 - `scripts/verify.sh` — runs the CI checks locally; runs automatically on `git push`. It starts a throwaway Postgres
@@ -64,6 +66,8 @@ Never run `vercel deploy` manually and never change Vercel settings from an agen
 
 ## Guardrails
 - Free provider tiers only; never configure a paid model or provider (owner rule).
+- Keep `ADMIN_CODE` set and private: it lets its holder change the rules for everyone. Never weaken `sanitize()` or
+  the publish check, and build admin content with DOM nodes and `textContent`, never `innerHTML`.
 - Keep `ACCESS_CODE` set in production: without it `/api/llm` is an open LLM relay on the owner's keys.
 - Model output is rendered only through `esc()` / `md()` (escape first). Never interpolate model or user text into
   `innerHTML` without them.
