@@ -62,7 +62,7 @@ async function editPublishFlow(url) {
       param(doc, "leadMin").label = "<script>alert(1)</script>";               // labels are not editable
       doc.params.push({ key: "backdoor", value: 1 });                          // unknown threshold
       doc.channels.push({ key: "lowvalue", name: "Low-value purchase" });      // a fifth channel
-      doc.categories[0].keywords = ["x"]; doc.categories[0].cm_mandatory = "yes";   // unknown field; not a boolean
+      doc.categories[0].secret = "x"; doc.categories[0].cm_mandatory = "yes";   // unknown field; not a boolean
       doc.rules.find((r) => r.id === "R11").outcomes[0].lead = "nobody";      // outcome attributes come from the seed
       doc.rules.push({ id: "R99", rows: [] });                                 // unknown rule
       doc.extra = { anything: true };
@@ -72,7 +72,7 @@ async function editPublishFlow(url) {
       assert.equal(param(savedDraft.draft, "formMin").value, 20000);
       assert.equal(param(savedDraft.draft, "leadMin").label, param(start.draft, "leadMin").label);
       assert.deepEqual([savedDraft.draft.params.length, savedDraft.draft.channels.length, savedDraft.draft.rules.length, "extra" in savedDraft.draft], [start.draft.params.length, 4, start.draft.rules.length, false]);
-      assert.deepEqual([savedDraft.draft.categories[0].keywords, savedDraft.draft.categories[0].cm_mandatory], [undefined, false]);
+      assert.deepEqual([savedDraft.draft.categories[0].secret, savedDraft.draft.categories[0].cm_mandatory], [undefined, false]);
       assert.equal(savedDraft.draft.rules.find((r) => r.id === "R11").outcomes[0].lead, "procurement");
       // the page still gets the published version
       assert.equal(param((await call(config)).body, "formMin").value, 100000);
@@ -206,4 +206,49 @@ test("a stored version from before a rule, question or fact existed gets it from
   const cfg = configFrom(old, 2, "database");
   assert.deepEqual(validateConfig(cfg), []);
   assert.deepEqual([cfg.rules.map((r) => r.id).slice(-2), cfg.questions.some((q) => q.key === "division"), cfg.divisions.length], [["R07", "R08"], true, 5]);
+});
+
+test("reference data: only known fields with their types are kept, and the lists must hang together", () => {
+  const { sanitize } = require(path.join(ROOT, "api", "_lib", "validate.js"));
+  const { SEED, validateConfig, configFrom } = require(path.join(ROOT, "api", "_lib", "seed.js"));
+  const doc = structuredClone(SEED);
+  doc.contracts.push({ id: "CTR-9001", supplier: "Gala Events", title: "Events framework", l4: "L4-2301;L4-9999", expires: "2029-12-31", remaining: "500000", secret: "x" });
+  doc.catalogue.push({ id: "CAT-9001", kind: "item", name: "Pens", supplier: "Paperhaus Supplies", l4: "L4-2602", price: "", unit: "box", kw: ["PENS*", "<b>"] });
+  doc.l4.push({ ...doc.l4[0] });                                    // the same code twice
+  doc.l4.push({ code: "L4-9001", name: "Fortune telling", theme: "astrology", kw: [] });
+  const out = sanitize(doc), last = (k) => out[k][out[k].length - 1];
+  assert.deepEqual(last("contracts"), { id: "CTR-9001", supplier: "Gala Events", title: "Events framework", l4: ["L4-2301", "L4-9999"], expires: "2029-12-31", remaining: 500000 });
+  assert.deepEqual([last("catalogue").price, last("catalogue").kw], [null, ["pens*"]]);
+  const problems = validateConfig(configFrom(out, 0, "draft"));
+  for (const p of ["Level 4 L4-1101: listed twice", 'Level 4 L4-9001: category "astrology" is not one of the buying categories', "Contract CTR-9001: covers L4-9999, which is not in the Level 4 list", "Catalogue CAT-9001: an item needs a price"])
+    assert.ok(problems.includes(p), `missing: ${p}\n${problems.join("\n")}`);
+});
+
+test("the configuration leaves out the reference data when the page already has the same", async () => {
+  const { config } = loadAll();
+  const full = (await call(config)).body;
+  assert.ok(full.l4.length > 300 && /^[0-9a-f]{12}$/.test(full.ref_checksum));
+  const same = (await call(config, { headers: { "x-ref-checksum": full.ref_checksum } })).body;
+  assert.deepEqual(["l4", "suppliers", "contracts", "catalogue"].map((k) => k in same), [false, false, false, false]);
+  assert.deepEqual([same.checksum, same.ref_checksum, same.rules.length], [full.checksum, full.ref_checksum, full.rules.length]);
+  assert.ok("l4" in (await call(config, { headers: { "x-ref-checksum": "000000000000" } })).body);
+});
+
+test("an upload is one line in the change log; published reference data is served to the page", async () => {
+  process.env.ADMIN_CODE = "admin-secret";
+  const { admin, config } = loadAll();
+  const before = (await call(config)).body.ref_checksum;
+  const start = (await call(admin, { headers: H })).body, doc = structuredClone(start.draft);
+  doc.l4.slice(0, 30).forEach((e) => { e.desc = e.desc + " (updated)"; });
+  doc.contracts.push({ id: "CTR-9001", supplier: "Gala Events", title: "Events framework", l4: ["L4-2301"], expires: "2029-12-31", remaining: 500000 });
+  const saved = (await call(admin, { method: "POST", headers: H, body: { action: "save", doc, revision: start.revision, actor: "Uploader" } })).body;
+  assert.deepEqual(saved.problems, []);
+  const audit = (await call(admin, { headers: H, query: { view: "audit" } })).body.audit;
+  const l4 = audit.filter((a) => a.part === "l4"), ctr = audit.filter((a) => a.part === "contracts");
+  assert.deepEqual([l4.length, l4[0].item, l4[0].after], [1, "30 entries", { added: 0, changed: 30, removed: 0 }]);
+  assert.deepEqual([ctr.length, ctr[0].item], [1, "CTR-9001"]);
+  await call(admin, { method: "POST", headers: H, body: { action: "publish", revision: saved.revision, note: "Events framework" } });
+  const live = (await call(config)).body;
+  assert.ok(live.contracts.some((c) => c.id === "CTR-9001"));
+  assert.notEqual(live.ref_checksum, before);
 });

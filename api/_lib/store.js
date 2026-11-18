@@ -12,7 +12,8 @@ const DECISION_CAP = 2000, LOCK_WINDOW_MIN = 15;
 const conflict = () => Object.assign(new Error("The draft was changed by someone else. Reload and try again."), { code: "conflict" });
 // key order must not count: a document read back from a jsonb column has its keys in another order
 const same = (a, b) => JSON.stringify(canon(a ?? null)) === JSON.stringify(canon(b ?? null));
-const keyOf = (part, item) => (part === "categories" || part === "rules" ? item.id : item.key);
+const KEY = { categories: "id", rules: "id", divisions: "id", l4: "code", suppliers: "name", contracts: "id", catalogue: "id" };
+const keyOf = (part, item) => item[KEY[part] || "key"];
 
 // what changed between two documents, one entry per item: [{ part, item, before, after }]
 function diff(before, after) {
@@ -21,7 +22,12 @@ function diff(before, after) {
     const a = new Map((before[part] || []).map((x) => [keyOf(part, x), x])), b = new Map((after[part] || []).map((x) => [keyOf(part, x), x]));
     for (const k of new Set([...a.keys(), ...b.keys()])) if (!same(a.get(k), b.get(k))) out.push({ part, item: String(k), before: a.get(k) ?? null, after: b.get(k) ?? null });
   }
-  return out;
+  // more than 25 changes in one part (an upload) are one line: how many entries were added, changed and removed
+  const many = new Set(Object.entries(out.reduce((n, c) => ({ ...n, [c.part]: (n[c.part] || 0) + 1 }), {})).filter(([, n]) => n > 25).map(([p]) => p));
+  return [...out.filter((c) => !many.has(c.part)), ...[...many].map((part) => {
+    const of = out.filter((c) => c.part === part), count = (f) => of.filter(f).length;
+    return { part, item: `${of.length} entries`, before: null, after: { added: count((c) => !c.before), changed: count((c) => c.before && c.after), removed: count((c) => !c.after) } };
+  })];
 }
 
 function memoryStore() {

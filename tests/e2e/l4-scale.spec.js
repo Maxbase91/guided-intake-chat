@@ -130,7 +130,7 @@ test("preferred suppliers follow the Level 4; long lists are shortened; framewor
   expect(got.key).toBe("contoso cloud");   // Contoso Office shares the first word
 });
 
-test("the import script writes the data block and refuses rows without a valid category", () => {
+test("the import script writes the seed files and refuses rows without a valid category", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "l4-import-"));
   const html = path.join(dir, "index.html");
   fs.copyFileSync(path.join(ROOT, "index.html"), html);
@@ -139,14 +139,15 @@ test("the import script writes the data block and refuses rows without a valid c
   fs.writeFileSync(path.join(src, "l4.csv"), 'code,name,l1,l2,l3,theme,desc,kw\nL4-9001,Test entry,Group,Sub,Leaf,software,"A test entry, with a comma.",alpha;beta\nL4-9002,Bad entry,Group,Sub,Leaf,nonsense,No theme here.,\n');
   fs.writeFileSync(path.join(src, "suppliers.csv"), "supplier,preferred_l4\nTest Supplier,L4-9001;L4-9999\n");
   let err = "";
-  try { execFileSync("python3", [path.join(ROOT, "scripts", "import_taxonomy.py"), src, "--html", html], { encoding: "utf8", stdio: "pipe" }); } catch (e) { err = e.stderr; }
+  const out_dir = path.join(dir, "seed");   // never the real db/seed
+  try { execFileSync("python3", [path.join(ROOT, "scripts", "import_taxonomy.py"), src, "--html", html, "--seed-dir", out_dir], { encoding: "utf8", stdio: "pipe" }); } catch (e) { err = e.stderr; }
   expect(err).toContain("L4-9002 has no valid theme");
   expect(err).toContain("unknown code L4-9999");
   fs.writeFileSync(path.join(src, "l4.csv"), 'code,name,l1,l2,l3,theme,desc,kw\nL4-9001,Test entry,Group,Sub,Leaf,software,"A test entry, with a comma.",alpha;beta\n');
   fs.writeFileSync(path.join(src, "suppliers.csv"), "supplier,preferred_l4\nTest Supplier,L4-9001\n");
-  const out = execFileSync("python3", [path.join(ROOT, "scripts", "import_taxonomy.py"), src, "--html", html, "--version", "unit"], { encoding: "utf8" });
+  const out = execFileSync("python3", [path.join(ROOT, "scripts", "import_taxonomy.py"), src, "--html", html, "--seed-dir", out_dir], { encoding: "utf8" });
   expect(out).toContain("1 Level 4 categories, 1 suppliers, 0 contracts");
-  const block = fs.readFileSync(html, "utf8").match(/<script id="taxonomy-data" type="application\/json">([\s\S]*?)<\/script>/)[1];
-  const data = JSON.parse(block);
-  expect(data).toMatchObject({ version: "unit", l4: [{ code: "L4-9001", theme: "software", kw: ["alpha", "beta"] }], suppliers: [{ name: "Test Supplier", preferred_l4: ["L4-9001"] }] });
+  const read = (f) => JSON.parse(fs.readFileSync(path.join(out_dir, `${f}.json`), "utf8"));
+  const data = { l4: read("l4"), suppliers: read("suppliers") };
+  expect(data).toMatchObject({ l4: [{ code: "L4-9001", theme: "software", kw: ["alpha", "beta"] }], suppliers: [{ name: "Test Supplier", preferred_l4: ["L4-9001"] }] });
 });

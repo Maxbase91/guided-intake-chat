@@ -45,6 +45,19 @@ function rule(seedRule, r) {
   };
 }
 
+// search words: lower case, letters, digits, spaces and a few signs; a trailing * matches longer words
+const words = (list, max = 60) => [...new Set((Array.isArray(list) ? list : []).slice(0, max).map((k) => text(k, 40).toLowerCase().replace(/[^a-z0-9äöüß .'&/-]*?(\*?)$/, "$1").replace(/[^a-z0-9äöüß .'&/*-]/g, "").replace(/\*(?!$)/g, "").trim()).filter((k) => k.replace("*", "").length >= 2))];
+const num = (v) => (typeof v === "number" && isFinite(v) ? v : typeof v === "string" && v.trim() !== "" && isFinite(Number(v)) ? Number(v) : null);
+const codes = (list) => (Array.isArray(list) ? list : typeof list === "string" ? list.split(/[;,]/) : []).map((x) => text(String(x), 20)).filter(Boolean).slice(0, 2000);
+// reference data: the known fields of each entry, with their types; checked against each other by validateReference
+const REF = {
+  l4: { max: 5000, clean: (e) => ({ code: text(e.code, 20), name: text(e.name, 120), l1: text(e.l1, 80), l2: text(e.l2, 80), l3: text(e.l3, 80), theme: text(e.theme, 40), desc: text(e.desc, 600), kw: words(e.kw, 40) }) },
+  suppliers: { max: 5000, clean: (e) => ({ name: text(e.name, 120), preferred_l4: codes(e.preferred_l4) }) },
+  contracts: { max: 2000, clean: (e) => ({ id: text(e.id, 40), supplier: text(e.supplier, 120), title: text(e.title, 160), l4: codes(e.l4), expires: text(e.expires, 10), remaining: num(e.remaining) }) },
+  catalogue: { max: 5000, clean: (e) => ({ id: text(e.id, 40), kind: text(e.kind, 10), name: text(e.name, 120), supplier: text(e.supplier, 120), l4: text(e.l4, 20), price: num(e.price), max_order: num(e.max_order), unit: text(e.unit, 30), kw: words(e.kw, 20) }) },
+};
+const reference = (doc) => Object.fromEntries(Object.entries(REF).map(([k, r]) => [k, (Array.isArray(doc[k]) ? doc[k] : SEED[k]).slice(0, r.max).filter((e) => e && typeof e === "object").map(r.clean)]));
+
 // -> a clean document, or null when the request is not a configuration at all
 function sanitize(doc) {
   if (!doc || typeof doc !== "object" || !["params", "channels", "categories", "rules"].every((k) => Array.isArray(doc[k]))) return null;
@@ -61,7 +74,7 @@ function sanitize(doc) {
       if ("short_days" in c) Object.assign(out, { short_days: text(x.short_days, 20, c.short_days) || c.short_days, short_lead_days: int(x.short_lead_days, 0, 365, c.short_lead_days) });
       return out;
     }),
-    categories: SEED.categories.map((c) => { const x = categories.get(c.id) || {}; return { id: c.id, name: text(x.name, 80, c.name) || c.name, cm_mandatory: x.cm_mandatory === true, renewals_calendar: x.renewals_calendar === true }; }),
+    categories: SEED.categories.map((c) => { const x = categories.get(c.id) || {}; return { id: c.id, name: text(x.name, 80, c.name) || c.name, cm_mandatory: x.cm_mandatory === true, renewals_calendar: x.renewals_calendar === true, keywords: Array.isArray(x.keywords) ? words(x.keywords) : [...c.keywords] }; }),
     facts: structuredClone(SEED.facts),
     rules: SEED.rules.map((r) => rule(r, rules.get(r.id))),
     // a question's texts can be changed only where the code asks it the same way every time (the seed has them)
@@ -82,6 +95,7 @@ function sanitize(doc) {
       if ("_" in g.texts && !texts._) texts._ = g.texts._;
       return { ...g, texts: Object.fromEntries(Object.keys(texts).sort((a, b) => (a === "_" ? -1 : b === "_" ? 1 : a.localeCompare(b))).map((k) => [k, texts[k]])) };
     }),
+    ...reference(doc),
     divisions: SEED.divisions.map((d) => { const x = divisions.get(d.id) || {}; return { id: d.id, name: text(x.name, 80) || d.name, vendor_office: text(x.vendor_office, 100) || d.vendor_office }; }),
     // review lists: entries with a name and search words ("word", or "stem*" for longer words too)
     lists: SEED.lists.map((l) => {

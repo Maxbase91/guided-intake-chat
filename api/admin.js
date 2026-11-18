@@ -13,7 +13,7 @@ const { validateConfig, configFrom } = require("./_lib/seed");
 const { sanitize, text } = require("./_lib/validate");
 const Engine = require("../engine.js");
 
-const MAX_BYTES = 300 * 1024, MAX_FAILURES = 5;
+const MAX_BYTES = 3 * 1024 * 1024, MAX_FAILURES = 5;   // a draft with the reference data is a few hundred KB
 const actorOf = (b) => text(b && b.actor, 60) || "admin";
 
 async function state(store) {

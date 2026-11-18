@@ -107,12 +107,13 @@ test("the import reads the catalogue and refuses a shop without a maximum order 
   fs.writeFileSync(path.join(src, "l4.csv"), "code,name,l1,l2,l3,theme,desc,kw\nL4-9001,Test flowers,Group,Sub,Leaf,facilities,Flowers for tests.,flowers\n");
   fs.writeFileSync(path.join(src, "catalogue.csv"), "id,kind,name,supplier,l4,price,max_order,unit,kw\nSHOP-1,shop,Florist shop,Test Florist,L4-9001,,,,flowers\nCAT-1,item,Vase,Test Florist,L4-9999,20,,each,vase\n");
   let err = "";
-  try { execFileSync("python3", [path.join(ROOT, "scripts", "import_taxonomy.py"), src, "--html", html], { encoding: "utf8", stdio: "pipe" }); } catch (e) { err = e.stderr; }
+  const out_dir = path.join(dir, "seed");   // never the real db/seed
+  try { execFileSync("python3", [path.join(ROOT, "scripts", "import_taxonomy.py"), src, "--html", html, "--seed-dir", out_dir], { encoding: "utf8", stdio: "pipe" }); } catch (e) { err = e.stderr; }
   expect(err).toContain("shop SHOP-1 needs a max_order");
   expect(err).toContain("CAT-1 is linked to unknown Level 4 'L4-9999'");
   fs.writeFileSync(path.join(src, "catalogue.csv"), "id,kind,name,supplier,l4,price,max_order,unit,kw\nSHOP-1,shop,Florist shop,Test Florist,L4-9001,,1000,,flowers;bouquet\n");
-  const out = execFileSync("python3", [path.join(ROOT, "scripts", "import_taxonomy.py"), src, "--html", html, "--version", "unit"], { encoding: "utf8" });
+  const out = execFileSync("python3", [path.join(ROOT, "scripts", "import_taxonomy.py"), src, "--html", html, "--seed-dir", out_dir], { encoding: "utf8" });
   expect(out).toContain("1 catalogue entries (1 shops)");
-  const data = JSON.parse(fs.readFileSync(html, "utf8").match(/<script id="taxonomy-data" type="application\/json">([\s\S]*?)<\/script>/)[1]);
+  const data = { catalogue: JSON.parse(fs.readFileSync(path.join(out_dir, "catalogue.json"), "utf8")) };
   expect(data.catalogue).toEqual([{ id: "SHOP-1", kind: "shop", name: "Florist shop", supplier: "Test Florist", l4: "L4-9001", price: null, max_order: 1000, unit: "", kw: ["flowers", "bouquet"] }]);
 });

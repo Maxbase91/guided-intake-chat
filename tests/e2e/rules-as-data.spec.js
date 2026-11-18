@@ -15,8 +15,8 @@ async function published(request, change) {
 
 test("without a database the server serves the seed, and the page runs on its built-in defaults", async ({ page }) => {
   const errors = await openApp(page);
-  const got = await page.evaluate(() => ({ cfg: { ...CFG }, defaults: DEFAULTS.checksum, rules: Object.keys(RULES) }));
-  expect(got.cfg).toEqual({ version: 0, source: "builtin", checksum: got.defaults });
+  const got = await page.evaluate(() => ({ cfg: { ...CFG }, defaults: DEFAULTS.checksum, ref: DEFAULTS.ref_checksum, rules: Object.keys(RULES) }));
+  expect(got.cfg).toEqual({ version: 0, source: "builtin", checksum: got.defaults, ref_checksum: got.ref });
   expect(got.rules).toEqual(["R01", "R02", "R11", "R19", "R07", "R08"]);
   expect(await routeOf(page)).toEqual(["business", "division"]);
   await page.click("#howBtn");

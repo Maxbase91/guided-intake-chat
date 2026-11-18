@@ -104,6 +104,12 @@ of the same configuration; `applyConfig()` writes them into `FACTS` and the guid
 suggestion names its source (`sugSource`): the AI, or the guidance for the category or operations domain. Text
 matching, questions worded from the request, the question conditions and the outsourcing tree stay code.
 
+**Reference data.** The Level 4 list, suppliers, contracts and catalogue are parts of the configuration too
+(`db/seed/l4.json` and so on, example data). `scripts/build_defaults.js` writes them into the `taxonomy-data` block,
+which the page reads at start. `/api/config` sends them only when they differ from what the page has (header
+`x-ref-checksum`); `applyReference()` then rebuilds the lists and the caches built from them. `scripts/import_taxonomy.py`
+writes the seed files from CSV exports.
+
 **Divisions and checks.** New demand asks for the division (`divisions`), then the ownership questions that division's
 vendor office needs (`orgFacts`, from `applies` in `questions`: R required, C conditional, - not asked). Two check
 rules run for everything but a catalogue order: R07 (a service in the list `prohibited_services`) and R08 (a country
@@ -280,7 +286,10 @@ loads `engine.js`, so the rule rows and their test cases are checked in the brow
   rule its name, source, mode, rows, reason texts and test cases; the label of every question and the question,
   example and reason texts of the 40 questions the chat asks the same way for every request; and the category
   guidance (examples and suggested answers per category, with a text for any other category); division names and
-  vendor offices, which division is asked which ownership question, and the two review lists the checks read. Which thresholds, channels, categories, facts and
+  vendor offices, which division is asked which ownership question, and the two review lists the checks read;
+  category search words; and the reference data (Level 4 list, suppliers, framework contracts, catalogue) by CSV
+  download and upload. The server checks that the lists hang together (unique keys, known categories, links to
+  existing entries) before a draft can be published; an upload is one line in the change log. Which thresholds, channels, categories, facts and
   rules exist, and the attributes of a rule's outcomes, come from the seed.
 - **Test cases follow thresholds:** a given value can be a threshold reference (`{param, plus}`), shown as "just under"
   or "exactly", so lowering a threshold does not break the rule's own tests.

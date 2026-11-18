@@ -218,3 +218,59 @@ test("divisions, review lists and which division is asked what are edited on the
   expect(got.asked).toEqual(["division", "demand_owner", "sponsor", "spend_type"]);
   expect(errors).toEqual([]);
 });
+
+test("reference data: a contracts CSV is downloaded, edited, uploaded and published, and a request then uses the new contract", async ({ page }) => {
+  const errors = await signIn(page);
+  await page.click("[data-tab=reference]");
+  const card = page.locator("[data-ref=contracts]");
+  await expect(card).toContainText("40 entries");
+  const [dl] = await Promise.all([page.waitForEvent("download"), card.getByRole("button", { name: "Download CSV" }).click()]);
+  const csv = require("fs").readFileSync(await dl.path(), "utf8");
+  expect(csv.split("\n")[0]).toBe("id,supplier,title,l4,expires,remaining");
+  expect(csv.split("\n").filter(Boolean).length).toBe(41);
+
+  // a file with a wrong header is refused before anything changes
+  await page.setInputFiles("#ref-contracts-file", { name: "bad.csv", mimeType: "text/csv", buffer: Buffer.from("id,name\nX,Y\n") });
+  await expect(card).toContainText("bad.csv: The first row must name the columns");
+  await expect(status(page)).toContainText("No changes");
+
+  // a contract for events, and one that points to a Level 4 that does not exist
+  const edited = csv + 'CTR-9001,Gala Events,"Events and hospitality framework, Europe",L4-2301,2029-12-31,500000\nCTR-9002,Nobody,Broken,L4-9999,2029-12-31,1\n';
+  await page.setInputFiles("#ref-contracts-file", { name: "contracts.csv", mimeType: "text/csv", buffer: Buffer.from(edited) });
+  await expect(card).toContainText("42 entries");
+  await expect(card).toContainText("contracts.csv: 42 entries loaded into the draft");
+  await page.click("#saveBtn");
+  await expect(page.locator("#problems")).toContainText("Contract CTR-9002: covers L4-9999, which is not in the Level 4 list");
+  await expect(page.locator("#publishBtn")).toBeDisabled();
+
+  // fixed in the file, uploaded again, published
+  await page.setInputFiles("#ref-contracts-file", { name: "contracts.csv", mimeType: "text/csv", buffer: Buffer.from(edited.replace(/CTR-9002.*\n/, "")) });
+  await page.click("#saveBtn");
+  await expect(status(page)).toContainText("All rules pass their tests");
+  accept(page, "Events framework added");
+  await page.click("#publishBtn");
+  await expect(status(page)).toContainText("Published: version 6");
+  await page.click("[data-tab=versions]");
+  await expect(page.locator(".card").nth(1)).toContainText("contracts: CTR-9001");
+
+  await openApp(page, { kind: "admin" });
+  const got = await page.evaluate(() => withExampleState("An agency for a client dinner for 40 people, around 30k.", () => { S.f.l4 = "L4-2301"; refresh(); return [S.det.route, S.det.contract && S.det.contract.id, TAXONOMY.version, CONTRACTS.length]; }));
+  expect(got).toEqual(["contract", "CTR-9001", "configuration version 6", 41]);
+  expect(errors).toEqual([]);
+});
+
+test("category search words are edited on the admin page and change which category a request lands in", async ({ page }) => {
+  const errors = await signIn(page);
+  await page.click("[data-tab=categories]");
+  const kw = page.locator("#cat-marketing-kw");
+  await kw.fill((await kw.inputValue()) + ", gala dinner*");
+  await page.click("#saveBtn");
+  accept(page, "Search word for gala dinners");
+  await page.click("#publishBtn");
+  await expect(status(page)).toContainText("Published: version 7");
+  await openApp(page, { kind: "admin" });
+  expect(await page.evaluate(() => CATEGORIES.find((c) => c.id === "marketing").kw.includes("gala dinner*"))).toBe(true);
+  // the reference data stays as published in version 6: the page received it only because it differs from its own
+  expect(await page.evaluate(() => [CFG.version, CONTRACTS.some((c) => c.id === "CTR-9001")])).toEqual([7, true]);
+  expect(errors).toEqual([]);
+});

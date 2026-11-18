@@ -1,7 +1,11 @@
-"""Import the Level 4 taxonomy, preferred suppliers, framework contracts and the catalogue into index.html.
+"""Import the Level 4 taxonomy, preferred suppliers, framework contracts and the catalogue into db/seed/.
+
+The seed files are the starting reference data; `node scripts/build_defaults.js` then writes them into index.html, and
+`npm run db:seed -- --update` publishes them to a database nothing was published to from the admin page. Once the
+admin page is in use, upload the CSV files there instead (Reference data).
 
 Usage:
-    python3 scripts/import_taxonomy.py data/taxonomy-test            # validate and write into index.html
+    python3 scripts/import_taxonomy.py data/taxonomy-test            # validate and write db/seed/l4.json etc.
     python3 scripts/import_taxonomy.py data/taxonomy-test --check    # validate only
 
 The folder holds CSV files (UTF-8, header row). Several files of each kind are merged:
@@ -274,7 +278,8 @@ def main() -> int:
         default=None,
         help="label stored with the data (default: the folder name)",
     )
-    ap.add_argument("--html", type=Path, default=HTML)
+    ap.add_argument("--html", type=Path, default=HTML, help="the page the category ids are read from")
+    ap.add_argument("--seed-dir", type=Path, default=ROOT / "db" / "seed", help="where the four JSON files are written (tests use a temporary folder)")
     args = ap.parse_args()
 
     html = args.html.read_text(encoding="utf-8")
@@ -296,20 +301,13 @@ def main() -> int:
     print("by theme: " + ", ".join(f"{k} {v}" for k, v in sorted(by_theme.items())))
     if args.check:
         return 0
-    if not BLOCK_RE.search(html):
-        print(
-            'index.html has no <script id="taxonomy-data" type="application/json"> block',
-            file=sys.stderr,
-        )
-        return 1
-    data = to_json(args.version or args.folder.name, l4, suppliers, contracts, catalogue)
-    args.html.write_text(
-        BLOCK_RE.sub(
-            lambda m: m.group(1) + "\n" + data + "\n" + m.group(3), html, count=1
-        ),
-        encoding="utf-8",
-    )
-    print(f"written to {args.html}")
+    seed = args.seed_dir
+    seed.mkdir(parents=True, exist_ok=True)
+    for name, items in (("l4", l4), ("suppliers", suppliers), ("contracts", contracts), ("catalogue", catalogue)):
+        rows = ",\n".join(json.dumps(asdict(x), ensure_ascii=False) for x in items)
+        (seed / f"{name}.json").write_text(f"[\n{rows}\n]\n", encoding="utf-8")
+    print(f"written to {seed}/l4.json, suppliers.json, contracts.json, catalogue.json")
+    print("next: node scripts/build_defaults.js")
     return 0
 
 

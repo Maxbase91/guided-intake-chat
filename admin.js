@@ -6,8 +6,8 @@
 (function () {
   "use strict";
   const $app = document.getElementById("app");
-  const S = { code: sessionStorage.getItem("adm") || "", actor: localStorage.getItem("adm-name") || "", st: null, doc: null, tab: "thresholds", unsaved: false, extra: {}, busy: false, qFilter: "", gKey: "" };
-  const TABS = [["thresholds", "Thresholds"], ["channels", "Channels"], ["categories", "Categories"], ["rules", "Rules"], ["questions", "Questions"], ["guidance", "Guidance"], ["lists", "Divisions and lists"], ["versions", "Versions and changes"], ["decisions", "Decision log"]];
+  const S = { code: sessionStorage.getItem("adm") || "", actor: localStorage.getItem("adm-name") || "", st: null, doc: null, tab: "thresholds", unsaved: false, extra: {}, busy: false, qFilter: "", gKey: "", refFilter: {}, refNote: {} };
+  const TABS = [["thresholds", "Thresholds"], ["channels", "Channels"], ["categories", "Categories"], ["rules", "Rules"], ["questions", "Questions"], ["guidance", "Guidance"], ["lists", "Divisions and lists"], ["reference", "Reference data"], ["versions", "Versions and changes"], ["decisions", "Decision log"]];
 
   // ---------- small helpers
   function h(tag, attrs, ...kids) {
@@ -68,6 +68,8 @@
       out.push(...Engine.validateRule(rule, registry, params));
       Engine.runTests(rule, params).filter((t) => !t.ok).forEach((t) => out.push(`${rule.id}: test "${t.name}" expects ${t.expect}, got ${t.got}`));
     });
+    // the reference data is checked by the server when the draft is saved
+    if (!S.unsaved) (S.st.problems || []).filter((p) => /^(Level 4|Supplier|Contract|Catalogue)/.test(p)).forEach((p) => out.push(p));
     return out;
   }
   function edit(fn) { fn(); S.unsaved = !same(S.doc, S.st.draft); S.error = ""; render(); }
@@ -143,9 +145,11 @@
     const box = (c, f, label) => h("input", { type: "checkbox", id: `cat-${c.id}-${f}`, "aria-label": `${c.name}: ${label}`, checked: c[f], onchange: (e) => edit(() => { c[f] = e.target.checked; }) });
     return h("div", { class: "card" }, h("h2", {}, "Categories"), h("p", { class: "hint" }, "Two flags per category are read by the who-leads rule. Mandatory: between the two thresholds procurement leads instead of the Category Manager deciding. Renewals calendar: a renewal in this category goes to procurement without a sourcing request form."),
       h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Category"), h("th", {}, "Category Manager mandatory"), h("th", {}, "Renewals calendar"))),
-        h("tbody", {}, S.doc.categories.map((c) => h("tr", { class: changed("categories", c.id, "cm_mandatory") || changed("categories", c.id, "renewals_calendar") },
+        h("tbody", {}, S.doc.categories.map((c) => [h("tr", { class: changed("categories", c.id, "cm_mandatory") || changed("categories", c.id, "renewals_calendar") },
           h("td", {}, h("input", { type: "text", "aria-label": `Name of ${c.id}`, style: "width:300px", class: changed("categories", c.id, "name"), value: c.name, oninput: (e) => editQuiet(() => { c.name = e.target.value; }) }), " ", h("span", { class: "muted" }, c.id)),
-          h("td", {}, box(c, "cm_mandatory", "Category Manager mandatory")), h("td", {}, box(c, "renewals_calendar", "renewals calendar")))))));
+          h("td", {}, box(c, "cm_mandatory", "Category Manager mandatory")), h("td", {}, box(c, "renewals_calendar", "renewals calendar"))),
+          h("tr", {}, h("td", { colspan: "3", style: "padding-top:0" }, h("label", { class: "muted" }, "Search words that point to this category, separated by commas (a trailing * matches longer words) ",
+            h("input", { type: "text", id: `cat-${c.id}-kw`, "aria-label": `Search words for ${c.name}`, style: "width:100%", class: changed("categories", c.id, "keywords"), value: (c.keywords || []).join(", "), oninput: (e) => editQuiet(() => { c.keywords = e.target.value.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean); }) }))))]).flat())));
   }
 
   // ---------- rules: a decision table as sentences
@@ -278,6 +282,69 @@
         h("p", {}, h("button", { class: "btn s", type: "button", onclick: () => edit(() => { l.items.push({ name: "New entry", keywords: [] }); }) }, "+ entry")))));
   }
 
+  // ---------- reference data: download as CSV, edit in a spreadsheet, upload, check, publish
+  // columns as the import script reads them; lists inside a cell are separated by ";"
+  const REF = {
+    l4: { label: "Level 4 list", key: "code", cols: ["code", "name", "l1", "l2", "l3", "theme", "desc", "kw"], lists: ["kw"], nums: [], hint: "theme is the buying category id (see Categories); kw are search words." },
+    suppliers: { label: "Suppliers", key: "name", cols: ["supplier", "preferred_l4"], field: { supplier: "name" }, lists: ["preferred_l4"], nums: [], hint: "preferred_l4: the Level 4 codes the supplier is preferred for." },
+    contracts: { label: "Framework contracts", key: "id", cols: ["id", "supplier", "title", "l4", "expires", "remaining"], lists: ["l4"], nums: ["remaining"], hint: "l4: the Level 4 codes it covers; expires: YYYY-MM-DD; remaining: the value left, in euro." },
+    catalogue: { label: "Catalogue", key: "id", cols: ["id", "kind", "name", "supplier", "l4", "price", "max_order", "unit", "kw"], lists: ["kw"], nums: ["price", "max_order"], hint: "kind: item (a fixed price) or shop (a supplier's shop for a whole Level 4, with a maximum order value)." },
+  };
+  const fieldOf = (r, col) => (r.field && r.field[col]) || col;
+  function csvOut(part) {
+    const r = REF[part], cell = (v) => { const t = Array.isArray(v) ? v.join(";") : v === null || v === undefined ? "" : String(v); return /[",\n;]/.test(t) && !Array.isArray(v) || /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+    return [r.cols.join(","), ...S.doc[part].map((e) => r.cols.map((c) => cell(e[fieldOf(r, c)])).join(","))].join("\n") + "\n";
+  }
+  function csvRows(text) {   // RFC 4180: quoted cells may hold commas, quotes ("") and line breaks
+    const rows = []; let row = [], cell = "", q = false;
+    text = text.replace(/^﻿/, "");
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (q) { if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') q = false; else cell += ch; }
+      else if (ch === '"') q = true; else if (ch === ",") { row.push(cell); cell = ""; }
+      else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
+      else cell += ch;
+    }
+    if (cell || row.length) { row.push(cell); rows.push(row); }
+    return rows.filter((r) => r.some((c) => c.trim() !== ""));
+  }
+  function csvIn(part, text) {
+    const r = REF[part], rows = csvRows(text);
+    if (!rows.length) throw new Error("The file is empty.");
+    const head = rows[0].map((h) => h.trim().toLowerCase()), missing = r.cols.filter((c) => !head.includes(c));
+    if (missing.length) throw new Error(`The first row must name the columns ${r.cols.join(", ")}. Missing: ${missing.join(", ")}.`);
+    return rows.slice(1).map((cells) => Object.fromEntries(r.cols.map((c) => {
+      const v = (cells[head.indexOf(c)] || "").trim();
+      return [fieldOf(r, c), r.lists.includes(c) ? v.split(";").map((x) => x.trim()).filter(Boolean) : r.nums.includes(c) ? (v === "" ? null : Number(v.replace(/[€\s]/g, "").replace(/,(?=\d{3}\b)/g, ""))) : v];
+    })));
+  }
+  function download(name, text) {
+    const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
+    const a = h("a", { href: url, download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function reference() {
+    return h("div", {}, h("div", { class: "card" }, h("h2", {}, "Reference data"),
+      h("p", { class: "hint" }, "The lists the rules read: the Level 4 list, suppliers, framework contracts and the catalogue. Download a list as CSV, change it in a spreadsheet, and upload it: the upload replaces the whole list in the draft. Save the draft to have it checked (every Level 4 in a known category, every link to an existing entry), then publish. The lists shipped with the prototype are example data.")),
+      Object.entries(REF).map(([part, r]) => {
+        const list = S.doc[part], f = (S.refFilter[part] || "").toLowerCase(), base = S.st.draft[part] || [];
+        const shown = (f ? list.filter((e) => JSON.stringify(e).toLowerCase().includes(f)) : list).slice(0, 8);
+        const file = h("input", { type: "file", accept: ".csv,text/csv", id: `ref-${part}-file`, "aria-label": `Upload ${r.label} as CSV`, style: "display:none", onchange: (e) => {
+          const fl = e.target.files[0]; if (!fl) return;
+          fl.text().then((t) => { try { const rows = csvIn(part, t); edit(() => { S.doc[part] = rows; S.refNote[part] = `${fl.name}: ${rows.length} entries loaded into the draft. Save the draft to check them.`; }); } catch (x) { S.refNote[part] = `${fl.name}: ${x.message}`; render(); } });
+        } });
+        return h("div", { class: "card", "data-ref": part },
+          h("div", { style: "display:flex;gap:10px;align-items:baseline;flex-wrap:wrap" }, h("h2", {}, r.label), h("span", { class: "pill" }, `${list.length} entries`), !same(list, base) ? h("span", { class: "pill warn" }, "changed") : null, h("span", { style: "flex:1" }),
+            h("button", { class: "btn s", type: "button", id: `ref-${part}-download`, onclick: () => download(`${part}.csv`, csvOut(part)) }, "Download CSV"),
+            h("button", { class: "btn s", type: "button", id: `ref-${part}-upload`, disabled: S.busy, onclick: () => file.click() }, "Upload CSV"), file),
+          h("p", { class: "hint" }, `Columns: ${r.cols.join(", ")}. ${r.hint}`),
+          S.refNote[part] ? h("p", { class: "muted", role: "status" }, S.refNote[part]) : null,
+          h("p", {}, h("input", { type: "text", "aria-label": `Search ${r.label}`, placeholder: "Search", style: "width:min(320px,100%)", value: S.refFilter[part] || "", oninput: (e) => { S.refFilter[part] = e.target.value; render(); } }),
+            " ", h("span", { class: "muted" }, f ? `${list.filter((e) => JSON.stringify(e).toLowerCase().includes(f)).length} found, first 8 shown` : "first 8 shown")),
+          h("div", { style: "overflow-x:auto" }, h("table", {}, h("thead", {}, h("tr", {}, r.cols.map((c) => h("th", {}, c)))),
+            h("tbody", {}, shown.map((e) => h("tr", {}, r.cols.map((c) => { const v = e[fieldOf(r, c)]; const t = Array.isArray(v) ? v.join("; ") : v ?? ""; return h("td", { class: c === "desc" ? "muted" : "", style: ["code", "id", "theme", "l4", "kind", "expires"].includes(c) ? "white-space:nowrap" : null }, String(t).length > 90 ? String(t).slice(0, 90) + "…" : String(t)); })))))));
+      }));
+  }
+
   // ---------- guidance: texts per category that examples and suggestions are built from
   function guidance() {
     const g = S.doc.guidance.find((x) => x.key === S.gKey) || S.doc.guidance[0];
@@ -340,7 +407,7 @@
     $app.replaceChildren();
     if (!S.st) { $app.append(login()); return; }
     const prob = problems();
-    const body = { thresholds, channels, categories, rules, questions, guidance, lists, versions, decisions }[S.tab]();
+    const body = { thresholds, channels, categories, rules, questions, guidance, lists, reference, versions, decisions }[S.tab]();
     $app.append(
       h("header", { class: "top" }, h("h1", {}, "Rules and settings"), h("span", { class: "muted", style: "color:#d6deef" }, S.actor ? `Signed in as ${S.actor}` : ""), h("span", { class: "sp" }),
         h("a", { href: "./" }, "Open the intake"), h("button", { class: "btn s", type: "button", onclick: () => { if (S.unsaved && !confirm("Leave without saving?")) return; S.code = ""; sessionStorage.removeItem("adm"); S.st = null; S.extra = {}; render(); } }, "Sign out")),
