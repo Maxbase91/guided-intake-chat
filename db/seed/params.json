@@ -1,0 +1,10 @@
+[
+  {"key": "simpleMax", "value": 5000, "unit": "EUR", "label": "Small, simple purchase up to", "description": "Business-led demand with the short form: one quote or a corporate card, and a purchase request instead of a service description."},
+  {"key": "catalogueNoQtyMax", "value": 50000, "unit": "EUR", "label": "Catalogue order without a quantity up to", "description": "The most a catalogue order can be when no quantity is given."},
+  {"key": "formMin", "value": 100000, "unit": "EUR a year", "label": "Sourcing request form from", "description": "Below it the division leads with three quotes. From it the Category Manager decides, or procurement leads in mandatory categories."},
+  {"key": "leadMin", "value": 500000, "unit": "EUR a year", "label": "Procurement leads from", "description": "Procurement leads the sourcing with an RFP."},
+  {"key": "materialityMin", "value": 1000000, "unit": "EUR", "label": "Material spend review from", "description": "Adds the material spend review."},
+  {"key": "qualityMin", "value": 75, "unit": "points", "label": "Quality needed before submitting", "description": "Below it the chat offers an improvement round."},
+  {"key": "answerTip", "value": 5, "unit": "rating", "label": "Tips for thin answers", "description": "One tip when a new-demand answer rates this or lower (0 = off)."},
+  {"key": "l4Match", "value": 75, "unit": "%", "label": "Level 4 candidates shown from", "description": "After the first message every candidate at this match or more is offered."}
+]

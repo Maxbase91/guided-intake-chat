@@ -1,0 +1,22 @@
+[
+  {"id":"it-hardware","name":"IT hardware","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"software","name":"Software and SaaS","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"it-services","name":"IT services and development","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"cloud","name":"Cloud and hosting","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"consulting","name":"Management consulting","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"legal","name":"Legal services","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"marketing","name":"Marketing and events","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"facilities","name":"Facilities and real estate","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"contingent","name":"External workers","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"market-data","name":"Market data","cm_mandatory":false,"renewals_calendar":true},
+  {"id":"training","name":"Training and learning","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"office","name":"Office supplies and furniture","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"bpo","name":"Business process services","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"telecom","name":"Telecom","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"audit-tax","name":"Audit, tax and accounting advisory","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"hr-services","name":"Recruitment and HR services","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"fin-infra","name":"Financial market infrastructure","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"utilities","name":"Energy and utilities","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"travel","name":"Travel and company cars","cm_mandatory":false,"renewals_calendar":false},
+  {"id":"insurance","name":"Insurance","cm_mandatory":false,"renewals_calendar":false}
+]

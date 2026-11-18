@@ -4,6 +4,8 @@
 /*
 !/.gitignore
 !/index.html
+!/engine.js
+!/db/
 !/api/
 !/vercel.json
 !/README.md
@@ -18,6 +20,7 @@
 !/scripts/mock-providers.js
 !/scripts/import_taxonomy.py
 !/scripts/verify.sh
+!/scripts/build_defaults.js
 !/package.json
 !/package-lock.json
 !/playwright.config.js

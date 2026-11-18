@@ -1004,6 +1004,72 @@ body.doc-open{overflow:hidden}
 {"id": "CAT-2036", "kind": "item", "name": "Greeting cards (10)", "supplier": "Paperhaus Supplies", "l4": "L4-2602", "price": 18.0, "max_order": null, "unit": "pack", "kw": ["greeting card", "birthday card", "farewell card", "thank you card", "greeting cards"]}
 ]}
 </script>
+<script id="config-defaults" type="application/json">
+{
+"version":0,"source":"builtin","checksum":"14323fb256ea",
+"params":[
+{"key":"simpleMax","value":5000,"unit":"EUR","label":"Small, simple purchase up to","description":"Business-led demand with the short form: one quote or a corporate card, and a purchase request instead of a service description."},
+{"key":"catalogueNoQtyMax","value":50000,"unit":"EUR","label":"Catalogue order without a quantity up to","description":"The most a catalogue order can be when no quantity is given."},
+{"key":"formMin","value":100000,"unit":"EUR a year","label":"Sourcing request form from","description":"Below it the division leads with three quotes. From it the Category Manager decides, or procurement leads in mandatory categories."},
+{"key":"leadMin","value":500000,"unit":"EUR a year","label":"Procurement leads from","description":"Procurement leads the sourcing with an RFP."},
+{"key":"materialityMin","value":1000000,"unit":"EUR","label":"Material spend review from","description":"Adds the material spend review."},
+{"key":"qualityMin","value":75,"unit":"points","label":"Quality needed before submitting","description":"Below it the chat offers an improvement round."},
+{"key":"answerTip","value":5,"unit":"rating","label":"Tips for thin answers","description":"One tip when a new-demand answer rates this or lower (0 = off)."},
+{"key":"l4Match","value":75,"unit":"%","label":"Level 4 candidates shown from","description":"After the first message every candidate at this match or more is offered."}
+],
+"channels":[
+{"key":"catalogue","name":"Catalogue order","days":"1–3","lead_days":3,"doc":"Purchase request"},
+{"key":"contract","name":"Existing contract","days":"3–7","lead_days":7,"doc":"Scope of work"},
+{"key":"business","name":"Business-led demand","days":"7–15","lead_days":14,"doc":"Service description","short_days":"1–3","short_lead_days":3},
+{"key":"procurement","name":"Procurement-led demand","days":"30–60","lead_days":45,"doc":"Service description"}
+],
+"categories":[
+{"id":"it-hardware","name":"IT hardware","cm_mandatory":false,"renewals_calendar":false},
+{"id":"software","name":"Software and SaaS","cm_mandatory":false,"renewals_calendar":false},
+{"id":"it-services","name":"IT services and development","cm_mandatory":false,"renewals_calendar":false},
+{"id":"cloud","name":"Cloud and hosting","cm_mandatory":false,"renewals_calendar":false},
+{"id":"consulting","name":"Management consulting","cm_mandatory":false,"renewals_calendar":false},
+{"id":"legal","name":"Legal services","cm_mandatory":false,"renewals_calendar":false},
+{"id":"marketing","name":"Marketing and events","cm_mandatory":false,"renewals_calendar":false},
+{"id":"facilities","name":"Facilities and real estate","cm_mandatory":false,"renewals_calendar":false},
+{"id":"contingent","name":"External workers","cm_mandatory":false,"renewals_calendar":false},
+{"id":"market-data","name":"Market data","cm_mandatory":false,"renewals_calendar":true},
+{"id":"training","name":"Training and learning","cm_mandatory":false,"renewals_calendar":false},
+{"id":"office","name":"Office supplies and furniture","cm_mandatory":false,"renewals_calendar":false},
+{"id":"bpo","name":"Business process services","cm_mandatory":false,"renewals_calendar":false},
+{"id":"telecom","name":"Telecom","cm_mandatory":false,"renewals_calendar":false},
+{"id":"audit-tax","name":"Audit, tax and accounting advisory","cm_mandatory":false,"renewals_calendar":false},
+{"id":"hr-services","name":"Recruitment and HR services","cm_mandatory":false,"renewals_calendar":false},
+{"id":"fin-infra","name":"Financial market infrastructure","cm_mandatory":false,"renewals_calendar":false},
+{"id":"utilities","name":"Energy and utilities","cm_mandatory":false,"renewals_calendar":false},
+{"id":"travel","name":"Travel and company cars","cm_mandatory":false,"renewals_calendar":false},
+{"id":"insurance","name":"Insurance","cm_mandatory":false,"renewals_calendar":false}
+],
+"facts":[
+{"key":"request_type","label":"Request type","type":"enum","values":["new","renewal","extension"]},
+{"key":"category","label":"Buying category","type":"text"},
+{"key":"demand_type","label":"Type of demand","type":"enum","values":["goods","services","software","contingent_labour"]},
+{"key":"cat_cm_mandatory","label":"Category the Category Manager must handle","type":"bool"},
+{"key":"cat_renewals_calendar","label":"Category renewed through the renewals calendar","type":"bool"},
+{"key":"value_known","label":"Value is known","type":"bool"},
+{"key":"annual_value","label":"Annual value (EUR)","type":"number"},
+{"key":"total_value","label":"Total value (EUR)","type":"number"},
+{"key":"catalogue_match","label":"Catalogue match that fits the value","type":"enum","values":["none","item","shop"]},
+{"key":"contract_match","label":"Active framework contract covers it, and it is not declined","type":"bool"},
+{"key":"simple_eligible","label":"Simple purchase (not software or external workers, no technology, no data or system access, not ongoing over 12 months)","type":"bool"},
+{"key":"r01","label":"Result of R01 (catalogue)","type":"enum","values":["covered_item","covered_shop","not_covered"]},
+{"key":"r02","label":"Result of R02 (existing contract)","type":"enum","values":["use_contract","not_covered"]},
+{"key":"r11","label":"Result of R11 (who leads)","type":"enum","values":["renewal","pending_value","lead_threshold","cm_mandatory","cm_decides","division"]}
+],
+"rules":[
+{"id":"R01","name":"Covered by the catalogue","step":"Existing coverage","mode":"enforce","clause":"","decides":"Whether a catalogue item or a supplier's shop covers the need.","outcomes":[{"key":"covered_item","label":"A catalogue item covers it"},{"key":"covered_shop","label":"A supplier's shop covers it"},{"key":"not_covered","label":"Not covered"}],"rows":[{"when":[{"fact":"catalogue_match","op":"is","value":"item"}],"then":"covered_item"},{"when":[{"fact":"catalogue_match","op":"is","value":"shop"}],"then":"covered_shop"},{"when":[],"then":"not_covered"}],"tests":[{"name":"A catalogue item fits","given":{"catalogue_match":"item"},"expect":"covered_item"},{"name":"A supplier's shop fits","given":{"catalogue_match":"shop"},"expect":"covered_shop"},{"name":"Nothing in the catalogue","given":{"catalogue_match":"none"},"expect":"not_covered"}]},
+{"id":"R02","name":"Covered by an existing contract","step":"Existing coverage","mode":"enforce","clause":"","decides":"Whether an active framework contract is used.","outcomes":[{"key":"use_contract","label":"Use the existing contract"},{"key":"not_covered","label":"Not covered"}],"rows":[{"when":[{"fact":"contract_match","op":"is","value":true}],"then":"use_contract"},{"when":[],"then":"not_covered"}],"tests":[{"name":"A framework covers it","given":{"contract_match":true},"expect":"use_contract"},{"name":"No framework, or the requester looks wider","given":{"contract_match":false},"expect":"not_covered"}]},
+{"id":"R11","name":"Who leads the sourcing","step":"Sourcing route","mode":"enforce","clause":"","decides":"Who leads the sourcing of new demand: procurement, or the division through its divisional vendor office.","outcomes":[{"key":"renewal","label":"Procurement leads through the renewals calendar","lead":"procurement","status":"decided","form":false},{"key":"pending_value","label":"Procurement-led until the value is known","lead":"procurement","status":"pending_value","form":true},{"key":"lead_threshold","label":"Procurement leads","lead":"procurement","status":"decided","form":true},{"key":"cm_mandatory","label":"Procurement leads (mandatory category)","lead":"procurement","status":"decided","form":true},{"key":"cm_decides","label":"The Category Manager decides","lead":"category_manager","status":"pending_category_manager","form":true},{"key":"division","label":"The division leads","lead":"division","status":"decided","form":false}],"rows":[{"when":[{"fact":"cat_renewals_calendar","op":"is","value":true},{"fact":"request_type","op":"is","value":"renewal"}],"then":"renewal","text":"This is a market data renewal. It goes through the renewals calendar, so procurement leads it and no sourcing request form is needed."},{"when":[{"fact":"value_known","op":"is","value":false}],"then":"pending_value","text":"{intro} The value is not known yet, so I assume procurement-led demand until it is."},{"when":[{"fact":"annual_value","op":"gte","value":{"param":"leadMin"}}],"then":"lead_threshold","text":"{intro} At {amount} it is at or above the {lead_threshold} threshold, so procurement leads the sourcing with an RFP."},{"when":[{"fact":"annual_value","op":"gte","value":{"param":"formMin"}},{"fact":"cat_cm_mandatory","op":"is","value":true}],"then":"cm_mandatory","text":"{intro} At {amount} it is at or above {form_threshold} in a category the Category Manager must handle, so procurement leads the sourcing with an RFP."},{"when":[{"fact":"annual_value","op":"gte","value":{"param":"formMin"}}],"then":"cm_decides","text":"{intro} At {amount} it is between {form_threshold} and {lead_threshold}, so the Category Manager decides whether procurement leads. Until then I treat it as procurement-led demand."},{"when":[],"then":"division","text":"{intro} At {amount} it is under the {form_threshold} threshold, so your division leads the sourcing: you collect at least three quotes, with procurement's guidance. No sourcing request form is needed."}],"tests":[{"name":"Market data renewal","given":{"cat_renewals_calendar":true,"request_type":"renewal","value_known":true,"annual_value":60000,"cat_cm_mandatory":false},"expect":"renewal"},{"name":"Market data extension follows the thresholds","given":{"cat_renewals_calendar":true,"request_type":"extension","value_known":true,"annual_value":60000,"cat_cm_mandatory":false},"expect":"division"},{"name":"Value not known yet","given":{"cat_renewals_calendar":false,"request_type":"new","value_known":false,"cat_cm_mandatory":false},"expect":"pending_value"},{"name":"At the upper threshold","given":{"cat_renewals_calendar":false,"request_type":"new","value_known":true,"annual_value":500000,"cat_cm_mandatory":false},"expect":"lead_threshold"},{"name":"Just under the upper threshold","given":{"cat_renewals_calendar":false,"request_type":"new","value_known":true,"annual_value":499999,"cat_cm_mandatory":false},"expect":"cm_decides"},{"name":"Mandatory category between the thresholds","given":{"cat_renewals_calendar":false,"request_type":"new","value_known":true,"annual_value":250000,"cat_cm_mandatory":true},"expect":"cm_mandatory"},{"name":"At the lower threshold","given":{"cat_renewals_calendar":false,"request_type":"new","value_known":true,"annual_value":100000,"cat_cm_mandatory":false},"expect":"cm_decides"},{"name":"Just under the lower threshold","given":{"cat_renewals_calendar":false,"request_type":"new","value_known":true,"annual_value":99999,"cat_cm_mandatory":false},"expect":"division"},{"name":"Mandatory category under the lower threshold","given":{"cat_renewals_calendar":false,"request_type":"new","value_known":true,"annual_value":60000,"cat_cm_mandatory":true},"expect":"division"}]},
+{"id":"R19","name":"Buying channel","step":"Outputs","mode":"enforce","clause":"","decides":"Which buying channel is recommended. It combines the results of R01, R02 and R11 and takes no decision of its own.","outcomes":[{"key":"catalogue","label":"Catalogue order","channel":"catalogue"},{"key":"contract","label":"Existing contract","channel":"contract"},{"key":"simple","label":"Business-led demand, short form for a small purchase","channel":"business"},{"key":"business","label":"Business-led demand","channel":"business"},{"key":"procurement","label":"Procurement-led demand","channel":"procurement"}],"rows":[{"when":[{"fact":"r01","op":"in","value":["covered_item","covered_shop"]}],"then":"catalogue"},{"when":[{"fact":"r02","op":"is","value":"use_contract"}],"then":"contract"},{"when":[{"fact":"r11","op":"is","value":"division"},{"fact":"simple_eligible","op":"is","value":true},{"fact":"total_value","op":"lte","value":{"param":"simpleMax"}}],"then":"simple"},{"when":[{"fact":"r11","op":"is","value":"division"}],"then":"business"},{"when":[],"then":"procurement"}],"tests":[{"name":"Catalogue item","given":{"r01":"covered_item","r02":"not_covered"},"expect":"catalogue"},{"name":"Catalogue wins over a contract","given":{"r01":"covered_shop","r02":"use_contract"},"expect":"catalogue"},{"name":"Existing contract","given":{"r01":"not_covered","r02":"use_contract"},"expect":"contract"},{"name":"Small, simple purchase","given":{"r01":"not_covered","r02":"not_covered","r11":"division","simple_eligible":true,"total_value":800},"expect":"simple"},{"name":"Small but not simple","given":{"r01":"not_covered","r02":"not_covered","r11":"division","simple_eligible":false,"total_value":800},"expect":"business"},{"name":"Division leads","given":{"r01":"not_covered","r02":"not_covered","r11":"division","simple_eligible":true,"total_value":60000},"expect":"business"},{"name":"Category Manager decides","given":{"r01":"not_covered","r02":"not_covered","r11":"cm_decides","simple_eligible":true,"total_value":250000},"expect":"procurement"},{"name":"Value not known","given":{"r01":"not_covered","r02":"not_covered","r11":"pending_value","simple_eligible":true},"expect":"procurement"}]}
+]
+}
+</script>
+<script src="engine.js"></script>
 <script>
 /* =========================================================
    1. CONFIGURATION
@@ -1015,7 +1081,7 @@ const CONFIG = {
   accessCode: "",                         // only if ACCESS_CODE is set on Vercel
   forceProvider: new URLSearchParams(location.search).get("ai") || "",   // testing: ?ai=mistral uses only that provider
   currency: "EUR",
-  thresholds: { simpleMax: 5000, catalogueNoQtyMax: 50000, formMin: 100000, leadMin: 500000, materialityMin: 1000000, qualityMin: 75, answerTip: 5, l4Match: 75 }
+  thresholds: {}                          // filled by applyConfig from the configuration (built-in defaults, or the server's)
 };
 
 /* =========================================================
@@ -1105,17 +1171,13 @@ function supplierKey(name){
 /* =========================================================
    3. ROUTES — what each one is, and what must be known for it
    ========================================================= */
-const CHANNELS = {
-  catalogue:   {name:"Catalogue order",        days:"1–3",   doc:"Purchase request"},
-  contract:    {name:"Existing contract",      days:"3–7",   doc:"Scope of work"},
-  business:    {name:"Business-led demand",    days:"7–15",  doc:"Service description"},
-  procurement: {name:"Procurement-led demand", days:"30–60", doc:"Service description"}
-};
+// names, typical days and documents come from the configuration (applyConfig)
+const CHANNELS = { catalogue:{}, contract:{}, business:{}, procurement:{} };
 // A route is the question profile: catalogue, contract, simple, business, procurement. The buying channel is one of the
 // four above: a small, simple purchase ("simple") is business-led demand with the short form.
 const ROUTES = ["catalogue","contract","simple","business","procurement"];
 const channelOf = r => r==="simple" ? "business" : r;
-const chan = r => r==="simple" ? {...CHANNELS.business, days:"1–3", doc:"Purchase request"} : CHANNELS[r];
+const chan = r => r==="simple" ? {...CHANNELS.business, days:CHANNELS.business.short_days||CHANNELS.business.days, doc:"Purchase request"} : CHANNELS[r];
 
 // Facts the chat can collect. q = plain question, ex = example, why = optional reason, choices = shortcuts for closed questions.
 const DELIV_EX = {
@@ -1380,15 +1442,28 @@ const catalogueFits = (f, items) => {
   return q>0 ? v <= 2*q*items.reduce((s,i)=>s+(i.price||0),0) : v <= CONFIG.thresholds.catalogueNoQtyMax;
 };
 // a small, simple purchase is bought directly with the short form, unless it needs the checks of the standard path (described in the Decision tree)
-const simpleFits = (f, v) => v!=null && v<=CONFIG.thresholds.simpleMax && !["contingent_labour","software"].includes(f.demand_type)
+const simpleEligible = f => !["contingent_labour","software"].includes(f.demand_type)
   && !yes(f.tech_service) && !yes(f.personal_data) && !yes(f.system_access) && !(isOngoing(f) && known(f.duration) && monthsOf(f.duration)>12);
+const simpleFits = (f, v) => v!=null && v<=CONFIG.thresholds.simpleMax && simpleEligible(f);
 const daysTo = d => (new Date(d) - new Date())/864e5;
 // Who leads the sourcing (rule R11; described in How it works and the Decision tree). The thresholds apply to the annual value:
 // the total divided by the years of the term; without a term of more than a year the stated figure counts as annual.
 const annualValue = f => { if(!known(f.value)) return null; const v=Number(f.value), m=known(f.duration)&&!isTBD(f.duration)?monthsOf(f.duration):0; return m>12 ? Math.round(v/(m/12)) : v; };
 const cmMandatory = f => !!(catById(f.category)||{}).cm;
 const isExtension = () => { const t=userText(); return /\b(extend|extension|prolong)/.test(t) && !/\brenew/.test(t); };
+// the facts the rules read (the fact view); R01, R02 and R19 add their own in determine
+const requestType = f => f.wants_renewal ? (isExtension() ? "extension" : "renewal") : "new";
+function leadView(f){
+  const annual=annualValue(f);
+  return {request_type:requestType(f), category:f.category||null, demand_type:f.demand_type||null, cat_cm_mandatory:cmMandatory(f), cat_renewals_calendar:!!(catById(f.category)||{}).renewals,
+    value_known:annual!=null, annual_value:annual, total_value:known(f.value)?Number(f.value):null};
+}
 function whoLeads(f){
+  const view=leadView(f), d=Engine.evaluate(RULES.R11, view, CONFIG.thresholds), a=d.attrs;
+  return {lead:a.lead, row:d.outcome, status:a.status, annual:view.annual_value, form:!!a.form, text:d.text, decision:d};
+}
+// the same rule in code, kept only to prove the tables decide the same (tests/e2e/parity.spec.js); removed with the database phase
+function whoLeadsLegacy(f){
   const T=CONFIG.thresholds, annual=annualValue(f);
   if(f.category==="market-data" && f.wants_renewal && !isExtension()) return {lead:"procurement", row:"renewal", status:"decided", annual, form:false};
   if(annual==null) return {lead:"procurement", row:"pending_value", status:"pending_value", annual, form:true};
@@ -1414,6 +1489,40 @@ function determine(){
   const all = catalogueMatches(f), items = all.filter(i=>i.kind!=="shop"), shops = all.filter(i=>i.kind==="shop"), ctr = contractFor(f);
   // fixed-price items first; a shop when no item fits
   const cat = items.length && catalogueFits(f, items) ? items : shops.length && catalogueFits(f, shops) ? shops.slice(0,1) : [];
+  const P=T, view={...leadView(f), catalogue_match:cat.length?cat[0].kind:"none", contract_match:!!ctr, simple_eligible:simpleEligible(f)};
+  const r01=Engine.evaluate(RULES.R01,view,P); view.r01=r01.outcome;
+  const r02=Engine.evaluate(RULES.R02,view,P); view.r02=r02.outcome;
+  const lead0 = r01.outcome==="not_covered" && r02.outcome==="not_covered" ? whoLeads(f) : null; if(lead0) view.r11=lead0.row;
+  const r19=Engine.evaluate(RULES.R19,view,P);
+  // a rule can only send a request to the catalogue or to a contract when there is one
+  const route = (r19.outcome==="catalogue" && !cat.length) || (r19.outcome==="contract" && !ctr) || !ROUTES.includes(r19.outcome) ? "procurement" : r19.outcome;
+  const L = route==="catalogue" || route==="contract" ? null : lead0 || whoLeads(f);
+  let why;
+  const declined=(f.decline_contract||f.contract_ok===false) && CONTRACTS.some(c=>contractCovers(c,f) && new Date(c.expires)>new Date());   // "No, look wider"
+  const intro=`This is new demand${declined?" (you chose to look wider than the existing framework)":" with no contract in place"}.`;
+  if(route==="catalogue" && cat[0].kind==="shop"){ why=`The ${cat[0].name.toLowerCase()} of ${cat[0].supplier} is in the catalogue for orders up to ${money(cat[0].max_order)}, so you order there directly at the agreed prices.`; }
+  else if(route==="catalogue"){ why=`${cat.map(i=>i.name).join(" and ")} ${cat.length>1?"are":"is"} in the catalogue, so you can order directly at the agreed price.`; }
+  else if(route==="contract"){ why = f.demand_type==="contingent_labour"
+      ? `External workers come through the ${ctr.title} with ${ctr.supplier}, so this is a call-off with a role profile. No new competition is needed.`
+      : `The ${ctr.title} with ${ctr.supplier} already covers this, with ${money(ctr.remaining)} left until ${fmtDate(ctr.expires)}. No new competition is needed.`; }
+  else { const est=f.value_is_estimate?" (estimated)":"", yr = L.annual!=null && L.annual!==v ? `${money(L.annual)} a year (${money(v)} over the full term)` : v!=null ? `${money(v)}${est}` : "";
+    if(route==="simple"){ why=`At ${money(v)}${est} it is a small, simple purchase and no catalogue item or framework covers it, so you buy it directly: a purchase order with one quote, or your corporate card where the card policy allows.`; }
+    else if(L.text){ why=Engine.fill(L.text, {intro, amount:yr, form_threshold:money(T.formMin), lead_threshold:money(T.leadMin)}); }
+    else if(L.lead==="division"){ why=`${intro} At ${yr} it is under the ${money(T.formMin)} threshold, so your division leads the sourcing: you collect at least three quotes, with procurement's guidance. No sourcing request form is needed.`; }
+    else {
+      why = L.row==="renewal" ? "This is a market data renewal. It goes through the renewals calendar, so procurement leads it and no sourcing request form is needed."
+        : L.row==="pending_value" ? `${intro} The value is not known yet, so I assume procurement-led demand until it is.`
+        : L.row==="lead_threshold" ? `${intro} At ${yr} it is at or above the ${money(T.leadMin)} threshold, so procurement leads the sourcing with an RFP.`
+        : L.row==="cm_mandatory" ? `${intro} At ${yr} it is at or above ${money(T.formMin)} in a category the Category Manager must handle, so procurement leads the sourcing with an RFP.`
+        : `${intro} At ${yr} it is between ${money(T.formMin)} and ${money(T.leadMin)}, so the Category Manager decides whether procurement leads. Until then I treat it as procurement-led demand.`; } }
+  return {route, channel:channelOf(route), lead:L && {lead:L.lead, row:L.row, status:L.status, annual:L.annual, form:L.form}, why, rules:[r01, r02, ...(lead0?[lead0.decision]:[]), r19].map(d=>({rule:d.rule, row:d.row, outcome:d.outcome})), contract:ctr, catalogue:cat, controls:controlsFor(route,ctr,cat), steps:nextSteps(route,cat,ctr)};
+}
+// the routing in code, kept only for the parity test (see whoLeadsLegacy)
+function determineLegacy(){
+  const f=S.f, T=CONFIG.thresholds, v=known(f.value)?Number(f.value):null;
+  const all = catalogueMatches(f), items = all.filter(i=>i.kind!=="shop"), shops = all.filter(i=>i.kind==="shop"), ctr = contractFor(f);
+  // fixed-price items first; a shop when no item fits
+  const cat = items.length && catalogueFits(f, items) ? items : shops.length && catalogueFits(f, shops) ? shops.slice(0,1) : [];
   let route, why, L=null;
   const declined=(f.decline_contract||f.contract_ok===false) && CONTRACTS.some(c=>contractCovers(c,f) && new Date(c.expires)>new Date());   // "No, look wider"
   const intro=`This is new demand${declined?" (you chose to look wider than the existing framework)":" with no contract in place"}.`;
@@ -1422,7 +1531,7 @@ function determine(){
   else if(ctr){ route="contract"; why = f.demand_type==="contingent_labour"
       ? `External workers come through the ${ctr.title} with ${ctr.supplier}, so this is a call-off with a role profile. No new competition is needed.`
       : `The ${ctr.title} with ${ctr.supplier} already covers this, with ${money(ctr.remaining)} left until ${fmtDate(ctr.expires)}. No new competition is needed.`; }
-  else { L=whoLeads(f); const est=f.value_is_estimate?" (estimated)":"", yr = L.annual!=null && L.annual!==v ? `${money(L.annual)} a year (${money(v)} over the full term)` : v!=null ? `${money(v)}${est}` : "";
+  else { L=whoLeadsLegacy(f); const est=f.value_is_estimate?" (estimated)":"", yr = L.annual!=null && L.annual!==v ? `${money(L.annual)} a year (${money(v)} over the full term)` : v!=null ? `${money(v)}${est}` : "";
     if(L.lead==="division" && simpleFits(f, v)){ route="simple"; why=`At ${money(v)}${est} it is a small, simple purchase and no catalogue item or framework covers it, so you buy it directly: a purchase order with one quote, or your corporate card where the card policy allows.`; }
     else if(L.lead==="division"){ route="business"; why=`${intro} At ${yr} it is under the ${money(T.formMin)} threshold, so your division leads the sourcing: you collect at least three quotes, with procurement's guidance. No sourcing request form is needed.`; }
     else { route="procurement";
@@ -1909,7 +2018,23 @@ function parseWhen(str){
 }
 // the answer to "a day rate or a total budget?": €5,000 or more is the total, so it is never printed as a day rate
 const rateIsTotal = r => (parseMoney(r)||0) >= 5000;
-const LEAD_DAYS={catalogue:3,simple:3,contract:7,business:14,procurement:45};
+const LEAD_DAYS={};
+/* ---------- configuration: thresholds, channels, category cards and the decision tables ----------
+   The built-in defaults are the "config-defaults" block above this script, generated from db/seed by
+   scripts/build_defaults.js. applyConfig fills the constants in place, so a configuration from the server replaces
+   the defaults without a reload. The rules are data and run through engine.js. */
+const DEFAULTS = JSON.parse(document.getElementById("config-defaults").textContent);
+const RULES = {}, CFG = {version:0, source:"builtin", checksum:""};
+function applyConfig(cfg){
+  cfg.params.forEach(p=>{ CONFIG.thresholds[p.key]=p.value; });
+  cfg.channels.forEach(c=>{ const ch=CHANNELS[c.key]; if(!ch) return;
+    Object.assign(ch, {name:c.name, days:c.days, doc:c.doc, short_days:c.short_days||c.days}); LEAD_DAYS[c.key]=c.lead_days;
+    if(c.key==="business") LEAD_DAYS.simple=c.short_lead_days||c.lead_days; });
+  cfg.categories.forEach(c=>{ const cat=CATEGORIES.find(x=>x.id===c.id); if(cat) Object.assign(cat, {name:c.name, cm:!!c.cm_mandatory, renewals:!!c.renewals_calendar}); });
+  Object.keys(RULES).forEach(k=>delete RULES[k]); cfg.rules.forEach(r=>{ RULES[r.id]=r; });
+  Object.assign(CFG, {version:cfg.version, source:cfg.source, checksum:cfg.checksum});
+}
+applyConfig(DEFAULTS);
 // a catalogue order or a small, simple purchase: a short purchase request, no service description
 const LIGHT = r => r==="catalogue" || r==="simple";
 const docName = () => S.det && LIGHT(S.det.route) ? "purchase request" : "service description";
@@ -4465,7 +4590,7 @@ function submit(){ S.holdScroll=false;
 function payload(){
   return {created:new Date().toISOString(), facts:S.f, category_name:catById(S.f.category).name,
     conversation:S.msgs.filter(m=>!m.kind).map(m=>({role:m.role,text:m.text})),
-    decision:S.det?{route:S.det.route, channel:S.det.channel, lead:S.det.lead, chosen:S.override||S.det.route, override:!!S.override, justification:($("#just")||{}).value||null, why:S.det.why,
+    decision:S.det?{route:S.det.route, channel:S.det.channel, lead:S.det.lead, rules:S.det.rules, config:{...CFG}, chosen:S.override||S.det.route, override:!!S.override, justification:($("#just")||{}).value||null, why:S.det.why,
       required_facts:requiredFor(S.det.route,S.f), contract:S.det.contract?.id||null, controls:S.det.controls.map(c=>c[1]), next_steps:S.det.steps, thresholds:CONFIG.thresholds}:null,
     l4_candidates:(S.l4Cands||[]).map(c=>({code:c.code, name:c.name, path:[c.l1,c.l2,c.l3].filter(Boolean).join(" › "), match:c.match, weaker:!!c.weak})), l4_choice:S.l4Chosen||null,
     quality:S.quality||null, quality_threshold:CONFIG.thresholds.qualityMin, submitted_below_threshold:!!S.belowThreshold, answer_checks:S.flags,
@@ -4877,7 +5002,7 @@ function renderSide(){
   }).join("");
   $("#side").innerHTML=`${closeBtn}<div class="panel">
       <div class="eyebrow">Route ${S.missing.length?"so far":""}</div>
-      <div class="route">${chan(S.override||D.route).name}</div>
+      <div class="route">${esc(chan(S.override||D.route).name)}</div>
       <div class="prov">${S.missing.length?"May change as you answer":"Ready"} · ${esc((l4ByCode(f.l4)||{}).name || catById(f.category).name)} <button class="ed" data-edit="category" title="Change the category" aria-label="Change the category">✎</button></div>
       ${S.editing==="category"?`<div class="fact editing">${editorHTML("category")}</div>`:""}
       <div class="prog"><i style="width:${pct}%"></i></div>

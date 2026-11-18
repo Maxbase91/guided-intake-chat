@@ -1,0 +1,118 @@
+[
+  {
+    "id": "R01",
+    "name": "Covered by the catalogue",
+    "step": "Existing coverage",
+    "mode": "enforce",
+    "clause": "",
+    "decides": "Whether a catalogue item or a supplier's shop covers the need.",
+    "outcomes": [
+      {"key": "covered_item", "label": "A catalogue item covers it"},
+      {"key": "covered_shop", "label": "A supplier's shop covers it"},
+      {"key": "not_covered", "label": "Not covered"}
+    ],
+    "rows": [
+      {"when": [{"fact": "catalogue_match", "op": "is", "value": "item"}], "then": "covered_item"},
+      {"when": [{"fact": "catalogue_match", "op": "is", "value": "shop"}], "then": "covered_shop"},
+      {"when": [], "then": "not_covered"}
+    ],
+    "tests": [
+      {"name": "A catalogue item fits", "given": {"catalogue_match": "item"}, "expect": "covered_item"},
+      {"name": "A supplier's shop fits", "given": {"catalogue_match": "shop"}, "expect": "covered_shop"},
+      {"name": "Nothing in the catalogue", "given": {"catalogue_match": "none"}, "expect": "not_covered"}
+    ]
+  },
+  {
+    "id": "R02",
+    "name": "Covered by an existing contract",
+    "step": "Existing coverage",
+    "mode": "enforce",
+    "clause": "",
+    "decides": "Whether an active framework contract is used.",
+    "outcomes": [
+      {"key": "use_contract", "label": "Use the existing contract"},
+      {"key": "not_covered", "label": "Not covered"}
+    ],
+    "rows": [
+      {"when": [{"fact": "contract_match", "op": "is", "value": true}], "then": "use_contract"},
+      {"when": [], "then": "not_covered"}
+    ],
+    "tests": [
+      {"name": "A framework covers it", "given": {"contract_match": true}, "expect": "use_contract"},
+      {"name": "No framework, or the requester looks wider", "given": {"contract_match": false}, "expect": "not_covered"}
+    ]
+  },
+  {
+    "id": "R11",
+    "name": "Who leads the sourcing",
+    "step": "Sourcing route",
+    "mode": "enforce",
+    "clause": "",
+    "decides": "Who leads the sourcing of new demand: procurement, or the division through its divisional vendor office.",
+    "outcomes": [
+      {"key": "renewal", "label": "Procurement leads through the renewals calendar", "lead": "procurement", "status": "decided", "form": false},
+      {"key": "pending_value", "label": "Procurement-led until the value is known", "lead": "procurement", "status": "pending_value", "form": true},
+      {"key": "lead_threshold", "label": "Procurement leads", "lead": "procurement", "status": "decided", "form": true},
+      {"key": "cm_mandatory", "label": "Procurement leads (mandatory category)", "lead": "procurement", "status": "decided", "form": true},
+      {"key": "cm_decides", "label": "The Category Manager decides", "lead": "category_manager", "status": "pending_category_manager", "form": true},
+      {"key": "division", "label": "The division leads", "lead": "division", "status": "decided", "form": false}
+    ],
+    "rows": [
+      {"when": [{"fact": "cat_renewals_calendar", "op": "is", "value": true}, {"fact": "request_type", "op": "is", "value": "renewal"}], "then": "renewal",
+       "text": "This is a market data renewal. It goes through the renewals calendar, so procurement leads it and no sourcing request form is needed."},
+      {"when": [{"fact": "value_known", "op": "is", "value": false}], "then": "pending_value",
+       "text": "{intro} The value is not known yet, so I assume procurement-led demand until it is."},
+      {"when": [{"fact": "annual_value", "op": "gte", "value": {"param": "leadMin"}}], "then": "lead_threshold",
+       "text": "{intro} At {amount} it is at or above the {lead_threshold} threshold, so procurement leads the sourcing with an RFP."},
+      {"when": [{"fact": "annual_value", "op": "gte", "value": {"param": "formMin"}}, {"fact": "cat_cm_mandatory", "op": "is", "value": true}], "then": "cm_mandatory",
+       "text": "{intro} At {amount} it is at or above {form_threshold} in a category the Category Manager must handle, so procurement leads the sourcing with an RFP."},
+      {"when": [{"fact": "annual_value", "op": "gte", "value": {"param": "formMin"}}], "then": "cm_decides",
+       "text": "{intro} At {amount} it is between {form_threshold} and {lead_threshold}, so the Category Manager decides whether procurement leads. Until then I treat it as procurement-led demand."},
+      {"when": [], "then": "division",
+       "text": "{intro} At {amount} it is under the {form_threshold} threshold, so your division leads the sourcing: you collect at least three quotes, with procurement's guidance. No sourcing request form is needed."}
+    ],
+    "tests": [
+      {"name": "Market data renewal", "given": {"cat_renewals_calendar": true, "request_type": "renewal", "value_known": true, "annual_value": 60000, "cat_cm_mandatory": false}, "expect": "renewal"},
+      {"name": "Market data extension follows the thresholds", "given": {"cat_renewals_calendar": true, "request_type": "extension", "value_known": true, "annual_value": 60000, "cat_cm_mandatory": false}, "expect": "division"},
+      {"name": "Value not known yet", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": false, "cat_cm_mandatory": false}, "expect": "pending_value"},
+      {"name": "At the upper threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": 500000, "cat_cm_mandatory": false}, "expect": "lead_threshold"},
+      {"name": "Just under the upper threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": 499999, "cat_cm_mandatory": false}, "expect": "cm_decides"},
+      {"name": "Mandatory category between the thresholds", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": 250000, "cat_cm_mandatory": true}, "expect": "cm_mandatory"},
+      {"name": "At the lower threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": 100000, "cat_cm_mandatory": false}, "expect": "cm_decides"},
+      {"name": "Just under the lower threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": 99999, "cat_cm_mandatory": false}, "expect": "division"},
+      {"name": "Mandatory category under the lower threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": 60000, "cat_cm_mandatory": true}, "expect": "division"}
+    ]
+  },
+  {
+    "id": "R19",
+    "name": "Buying channel",
+    "step": "Outputs",
+    "mode": "enforce",
+    "clause": "",
+    "decides": "Which buying channel is recommended. It combines the results of R01, R02 and R11 and takes no decision of its own.",
+    "outcomes": [
+      {"key": "catalogue", "label": "Catalogue order", "channel": "catalogue"},
+      {"key": "contract", "label": "Existing contract", "channel": "contract"},
+      {"key": "simple", "label": "Business-led demand, short form for a small purchase", "channel": "business"},
+      {"key": "business", "label": "Business-led demand", "channel": "business"},
+      {"key": "procurement", "label": "Procurement-led demand", "channel": "procurement"}
+    ],
+    "rows": [
+      {"when": [{"fact": "r01", "op": "in", "value": ["covered_item", "covered_shop"]}], "then": "catalogue"},
+      {"when": [{"fact": "r02", "op": "is", "value": "use_contract"}], "then": "contract"},
+      {"when": [{"fact": "r11", "op": "is", "value": "division"}, {"fact": "simple_eligible", "op": "is", "value": true}, {"fact": "total_value", "op": "lte", "value": {"param": "simpleMax"}}], "then": "simple"},
+      {"when": [{"fact": "r11", "op": "is", "value": "division"}], "then": "business"},
+      {"when": [], "then": "procurement"}
+    ],
+    "tests": [
+      {"name": "Catalogue item", "given": {"r01": "covered_item", "r02": "not_covered"}, "expect": "catalogue"},
+      {"name": "Catalogue wins over a contract", "given": {"r01": "covered_shop", "r02": "use_contract"}, "expect": "catalogue"},
+      {"name": "Existing contract", "given": {"r01": "not_covered", "r02": "use_contract"}, "expect": "contract"},
+      {"name": "Small, simple purchase", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "division", "simple_eligible": true, "total_value": 800}, "expect": "simple"},
+      {"name": "Small but not simple", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "division", "simple_eligible": false, "total_value": 800}, "expect": "business"},
+      {"name": "Division leads", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "division", "simple_eligible": true, "total_value": 60000}, "expect": "business"},
+      {"name": "Category Manager decides", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "cm_decides", "simple_eligible": true, "total_value": 250000}, "expect": "procurement"},
+      {"name": "Value not known", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "pending_value", "simple_eligible": true}, "expect": "procurement"}
+    ]
+  }
+]

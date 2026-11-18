@@ -5,15 +5,18 @@ buying route and the DORA / outsourcing classification, and an LLM only holds th
 Dummy data only.
 
 ## Stack
-- `index.html`: the whole app (vanilla JS, inline CSS and script, reference data as one JSON block). No build step.
+- `index.html`: the app (vanilla JS, inline CSS and script, reference data and the built-in configuration as JSON blocks). No build step.
+- `engine.js`: the decision-table engine, loaded by the page with a script tag and by Node with `require`.
+- `db/seed/*.json`: thresholds, channels, category cards, facts and rules (decision tables with their test cases).
+  `node scripts/build_defaults.js` writes them into the `config-defaults` block of `index.html`; run it after every seed change.
 - `api/llm.js`: Vercel Node serverless function (CommonJS). LLM proxy: Gemini → Groq → Mistral → OpenRouter `:free`.
 - `vercel.json`: function timeout (60 s) and security headers.
 - No dependencies are deployed.
 
 ## What is in Git
-`.gitignore` is an allow-list: the app (`index.html`, `api/`, `vercel.json`), docs (`README.md`, `CLAUDE.md`, `docs/`,
+`.gitignore` is an allow-list: the app (`index.html`, `engine.js`, `db/`, `api/`, `vercel.json`), docs (`README.md`, `CLAUDE.md`, `docs/`,
 `LICENSE`, `NOTICE`) and what runs the tests from a fresh clone (`tests/`, `scripts/dev-server.js`,
-`scripts/mock-providers.js`, `scripts/import_taxonomy.py`, `package.json`, `package-lock.json`, `playwright.config.js`,
+`scripts/mock-providers.js`, `scripts/import_taxonomy.py`, `scripts/build_defaults.js`, `package.json`, `package-lock.json`, `playwright.config.js`,
 `.github/`). Test data (`data/`), task notes (`tasks/`) and test output stay local (docs/ARCHITECTURE.md §10).
 A new tracked file needs a `!/path` line in `.gitignore`. Test data in tracked files must be synthetic: no real
 access codes, keys or personal data.
@@ -31,7 +34,10 @@ access codes, keys or personal data.
 - After a scripted edit of `index.html`, syntax-check its `<script>` blocks before testing (see `tasks/lessons.md`).
 
 ## Repo map
-- `index.html` sections: 1 Configuration (`CONFIG`, thresholds) … 9 Render … 11 Wiring (access gate, start-up).
+- `index.html` sections: 1 Configuration (`CONFIG`) … 9 Render … 11 Wiring (access gate, start-up).
+  Thresholds, channel names, category flags and the routing rules (R01, R02, R11, R19) are data: change them in
+  `db/seed/`, not in the script. `applyConfig()` fills the constants; `determine()` runs the rules through `Engine`.
+  `determineLegacy()` / `whoLeadsLegacy()` are the old code, kept only for `tests/e2e/parity.spec.js`.
   "How it works" (`specModel()`) and "Decision tree" (`treeModel()` / `treeFigure()`) are generated from the code:
   update them when route, check or quality logic changes.
 - `api/llm.js`: `GET /api/llm` (config, no secrets), `?verify=1` (access code), `?check=1` (live provider check, needs

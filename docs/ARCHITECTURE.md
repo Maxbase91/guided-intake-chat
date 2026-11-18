@@ -91,6 +91,17 @@ A change of category, value or supplier therefore re-routes on the spot.
 
 There is no AI call for catalogue orders and small, simple purchases: the purchase request is built from the answers.
 
+**Rules as data.** Thresholds, channels, category flags and the routing rules live in `db/seed/*.json` and reach the
+page as its built-in configuration: the `config-defaults` JSON block, written by `scripts/build_defaults.js`.
+`applyConfig()` fills `CONFIG.thresholds`, `CHANNELS`, `LEAD_DAYS`, the category flags and `RULES` in place. A rule is a
+decision table: ordered rows of conditions on facts (`{fact, op, value}`, a value can name a threshold), the first row
+that holds gives the outcome, and the last row is the "otherwise" row. `engine.js` evaluates, validates and tests
+them; the same file runs in the page and in Node. `determine()` builds the fact view (`leadView` plus the catalogue
+and contract matches), runs R01 (catalogue), R02 (existing contract), R11 (who leads) and R19 (buying channel), and
+records the rows that decided in `S.det.rules`. Text matching, the outcome wording for catalogue and contract, the
+questions and the outsourcing tree stay code. `tests/e2e/parity.spec.js` compares the tables with the previous code
+path (`determineLegacy`) over a grid of requests.
+
 **Routes and channels.** `determine()` returns a route, which is the question profile: `catalogue`, `contract`, `simple`,
 `business` or `procurement`. The buying channel shown to the requester is one of four (`CHANNELS`): a small, simple
 purchase (`simple`) is business-led demand with the short form (`channelOf`, `chan`).

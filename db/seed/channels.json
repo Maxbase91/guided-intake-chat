@@ -1,0 +1,6 @@
+[
+  {"key": "catalogue", "name": "Catalogue order", "days": "1–3", "lead_days": 3, "doc": "Purchase request"},
+  {"key": "contract", "name": "Existing contract", "days": "3–7", "lead_days": 7, "doc": "Scope of work"},
+  {"key": "business", "name": "Business-led demand", "days": "7–15", "lead_days": 14, "doc": "Service description", "short_days": "1–3", "short_lead_days": 3},
+  {"key": "procurement", "name": "Procurement-led demand", "days": "30–60", "lead_days": 45, "doc": "Service description"}
+]

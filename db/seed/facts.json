@@ -1,0 +1,16 @@
+[
+  {"key": "request_type", "label": "Request type", "type": "enum", "values": ["new", "renewal", "extension"]},
+  {"key": "category", "label": "Buying category", "type": "text"},
+  {"key": "demand_type", "label": "Type of demand", "type": "enum", "values": ["goods", "services", "software", "contingent_labour"]},
+  {"key": "cat_cm_mandatory", "label": "Category the Category Manager must handle", "type": "bool"},
+  {"key": "cat_renewals_calendar", "label": "Category renewed through the renewals calendar", "type": "bool"},
+  {"key": "value_known", "label": "Value is known", "type": "bool"},
+  {"key": "annual_value", "label": "Annual value (EUR)", "type": "number"},
+  {"key": "total_value", "label": "Total value (EUR)", "type": "number"},
+  {"key": "catalogue_match", "label": "Catalogue match that fits the value", "type": "enum", "values": ["none", "item", "shop"]},
+  {"key": "contract_match", "label": "Active framework contract covers it, and it is not declined", "type": "bool"},
+  {"key": "simple_eligible", "label": "Simple purchase (not software or external workers, no technology, no data or system access, not ongoing over 12 months)", "type": "bool"},
+  {"key": "r01", "label": "Result of R01 (catalogue)", "type": "enum", "values": ["covered_item", "covered_shop", "not_covered"]},
+  {"key": "r02", "label": "Result of R02 (existing contract)", "type": "enum", "values": ["use_contract", "not_covered"]},
+  {"key": "r11", "label": "Result of R11 (who leads)", "type": "enum", "values": ["renewal", "pending_value", "lead_threshold", "cm_mandatory", "cm_decides", "division"]}
+]
