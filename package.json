@@ -4,16 +4,24 @@
   "private": true,
   "description": "Conversational procurement intake prototype (static front end + Vercel serverless LLM proxy)",
   "license": "UNLICENSED",
-  "engines": { "node": ">=18.17" },
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "start": "node scripts/dev-server.js",
     "start:mock": "MOCK_PROVIDERS=1 GEMINI_API_KEY=mock GROQ_API_KEY=mock MISTRAL_API_KEY=mock node scripts/dev-server.js",
     "test": "npm run test:api && npm run test:e2e",
     "test:api": "node --test tests/api/*.test.js",
     "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "build:defaults": "node scripts/build_defaults.js",
+    "db:migrate": "node --env-file-if-exists=.env scripts/db-migrate.js",
+    "db:seed": "node --env-file-if-exists=.env scripts/db-seed.js"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
   }
 }

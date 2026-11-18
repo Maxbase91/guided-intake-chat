@@ -99,8 +99,7 @@ that holds gives the outcome, and the last row is the "otherwise" row. `engine.j
 them; the same file runs in the page and in Node. `determine()` builds the fact view (`leadView` plus the catalogue
 and contract matches), runs R01 (catalogue), R02 (existing contract), R11 (who leads) and R19 (buying channel), and
 records the rows that decided in `S.det.rules`. Text matching, the outcome wording for catalogue and contract, the
-questions and the outsourcing tree stay code. `tests/e2e/parity.spec.js` compares the tables with the previous code
-path (`determineLegacy`) over a grid of requests.
+questions and the outsourcing tree stay code.
 
 **Routes and channels.** `determine()` returns a route, which is the question profile: `catalogue`, `contract`, `simple`,
 `business` or `procurement`. The buying channel shown to the requester is one of four (`CHANNELS`): a small, simple
@@ -205,7 +204,9 @@ the outsourcing test.
 **Current data:** realistic test data (396 Level 4 entries, 184 suppliers, 40 frameworks, 84 catalogue entries
 including 25 shops). The legal entities in section 2 of the script are mock data.
 
-## 8. Server: `api/llm.js`
+## 8. Server: `api/`
+
+### `api/llm.js`: the AI proxy
 
 | Endpoint | Purpose |
 |---|---|
@@ -226,6 +227,32 @@ including 25 shops). The legal entities in section 2 of the script are mock data
 - `ACCESS_CODE`;
 - optional `LLM_PROVIDER` and per-provider `*_MODEL`;
 - optional `RATE_LIMIT_PER_MIN` (default 30) and `CHECK_LIMIT_PER_MIN` (default 5); `0` turns a limit off.
+
+### `api/config.js` and `api/decisions.js`: configuration and decision log
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/config` | The published configuration as one document: `{version, source, checksum, params, channels, categories, facts, rules}`. Cached for a minute per warm instance |
+| `POST /api/decisions` | The decision log of one conversation: `{conversation_id, config_version, config_source, config_checksum, decisions:[{seq, rule, row, outcome, facts}]}`. Returns `{stored}`; a batch sent twice is stored once |
+
+Both need the access code when one is set and are rate limited per IP (`CONFIG_LIMIT_PER_MIN`, default 300;
+`DECISIONS_LIMIT_PER_MIN`, default 10). The decision log accepts only typed values: numbers, true or false, and short
+codes such as a category id. Free text, names and unknown facts are refused, and the IP address is not stored.
+
+**Store** (`api/_lib/store.js`): with `DATABASE_URL` set, Postgres through `pg` (Neon in production); without it, a
+memory store that serves the seed and keeps nothing (tests, local runs). In production without a database the
+configuration endpoint serves the seed and the decision log answers 503. `api/_lib/seed.js` builds and validates the
+configuration document; `api/_lib/http.js` holds the access code, rate limit and body helpers shared by all functions.
+
+**Schema** (`db/migrations/001_init.sql`): `config_versions` (every published document, never changed),
+`config_draft` (the working copy for the admin page), `audit_log`, `admin_attempts`, `decisions`.
+`npm run db:migrate` applies the migrations once each; `npm run db:seed` publishes the seed as version 1 and does
+nothing when a version is already published. Both read `DATABASE_URL_UNPOOLED` (or `DATABASE_URL`) from the
+environment or a local `.env`. See [ADR 0001](adr/0001-rules-and-configuration-in-the-database.md).
+
+**In the page:** `loadConfig()` runs at start-up after the access gate: the server's configuration, else the last copy
+in `localStorage`, else the built-in defaults (`CFG.source`: `database`, `cached`, `builtin`). `sendDecisions()` runs
+on submit.
 
 **Rate limit:** per IP (`x-real-ip` / `x-forwarded-for`, set by Vercel) in fixed one-minute windows, held in the warm
 instance's memory (lost on a cold start, not shared between instances). `POST` and `?check` have separate budgets;

@@ -9,10 +9,11 @@ const ROOT = path.join(__dirname, "..");
 const PORT = Number(process.argv[2] || process.env.PORT || 3000);
 const mock = process.env.MOCK_PROVIDERS ? require("./mock-providers") : null;
 if (mock) mock.install();
-const API = path.join(ROOT, "api", "llm.js");
-let handler = require(API);
+const API_DIR = path.join(ROOT, "api");
+// api/<name>.js is served at /api/<name>, as on Vercel; folders starting with an underscore are not functions
+const handlerFor = (name) => { const file = path.join(API_DIR, `${name}.js`); return /^[a-z][a-z0-9-]*$/.test(name) && fs.existsSync(file) ? require(file) : null; };
 // a fresh copy of the function, as after a cold start on Vercel (clears its cooldown memory)
-const reloadHandler = () => { delete require.cache[require.resolve(API)]; handler = require(API); };
+const reloadHandler = () => { for (const k of Object.keys(require.cache)) if (k.startsWith(API_DIR + path.sep)) delete require.cache[k]; };
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon" };
 
@@ -35,10 +36,11 @@ async function readBody(req) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   try {
-    if (url.pathname === "/api/llm" || url.pathname === "/api/llm/") {
+    const fn = url.pathname.startsWith("/api/") ? handlerFor(url.pathname.slice(5).replace(/\/$/, "")) : null;
+    if (fn) {
       req.query = Object.fromEntries(url.searchParams);
       req.body = await readBody(req);
-      return await handler(req, vercelRes(res));
+      return await fn(req, vercelRes(res));
     }
     // test hook, only with MOCK_PROVIDERS: GET shows modes and calls; POST {"gemini":"429","coldStart":true,"resetCalls":true}
     if (mock && url.pathname === "/__mock") {
@@ -51,7 +53,7 @@ const server = http.createServer(async (req, res) => {
     }
     const rel = url.pathname === "/" ? "index.html" : decodeURIComponent(url.pathname).replace(/^\/+/, "");
     const file = path.resolve(ROOT, rel);
-    if (!file.startsWith(ROOT + path.sep) || /(^|[\\/])(\.|api[\\/]|node_modules|scripts|tests)/.test(path.relative(ROOT, file)) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+    if (!file.startsWith(ROOT + path.sep) || /(^|[\\/])(\.|api[\\/]|node_modules|scripts|tests|tasks|deliverables|data)/.test(path.relative(ROOT, file)) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
       res.statusCode = 404; return res.end("Not found");
     }
     res.setHeader("Content-Type", TYPES[path.extname(file)] || "application/octet-stream");

@@ -72,32 +72,8 @@ const coolingFor = (key) => IGNORE_COOLDOWN ? 0 : Math.max(0, ((cooldown.get(key
 
 const short = (m) => String(m || "").replace(/\s+/g, " ").slice(0, 160);
 
-// access code check in constant time (hashing first makes the lengths equal); no ACCESS_CODE means open
-const crypto = require("crypto");
-const sha = (x) => crypto.createHash("sha256").update(String(x || "")).digest();
-const codeOk = (c) => !process.env.ACCESS_CODE || crypto.timingSafeEqual(sha(c), sha(process.env.ACCESS_CODE));
-const WRONG_CODE_DELAY_MS = 700;        // slows down guessing on every endpoint, not only ?verify
-
-// per-IP limit, fixed one-minute windows, in the warm instance's memory (lost on cold start and not shared between instances,
-// which is enough for a demo). x-real-ip / x-forwarded-for are set by Vercel itself, not by the caller.
-const RATE_WINDOW_MS = 60 * 1000;
-const hits = new Map();                 // "bucket:ip" -> { n, start }
-const limitFrom = (name, dflt) => { const v = parseInt(process.env[name], 10); return Number.isFinite(v) && v >= 0 ? v : dflt; };
-const clientIp = (req) => String(req.headers["x-real-ip"] || String(req.headers["x-forwarded-for"] || "").split(",")[0] || req.socket?.remoteAddress || "unknown").trim();
-// seconds to wait when this request is over the limit, else 0
-function overLimit(bucket, req, max) {
-  if (!max) return 0;
-  const now = Date.now(), key = `${bucket}:${clientIp(req)}`;
-  if (hits.size > 10000) for (const [k, h] of hits) if (now - h.start >= RATE_WINDOW_MS) hits.delete(k);
-  let h = hits.get(key);
-  if (!h || now - h.start >= RATE_WINDOW_MS) { h = { n: 0, start: now }; hits.set(key, h); }
-  h.n++;
-  return h.n > max ? Math.max(1, Math.ceil((h.start + RATE_WINDOW_MS - now) / 1000)) : 0;
-}
-function tooMany(res, waitS) {
-  res.setHeader("Retry-After", String(waitS));
-  return res.status(429).json({ error: "Too many requests. Please wait a moment and try again.", code: "rate_limited", quota: false, retryAfter: waitS });
-}
+// access code and per-IP rate limit: shared with the other functions
+const { codeOk, WRONG_CODE_DELAY_MS, limitFrom, overLimit, tooMany } = require("./_lib/http");
 
 async function callGemini(system, history, model) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;

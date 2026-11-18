@@ -48,6 +48,22 @@ scripts/verify.sh   # runs the CI checks locally; runs automatically on `git pus
 npm start           # local server on http://localhost:3000 (npm run start:mock for fake providers)
 ```
 
+### Rules and configuration
+
+Thresholds, channel names, category flags and the routing rules are data, not code:
+
+- `db/seed/*.json` is the starting configuration. Each rule is a decision table with its own test cases.
+- `node scripts/build_defaults.js` writes it into `index.html` as the built-in defaults (run it after a seed change).
+- With a Postgres database (`DATABASE_URL`, see `.env.example`) the server serves the published version and stores the
+  decision log: which rule decided, on which version, from which facts. Nothing the requester wrote is stored.
+
+```sh
+npm run db:migrate   # create the tables (once per database)
+npm run db:seed      # publish the seed as version 1 (does nothing if a version exists)
+```
+
+Without a database everything still works: the page runs on its built-in defaults and nothing is stored.
+
 ## Deploy
 
 **Set up Vercel:**

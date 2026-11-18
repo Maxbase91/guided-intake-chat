@@ -16,10 +16,22 @@ concurrency:
 
 jobs:
   test:
-    name: API and end-to-end tests (mock providers)
+    name: API and end-to-end tests (mock providers, throwaway Postgres)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # no provider keys: the API tests stub fetch and the e2e servers use scripts/mock-providers.js
+    # the store tests run against this throwaway Postgres, never against the real database
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: intake_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d intake_test" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/intake_test
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -31,6 +43,7 @@ jobs:
       # the tests block Google Fonts; with Inter installed locally the page renders in its real font, as on a designer's
       # machine, so the layout tests (welcome screen fits without scrolling) measure the real layout, not a fallback font
       - run: sudo apt-get install -y --no-install-recommends fonts-inter
+      - run: node scripts/build_defaults.js --check
       - run: npm run test:api
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4

@@ -20,6 +20,7 @@ async function openApp(page, { kind = "offline", viewport, waitReady = true, mot
   if (waitReady) {
     await expect(page.locator("#gate")).toBeHidden();
     await expect(page.locator(".welcome")).toBeVisible();
+    await page.waitForFunction(() => window.__ready === true);   // the configuration is loaded
   }
   return errors;
 }

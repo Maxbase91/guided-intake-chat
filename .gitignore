@@ -8,6 +8,8 @@
 !/db/
 !/api/
 !/vercel.json
+!/.vercelignore
+!/.env.example
 !/README.md
 !/CLAUDE.md
 !/LICENSE
@@ -21,6 +23,8 @@
 !/scripts/import_taxonomy.py
 !/scripts/verify.sh
 !/scripts/build_defaults.js
+!/scripts/db-migrate.js
+!/scripts/db-seed.js
 !/package.json
 !/package-lock.json
 !/playwright.config.js

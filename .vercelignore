@@ -1,0 +1,15 @@
+# Not part of the deployed site. The functions need api/, engine.js, db/seed/ and package.json, so those stay.
+tests
+scripts
+docs
+tasks
+data
+deliverables
+db/migrations
+playwright.config.js
+test-results
+playwright-report
+.github
+CLAUDE.md
+README.md
+ASSESSMENT.md

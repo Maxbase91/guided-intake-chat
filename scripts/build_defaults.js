@@ -7,38 +7,12 @@
 //   node scripts/build_defaults.js --check   exit 1 if the block differs from the seed (run by the tests)
 const fs = require("fs");
 const path = require("path");
-const crypto = require("crypto");
-const Engine = require("../engine.js");
+const { buildConfig, validateConfig } = require("../api/_lib/seed.js");
 
 const ROOT = path.join(__dirname, "..");
-const SEED = path.join(ROOT, "db", "seed");
 const HTML = path.join(ROOT, "index.html");
 const OPEN = '<script id="config-defaults" type="application/json">';
 const CLOSE = "</script>";
-
-const read = (name) => JSON.parse(fs.readFileSync(path.join(SEED, `${name}.json`), "utf8"));
-
-// the configuration document: the same shape the server publishes
-function buildConfig() {
-  const body = { params: read("params"), channels: read("channels"), categories: read("categories"), facts: read("facts"), rules: read("rules") };
-  const checksum = crypto.createHash("sha256").update(JSON.stringify(body)).digest("hex").slice(0, 12);
-  return { version: 0, source: "builtin", checksum, ...body };
-}
-
-// everything a published configuration must satisfy; returns a list of problems
-function validateConfig(cfg) {
-  const errors = [];
-  const params = Object.fromEntries(cfg.params.map((p) => [p.key, p.value]));
-  const registry = Object.fromEntries(cfg.facts.map((f) => [f.key, f]));
-  cfg.params.forEach((p) => { if (typeof p.value !== "number" || !isFinite(p.value)) errors.push(`threshold ${p.key}: not a number`); });
-  cfg.rules.forEach((rule) => {
-    errors.push(...Engine.validateRule(rule, registry, params));
-    Engine.runTests(rule, params).filter((t) => !t.ok).forEach((t) => errors.push(`${rule.id}: test "${t.name}" expects ${t.expect}, got ${t.got}`));
-  });
-  const ids = cfg.rules.map((r) => r.id);
-  ids.filter((id, i) => ids.indexOf(id) !== i).forEach((id) => errors.push(`rule ${id} is defined twice`));
-  return errors;
-}
 
 function block(cfg) {
   const lines = ["{", `"version":${cfg.version},"source":"builtin","checksum":"${cfg.checksum}",`];

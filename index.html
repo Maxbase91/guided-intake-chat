@@ -1006,7 +1006,7 @@ body.doc-open{overflow:hidden}
 </script>
 <script id="config-defaults" type="application/json">
 {
-"version":0,"source":"builtin","checksum":"14323fb256ea",
+"version":0,"source":"builtin","checksum":"5feb0909411e",
 "params":[
 {"key":"simpleMax","value":5000,"unit":"EUR","label":"Small, simple purchase up to","description":"Business-led demand with the short form: one quote or a corporate card, and a purchase request instead of a service description."},
 {"key":"catalogueNoQtyMax","value":50000,"unit":"EUR","label":"Catalogue order without a quantity up to","description":"The most a catalogue order can be when no quantity is given."},
@@ -1462,16 +1462,6 @@ function whoLeads(f){
   const view=leadView(f), d=Engine.evaluate(RULES.R11, view, CONFIG.thresholds), a=d.attrs;
   return {lead:a.lead, row:d.outcome, status:a.status, annual:view.annual_value, form:!!a.form, text:d.text, decision:d};
 }
-// the same rule in code, kept only to prove the tables decide the same (tests/e2e/parity.spec.js); removed with the database phase
-function whoLeadsLegacy(f){
-  const T=CONFIG.thresholds, annual=annualValue(f);
-  if(f.category==="market-data" && f.wants_renewal && !isExtension()) return {lead:"procurement", row:"renewal", status:"decided", annual, form:false};
-  if(annual==null) return {lead:"procurement", row:"pending_value", status:"pending_value", annual, form:true};
-  if(annual>=T.leadMin) return {lead:"procurement", row:"lead_threshold", status:"decided", annual, form:true};
-  if(annual>=T.formMin) return cmMandatory(f) ? {lead:"procurement", row:"cm_mandatory", status:"decided", annual, form:true}
-    : {lead:"category_manager", row:"cm_decides", status:"pending_category_manager", annual, form:true};
-  return {lead:"division", row:"division", status:"decided", annual, form:false};
-}
 
 function contractFor(f){
   if(f.decline_contract || f.contract_ok===false) return null;   // "No, look wider"
@@ -1515,32 +1505,7 @@ function determine(){
         : L.row==="lead_threshold" ? `${intro} At ${yr} it is at or above the ${money(T.leadMin)} threshold, so procurement leads the sourcing with an RFP.`
         : L.row==="cm_mandatory" ? `${intro} At ${yr} it is at or above ${money(T.formMin)} in a category the Category Manager must handle, so procurement leads the sourcing with an RFP.`
         : `${intro} At ${yr} it is between ${money(T.formMin)} and ${money(T.leadMin)}, so the Category Manager decides whether procurement leads. Until then I treat it as procurement-led demand.`; } }
-  return {route, channel:channelOf(route), lead:L && {lead:L.lead, row:L.row, status:L.status, annual:L.annual, form:L.form}, why, rules:[r01, r02, ...(lead0?[lead0.decision]:[]), r19].map(d=>({rule:d.rule, row:d.row, outcome:d.outcome})), contract:ctr, catalogue:cat, controls:controlsFor(route,ctr,cat), steps:nextSteps(route,cat,ctr)};
-}
-// the routing in code, kept only for the parity test (see whoLeadsLegacy)
-function determineLegacy(){
-  const f=S.f, T=CONFIG.thresholds, v=known(f.value)?Number(f.value):null;
-  const all = catalogueMatches(f), items = all.filter(i=>i.kind!=="shop"), shops = all.filter(i=>i.kind==="shop"), ctr = contractFor(f);
-  // fixed-price items first; a shop when no item fits
-  const cat = items.length && catalogueFits(f, items) ? items : shops.length && catalogueFits(f, shops) ? shops.slice(0,1) : [];
-  let route, why, L=null;
-  const declined=(f.decline_contract||f.contract_ok===false) && CONTRACTS.some(c=>contractCovers(c,f) && new Date(c.expires)>new Date());   // "No, look wider"
-  const intro=`This is new demand${declined?" (you chose to look wider than the existing framework)":" with no contract in place"}.`;
-  if(cat.length && cat[0].kind==="shop"){ route="catalogue"; why=`The ${cat[0].name.toLowerCase()} of ${cat[0].supplier} is in the catalogue for orders up to ${money(cat[0].max_order)}, so you order there directly at the agreed prices.`; }
-  else if(cat.length){ route="catalogue"; why=`${cat.map(i=>i.name).join(" and ")} ${cat.length>1?"are":"is"} in the catalogue, so you can order directly at the agreed price.`; }
-  else if(ctr){ route="contract"; why = f.demand_type==="contingent_labour"
-      ? `External workers come through the ${ctr.title} with ${ctr.supplier}, so this is a call-off with a role profile. No new competition is needed.`
-      : `The ${ctr.title} with ${ctr.supplier} already covers this, with ${money(ctr.remaining)} left until ${fmtDate(ctr.expires)}. No new competition is needed.`; }
-  else { L=whoLeadsLegacy(f); const est=f.value_is_estimate?" (estimated)":"", yr = L.annual!=null && L.annual!==v ? `${money(L.annual)} a year (${money(v)} over the full term)` : v!=null ? `${money(v)}${est}` : "";
-    if(L.lead==="division" && simpleFits(f, v)){ route="simple"; why=`At ${money(v)}${est} it is a small, simple purchase and no catalogue item or framework covers it, so you buy it directly: a purchase order with one quote, or your corporate card where the card policy allows.`; }
-    else if(L.lead==="division"){ route="business"; why=`${intro} At ${yr} it is under the ${money(T.formMin)} threshold, so your division leads the sourcing: you collect at least three quotes, with procurement's guidance. No sourcing request form is needed.`; }
-    else { route="procurement";
-      why = L.row==="renewal" ? "This is a market data renewal. It goes through the renewals calendar, so procurement leads it and no sourcing request form is needed."
-        : L.row==="pending_value" ? `${intro} The value is not known yet, so I assume procurement-led demand until it is.`
-        : L.row==="lead_threshold" ? `${intro} At ${yr} it is at or above the ${money(T.leadMin)} threshold, so procurement leads the sourcing with an RFP.`
-        : L.row==="cm_mandatory" ? `${intro} At ${yr} it is at or above ${money(T.formMin)} in a category the Category Manager must handle, so procurement leads the sourcing with an RFP.`
-        : `${intro} At ${yr} it is between ${money(T.formMin)} and ${money(T.leadMin)}, so the Category Manager decides whether procurement leads. Until then I treat it as procurement-led demand.`; } }
-  return {route, channel:channelOf(route), lead:L, why, contract:ctr, catalogue:cat, controls:controlsFor(route,ctr,cat), steps:nextSteps(route,cat,ctr)};
+  return {route, channel:channelOf(route), lead:L && {lead:L.lead, row:L.row, status:L.status, annual:L.annual, form:L.form}, why, rules:[r01, r02, ...(lead0?[lead0.decision]:[]), r19].map(d=>({rule:d.rule, row:d.row, outcome:d.outcome})), view, contract:ctr, catalogue:cat, controls:controlsFor(route,ctr,cat), steps:nextSteps(route,cat,ctr)};
 }
 
 // described in How it works (specModel) and the Decision tree (treeModel, treeFigure)
@@ -2177,9 +2142,37 @@ const PNAMES={gemini:"Gemini",groq:"Groq",mistral:"Mistral",openrouter:"OpenRout
 // only name a provider once it has actually answered; before that we don't know who will (limits are checked per call)
 const providerLabel = () => SERVER&&SERVER.last ? PNAMES[SERVER.last]||SERVER.last : "";
 const providerChain = () => SERVER ? Object.keys(PNAMES).filter(k=>SERVER.providers&&SERVER.providers[k]).map(k=>PNAMES[k]).join(" → ") : "";
+// the page is served by its own server (configuration and decision log), whether or not an AI provider is set up there
+let BACKEND=false;
+/* The configuration in use: the published version from the database when the server has one, else the last copy this
+   browser received, else the built-in defaults. CFG.source says which ("database", "cached", "builtin"). A running
+   conversation keeps the configuration it started with. */
+async function loadConfig(){
+  if(!BACKEND) return;
+  const usable = c => c && ["params","channels","categories","rules"].every(k=>Array.isArray(c[k])) && ["R01","R02","R11","R19"].every(id=>c.rules.some(r=>r.id===id && Array.isArray(r.rows)));
+  try{
+    const r=await fetch("/api/config",{headers:{"x-access-code":CONFIG.accessCode||""}, signal:AbortSignal.timeout(2500)});
+    if(r.ok){ const c=await r.json(); if(usable(c)){ if(!S.msgs.length) applyConfig(c); try{ if(c.source==="database") localStorage.setItem("cfg",JSON.stringify(c)); }catch(e){} return; } }
+  }catch(e){}
+  try{ const c=JSON.parse(localStorage.getItem("cfg")||"null"); if(usable(c) && !S.msgs.length) applyConfig({...c, source:"cached"}); }catch(e){}
+}
+/* The decision log: which rule row decided, on which configuration, from which facts. Only typed values are sent
+   (numbers, yes/no, codes such as the category id): nothing the requester wrote. */
+async function sendDecisions(){
+  if(!BACKEND || !S.det || !S.det.rules || !window.crypto || !crypto.randomUUID) return false;
+  S.uuid = S.uuid || crypto.randomUUID();
+  const keys=new Set(DEFAULTS.facts.map(x=>x.key)), typed=v=>v===null || typeof v==="boolean" || (typeof v==="number" && isFinite(v)) || (typeof v==="string" && /^[a-z0-9][a-z0-9_-]{0,39}$/.test(v));
+  const facts=Object.fromEntries(Object.entries(S.det.view||{}).filter(([k,v])=>keys.has(k) && typed(v))), from=S.logged||0;
+  const body={conversation_id:S.uuid, config_version:CFG.version, config_source:CFG.source, config_checksum:CFG.checksum, decisions:S.det.rules.map((d,i)=>({seq:from+i, rule:d.rule, row:d.row, outcome:d.outcome, facts}))};
+  try{
+    const r=await fetch("/api/decisions",{method:"POST", headers:{"Content-Type":"application/json","x-access-code":CONFIG.accessCode||""}, body:JSON.stringify(body), signal:AbortSignal.timeout(5000)});
+    if(r.ok){ S.logged=from+body.decisions.length; return true; }
+  }catch(e){}
+  return false;
+}
 async function detectServer(){
   if(!/^https?:$/.test(location.protocol)) return;
-  try{ const r=await fetch("/api/llm"); if(!r.ok) return; const d=await r.json(); if(d&&d.ok) SERVER=d; }catch(e){}
+  try{ const r=await fetch("/api/llm"); if(!r.ok) return; BACKEND=true; const d=await r.json(); if(d&&d.ok) SERVER=d; }catch(e){}
 }
 function resolveProvider(){
   if(CONFIG.provider!=="auto") return;
@@ -4584,8 +4577,8 @@ function submit(){ S.holdScroll=false;
   const id="REQ-"+Math.floor(1e5+Math.random()*9e5), ch=chan(S.override||S.det.route).name;
   S.submitted=id; S.brdEdited=null; S.offerImprove=null; S.choices=[];
   S.belowThreshold = !!(S.quality && NEW_DEMAND(S.det.route) && S.quality.score<CONFIG.thresholds.qualityMin);
-  S.msgs.push({role:"assistant",text:`Submitted. Request **${id}** goes to **${ch}** with ${LIGHT(S.override||S.det.route)?"the purchase request and the captured details":"the service description and the captured details"} attached.${S.belowThreshold?` It is marked as submitted below the quality threshold (${S.quality.rating}, ${S.quality.score}/100), so the buyer will look at the open points first.`:""} You'll get an update at each step.\n(Prototype: nothing was sent anywhere.)`});
-  render();
+  S.msgs.push({role:"assistant",text:`Submitted. Request **${id}** goes to **${ch}** with ${LIGHT(S.override||S.det.route)?"the purchase request and the captured details":"the service description and the captured details"} attached.${S.belowThreshold?` It is marked as submitted below the quality threshold (${S.quality.rating}, ${S.quality.score}/100), so the buyer will look at the open points first.`:""} You'll get an update at each step.\n${BACKEND?"(Prototype: the request is not sent to a buying system. Only the record of which rules decided is stored.)":"(Prototype: nothing was sent anywhere.)"}`});
+  render(); sendDecisions();
 }
 function payload(){
   return {created:new Date().toISOString(), facts:S.f, category_name:catById(S.f.category).name,
@@ -5270,7 +5263,8 @@ function specModel(withCurrent){
       `**JSON on submit:** ${ex.payloadKeys}.`]));
 
   B.push(h(2,"11. Settings and reference data"),
-    table(["Setting (in the code, set by procurement)","Value","Effect"],[
+    p(`**Configuration in use:** ${CFG.source==="database"?`version ${CFG.version}, published in the database`:CFG.source==="cached"?`version ${CFG.version}, the last copy this browser received (the database could not be reached)`:"the built-in defaults"} (checksum ${CFG.checksum}). Thresholds, channels, category flags and the routing rules are data; the rules are decision tables run by one engine.`),
+    table(["Setting (set by procurement in the configuration)","Value","Effect"],[
       ["Small, simple purchase up to", eur(T.simpleMax), "Business-led demand with the short form: one quote or a corporate card, and a purchase request instead of a service description"],
       ["Catalogue order without a quantity up to", eur(T.catalogueNoQtyMax), "The most a catalogue order can be when no quantity is given"],
       ["Sourcing request form from (annual value)", eur(T.formMin), "Below it the division leads with three quotes; from it the Category Manager decides, or procurement leads in mandatory categories"],
@@ -5659,7 +5653,9 @@ function reopenGate(){
 (async()=>{
   render(); await detectServer(); resolveProvider();
   if(SERVER && SERVER.accessRequired) await accessGate(); else $("#gate").hidden=true;
+  await loadConfig();
   render(); $("#inp").focus();
+  window.__ready=true;   // start-up is complete (the tests wait for it)
 })();
 </script>
 </body>

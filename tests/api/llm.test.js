@@ -9,7 +9,7 @@ const realFetch = global.fetch;
 let savedEnv, calls;
 
 // a fresh copy of the function per test, as after a cold start (its cooldown memory is module state)
-function load() { delete require.cache[require.resolve(API)]; return require(API); }
+function load() { for (const k of Object.keys(require.cache)) if (k === require.resolve(API) || k.includes(`${path.sep}api${path.sep}_lib${path.sep}`)) delete require.cache[k]; return require(API); }
 
 const reply = (status, body, headers = {}) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...headers } });
 const geminiOk = (text = '{"ok":true}') => reply(200, { candidates: [{ content: { parts: [{ text }] } }] });
