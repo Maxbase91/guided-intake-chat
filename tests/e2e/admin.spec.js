@@ -191,3 +191,30 @@ test("guidance and question texts are edited on the admin page, and new conversa
   expect(await page.evaluate(() => [CFG.version, CAT_AUD.marketing, FACTS.background.q(S.f)])).toEqual([4, "our top 40 corporate clients and their relationship managers", "Which client problem does this event solve, and what if it slips?"]);
   expect(errors).toEqual([]);
 });
+
+test("divisions, review lists and which division is asked what are edited on the admin page", async ({ page }) => {
+  const errors = await signIn(page);
+  await page.click("[data-tab=lists]");
+  const list = page.locator("[data-list=prohibited_services]");
+  await list.getByRole("button", { name: "+ entry" }).click();
+  await expect(status(page)).toContainText("problem");           // an entry without search words cannot be published
+  await list.locator("tbody tr").last().locator('input[aria-label="Name"]').fill("fortune telling");
+  await list.locator("tbody tr").last().locator('input[aria-label^="Search words"]').fill("astrolog*, fortune tell*");
+  await page.fill("#d-private-office", "Private banking sourcing desk");
+  await page.click("[data-tab=questions]");
+  await page.fill("#qFilter", "spend");
+  await page.selectOption("#qa-spend_type-private", "R");
+  await page.click("#saveBtn");
+  await expect(status(page)).toContainText("All rules pass their tests");
+  accept(page, "Lists and divisions");
+  await page.click("#publishBtn");
+  await expect(status(page)).toContainText("Published: version 5");
+  await openApp(page, { kind: "admin" });
+  const got = await page.evaluate(() => withExampleState("An astrologer for our private clients event, around 30k.", () => {
+    S.f.division = "private"; refresh();
+    return { controls: S.det.controls.map((c) => c[2]).filter((t) => /fortune/.test(t)), asked: S.req.filter((k) => ["division", "demand_owner", "sponsor", "spend_type"].includes(k)) };
+  }));
+  expect(got.controls).toEqual(["This looks like fortune telling, which the bank does not buy from third parties. The Private banking sourcing desk and Compliance review it before anything else happens."]);
+  expect(got.asked).toEqual(["division", "demand_owner", "sponsor", "spend_type"]);
+  expect(errors).toEqual([]);
+});

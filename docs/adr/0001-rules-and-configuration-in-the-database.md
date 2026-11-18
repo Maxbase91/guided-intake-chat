@@ -32,7 +32,7 @@ maintains the rules and that every decision can be traced.
 - What stays code: text matching, Level 4 classification, the outsourcing tree, the question conditions, questions
   worded from the request, the operations-domain guidance, prompts and document templates. Question texts that are the
   same for every request and the category guidance are data (added 18 November 2026; a document saved before that gets
-  them from the seed).
+  them from the seed). Divisions, applicability and the review lists followed the same way.
 - The thresholds are readable in the page source and the repository. The access code protects the AI calls, the
   configuration endpoint and the decision log, not the page file.
 - Neon's free tier sleeps when idle: the first read after a pause can take a second or two, which is why the page

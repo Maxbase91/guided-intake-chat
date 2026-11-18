@@ -1,0 +1,7 @@
+[
+  {"id": "corporate", "name": "Corporate banking", "vendor_office": "Corporate banking vendor office"},
+  {"id": "investment", "name": "Investment banking", "vendor_office": "Investment banking vendor office"},
+  {"id": "corporate_investment", "name": "Corporate and investment banking (joint)", "vendor_office": "Corporate and investment banking vendor office"},
+  {"id": "private", "name": "Private banking", "vendor_office": "Private banking vendor office"},
+  {"id": "technology", "name": "Technology and operations", "vendor_office": "Technology and operations vendor office"}
+]

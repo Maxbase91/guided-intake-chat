@@ -17,7 +17,7 @@ test("without a database the server serves the seed, and the page runs on its bu
   const errors = await openApp(page);
   const got = await page.evaluate(() => ({ cfg: { ...CFG }, defaults: DEFAULTS.checksum, rules: Object.keys(RULES) }));
   expect(got.cfg).toEqual({ version: 0, source: "builtin", checksum: got.defaults });
-  expect(got.rules).toEqual(["R01", "R02", "R11", "R19"]);
+  expect(got.rules).toEqual(["R01", "R02", "R11", "R19", "R07", "R08"]);
   expect(await routeOf(page)).toEqual(["business", "division"]);
   await page.click("#howBtn");
   await expect(page.locator("#specPaper")).toContainText("Configuration in use: the built-in defaults");
@@ -27,7 +27,7 @@ test("without a database the server serves the seed, and the page runs on its bu
 test("the request records the rule rows that decided and the configuration it ran on", async ({ page }) => {
   await openApp(page);
   const got = await page.evaluate((t) => withExampleState(t, () => S.det.rules), DINNER);
-  expect(got).toEqual([{ rule: "R01", row: 3, outcome: "not_covered" }, { rule: "R02", row: 3, outcome: "not_covered" }, { rule: "R11", row: 6, outcome: "division" }, { rule: "R19", row: 4, outcome: "business" }]);
+  expect(got).toEqual([{ rule: "R01", row: 3, outcome: "not_covered" }, { rule: "R02", row: 3, outcome: "not_covered" }, { rule: "R11", row: 6, outcome: "division" }, { rule: "R19", row: 4, outcome: "business" }, { rule: "R07", row: 2, outcome: "clear" }, { rule: "R08", row: 2, outcome: "clear" }]);
 });
 
 test("a published configuration from the server replaces the defaults and changes the outcome", async ({ page, request }) => {
@@ -86,7 +86,7 @@ test("submitting stores the decision log: rule rows and typed facts, nothing the
   expect(await (await request.post(resp.url(), { data: body })).json()).toEqual({ stored: 0 });
   expect(body.conversation_id).toMatch(/^[0-9a-f-]{36}$/);
   expect([body.config_version, body.config_source]).toEqual([0, "builtin"]);
-  expect(body.decisions.map((d) => [d.seq, d.rule, d.outcome])).toEqual([[0, "R01", "not_covered"], [1, "R02", "not_covered"], [2, "R11", "division"], [3, "R19", "business"]]);
+  expect(body.decisions.map((d) => [d.seq, d.rule, d.outcome])).toEqual([[0, "R01", "not_covered"], [1, "R02", "not_covered"], [2, "R11", "division"], [3, "R19", "business"], [4, "R07", "clear"], [5, "R08", "clear"]]);
   expect(body.decisions[2].facts).toMatchObject({ category: "marketing", annual_value: 30000, total_value: 30000, value_known: true, cat_cm_mandatory: false, request_type: "new", r11: "division" });
   expect(JSON.stringify(body)).not.toMatch(/dinner|agency|40 people/i);
   await expect(lastAssistant(page)).toContainText("Only the record of which rules decided is stored");

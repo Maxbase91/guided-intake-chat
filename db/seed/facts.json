@@ -12,5 +12,8 @@
   {"key": "simple_eligible", "label": "Simple purchase (not software or external workers, no technology, no data or system access, not ongoing over 12 months)", "type": "bool"},
   {"key": "r01", "label": "Result of R01 (catalogue)", "type": "enum", "values": ["covered_item", "covered_shop", "not_covered"]},
   {"key": "r02", "label": "Result of R02 (existing contract)", "type": "enum", "values": ["use_contract", "not_covered"]},
-  {"key": "r11", "label": "Result of R11 (who leads)", "type": "enum", "values": ["renewal", "pending_value", "lead_threshold", "cm_mandatory", "cm_decides", "division"]}
+  {"key": "r11", "label": "Result of R11 (who leads)", "type": "enum", "values": ["renewal", "pending_value", "lead_threshold", "cm_mandatory", "cm_decides", "division"]},
+  {"key": "division", "label": "Division", "type": "enum", "values": ["corporate", "investment", "corporate_investment", "private", "technology"]},
+  {"key": "prohibited_match", "label": "Names a service the bank does not buy from third parties", "type": "bool"},
+  {"key": "country_review", "label": "Involves a country that needs a vendor office review", "type": "bool"}
 ]

@@ -114,5 +114,47 @@
       {"name": "Category Manager decides", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "cm_decides", "simple_eligible": true, "total_value": {"param": "formMin", "plus": 1}}, "expect": "procurement"},
       {"name": "Value not known", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "pending_value", "simple_eligible": true}, "expect": "procurement"}
     ]
+  },
+  {
+    "id": "R07",
+    "name": "Prohibited services",
+    "step": "Sourcing checks",
+    "mode": "advise",
+    "clause": "",
+    "decides": "Whether the request names a service the bank does not buy from third parties. Proposal: run for every division; the corporate banking checklist requires it.",
+    "placeholders": ["item", "vendor_office"],
+    "outcomes": [
+      {"key": "prohibited", "label": "Possibly a prohibited service", "flag": true, "level": "b", "title": "Prohibited service check"},
+      {"key": "clear", "label": "Clear"}
+    ],
+    "rows": [
+      {"when": [{"fact": "prohibited_match", "op": "is", "value": true}], "then": "prohibited", "text": "This looks like {item}, which the bank does not buy from third parties. The {vendor_office} and Compliance review it before anything else happens."},
+      {"when": [], "then": "clear"}
+    ],
+    "tests": [
+      {"name": "Names a listed service", "given": {"prohibited_match": true}, "expect": "prohibited"},
+      {"name": "Nothing listed", "given": {"prohibited_match": false}, "expect": "clear"}
+    ]
+  },
+  {
+    "id": "R08",
+    "name": "Country review",
+    "step": "Sourcing checks",
+    "mode": "advise",
+    "clause": "",
+    "decides": "Whether the work, the data or the supplier involves a country that needs a vendor office review. Proposal: run for every division; the corporate banking checklist requires it.",
+    "placeholders": ["country", "vendor_office"],
+    "outcomes": [
+      {"key": "review", "label": "Country review needed", "flag": true, "level": "w", "title": "Country review"},
+      {"key": "clear", "label": "Clear"}
+    ],
+    "rows": [
+      {"when": [{"fact": "country_review", "op": "is", "value": true}], "then": "review", "text": "Part of this involves {country}, so the {vendor_office} reviews it before sourcing starts."},
+      {"when": [], "then": "clear"}
+    ],
+    "tests": [
+      {"name": "A listed country", "given": {"country_review": true}, "expect": "review"},
+      {"name": "No listed country", "given": {"country_review": false}, "expect": "clear"}
+    ]
   }
 ]

@@ -51,6 +51,7 @@ function sanitize(doc) {
   const by = (list, key) => new Map(list.filter((x) => x && typeof x === "object").map((x) => [x[key], x]));
   const params = by(doc.params, "key"), channels = by(doc.channels, "key"), categories = by(doc.categories, "id"), rules = by(doc.rules, "id");
   const questions = by(Array.isArray(doc.questions) ? doc.questions : [], "key"), guidance = by(Array.isArray(doc.guidance) ? doc.guidance : [], "key");
+  const divisions = by(Array.isArray(doc.divisions) ? doc.divisions : [], "id"), lists = by(Array.isArray(doc.lists) ? doc.lists : [], "key");
   const catIds = new Set(["_", ...SEED.categories.map((c) => c.id)]);
   return {
     params: SEED.params.map((p) => { const v = (params.get(p.key) || {}).value; return { ...p, value: typeof v === "number" && isFinite(v) && v >= 0 && v <= 1e12 ? v : p.value }; }),
@@ -69,6 +70,8 @@ function sanitize(doc) {
       if ("q" in q) out.q = text(x.q, 400) || q.q;
       if ("ex" in q) out.ex = typeof x.ex === "string" ? text(x.ex, 400) : q.ex;
       if ("why" in q) out.why = typeof x.why === "string" ? text(x.why, 400) : q.why;
+      // which divisions are asked: R required, C conditional (asked for new demand), - not asked
+      if (q.applies) out.applies = Object.fromEntries(SEED.divisions.map((d) => { const v = x.applies && x.applies[d.id]; return [d.id, ["R", "C", "-"].includes(v) ? v : q.applies[d.id] || "R"]; }));
       return out;
     }),
     // guidance texts per category; "_" is the text for any other category
@@ -78,6 +81,15 @@ function sanitize(doc) {
       for (const [k, v] of Object.entries(sent)) if (catIds.has(k)) { const t = text(v, 600); if (t) texts[k] = t; }
       if ("_" in g.texts && !texts._) texts._ = g.texts._;
       return { ...g, texts: Object.fromEntries(Object.keys(texts).sort((a, b) => (a === "_" ? -1 : b === "_" ? 1 : a.localeCompare(b))).map((k) => [k, texts[k]])) };
+    }),
+    divisions: SEED.divisions.map((d) => { const x = divisions.get(d.id) || {}; return { id: d.id, name: text(x.name, 80) || d.name, vendor_office: text(x.vendor_office, 100) || d.vendor_office }; }),
+    // review lists: entries with a name and search words ("word", or "stem*" for longer words too)
+    lists: SEED.lists.map((l) => {
+      const x = lists.get(l.key) || {}, items = Array.isArray(x.items) ? x.items : l.items;
+      return { ...l, items: items.slice(0, 200).filter((it) => it && typeof it === "object").map((it) => ({
+        name: text(it.name, 80),
+        keywords: (Array.isArray(it.keywords) ? it.keywords : []).slice(0, 20).map((k) => text(k, 40).toLowerCase().replace(/[^a-z0-9 *'&-]/g, "").replace(/\*(?!$)/g, "").trim()).filter((k) => k.replace("*", "").length >= 2),
+      })).filter((it) => it.name && it.keywords.length) };
     }),
   };
 }

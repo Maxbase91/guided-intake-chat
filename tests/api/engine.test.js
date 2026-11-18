@@ -58,7 +58,7 @@ test("every rule in the seed is valid and passes its own test cases", () => {
     assert.ok(r.tests.length >= 2, `${r.id} has test cases`);
     for (const t of Engine.runTests(r, params)) assert.ok(t.ok, `${r.id}: ${t.name} → ${t.got}, expected ${t.expect}`);
   }
-  assert.deepEqual(cfg.rules.map((r) => r.id), ["R01", "R02", "R11", "R19"]);
+  assert.deepEqual(cfg.rules.map((r) => r.id), ["R01", "R02", "R11", "R19", "R07", "R08"]);
 });
 
 test("validation names what is wrong with a rule in plain words", () => {

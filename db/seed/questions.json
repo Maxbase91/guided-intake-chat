@@ -61,5 +61,9 @@
   {"key": "ip_ownership", "label": "Who owns the work", "q": "Should we own what the supplier creates, such as designs, code or materials?", "ex": ""},
   {"key": "performance", "label": "Supplier so far", "ex": "Anything to fix in the renewal is useful to know."},
   {"key": "hosting", "label": "Who runs it", "q": "Who will host and run the software: the provider (SaaS or a managed service), or our own Technology team?", "ex": "This decides the outsourcing check: software the provider runs for us usually counts as outsourcing, software we install and run ourselves does not."},
-  {"key": "phasing", "label": "Phasing", "q": "Should any part be delivered first?", "ex": "For example: \"the KYC part first, trading in a second release\"."}
+  {"key": "phasing", "label": "Phasing", "q": "Should any part be delivered first?", "ex": "For example: \"the KYC part first, trading in a second release\"."},
+  {"key": "division", "label": "Division", "q": "Which division is this for?", "ex": "", "why": "It decides which vendor office reviews the request and which questions apply."},
+  {"key": "demand_owner", "label": "Demand owner", "q": "Who owns this demand on the business side?", "ex": "A name, or \"I am\". The demand owner decides on it and answers the buyer's questions.", "applies": {"corporate": "R", "investment": "R", "corporate_investment": "R", "private": "R", "technology": "R"}},
+  {"key": "sponsor", "label": "Sponsor and budget approver", "q": "Who sponsors this and approves the budget?", "ex": "A name or a role, for example \"the head of operations\".", "applies": {"corporate": "R", "investment": "R", "corporate_investment": "R", "private": "C", "technology": "R"}},
+  {"key": "spend_type", "label": "Spend type", "q": "Does this keep today's business running, or is it a change or a project?", "ex": "", "why": "Finance books running costs and change costs differently.", "applies": {"corporate": "R", "investment": "R", "corporate_investment": "-", "private": "-", "technology": "R"}}
 ]

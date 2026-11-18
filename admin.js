@@ -7,7 +7,7 @@
   "use strict";
   const $app = document.getElementById("app");
   const S = { code: sessionStorage.getItem("adm") || "", actor: localStorage.getItem("adm-name") || "", st: null, doc: null, tab: "thresholds", unsaved: false, extra: {}, busy: false, qFilter: "", gKey: "" };
-  const TABS = [["thresholds", "Thresholds"], ["channels", "Channels"], ["categories", "Categories"], ["rules", "Rules"], ["questions", "Questions"], ["guidance", "Guidance"], ["versions", "Versions and changes"], ["decisions", "Decision log"]];
+  const TABS = [["thresholds", "Thresholds"], ["channels", "Channels"], ["categories", "Categories"], ["rules", "Rules"], ["questions", "Questions"], ["guidance", "Guidance"], ["lists", "Divisions and lists"], ["versions", "Versions and changes"], ["decisions", "Decision log"]];
 
   // ---------- small helpers
   function h(tag, attrs, ...kids) {
@@ -62,6 +62,8 @@
     doc.params.forEach((p) => { if (typeof p.value !== "number" || !isFinite(p.value) || p.value < 0) out.push(`${p.label}: not a number of 0 or more`); });
     if (params.formMin > params.leadMin) out.push("The sourcing request form threshold is above the threshold from which procurement leads.");
     doc.channels.forEach((c) => { if (!String(c.name || "").trim()) out.push(`Channel ${c.key} has no name`); });
+    (doc.divisions || []).forEach((d) => { if (!String(d.name || "").trim() || !String(d.vendor_office || "").trim()) out.push(`Division ${d.id} has no name or vendor office`); });
+    (doc.lists || []).forEach((l) => l.items.forEach((it, i) => { if (!String(it.name || "").trim() || !it.keywords.length) out.push(`${l.label}, entry ${i + 1}: needs a name and at least one search word`); }));
     doc.rules.forEach((rule) => {
       out.push(...Engine.validateRule(rule, registry, params));
       Engine.runTests(rule, params).filter((t) => !t.ok).forEach((t) => out.push(`${rule.id}: test "${t.name}" expects ${t.expect}, got ${t.got}`));
@@ -117,7 +119,7 @@
   }
 
   // ---------- tabs
-  const changed = (part, key, field) => { const id = part === "categories" || part === "rules" ? "id" : "key"; const a = S.st.draft[part].find((x) => x[id] === key), b = S.doc[part].find((x) => x[id] === key); return a && b && !same(a[field], b[field]) ? "changed" : ""; };
+  const changed = (part, key, field) => { const id = part === "categories" || part === "rules" || part === "divisions" ? "id" : "key"; const a = S.st.draft[part].find((x) => x[id] === key), b = S.doc[part].find((x) => x[id] === key); return a && b && !same(a[field], b[field]) ? "changed" : ""; };
 
   function thresholds() {
     return h("div", { class: "card" }, h("h2", {}, "Thresholds"), h("p", { class: "hint" }, "Amounts are in euros. The rules read these values by name, so a change here changes every rule that uses the threshold."),
@@ -252,7 +254,28 @@
       h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Question"), h("th", {}, "Texts"))),
         h("tbody", {}, list.map((q) => h("tr", { "data-q": q.key },
           h("td", { style: "width:280px" }, h("input", { type: "text", id: `q-${q.key}-label`, "aria-label": `Label of ${q.key}`, style: "width:100%", class: changed("questions", q.key, "label"), value: q.label, oninput: (e) => editQuiet(() => { q.label = e.target.value; }) }), h("div", { class: "muted" }, q.key)),
-          h("td", {}, "q" in q ? area(q, "q", "Question") : h("div", { class: "muted" }, "Worded from the request (in the code)"), "ex" in q ? area(q, "ex", "Example") : null, "why" in q ? area(q, "why", "Why we ask") : null))))));
+          h("td", {}, "q" in q ? area(q, "q", "Question") : h("div", { class: "muted" }, "Worded from the request (in the code)"), "ex" in q ? area(q, "ex", "Example") : null, "why" in q ? area(q, "why", "Why we ask") : null,
+            q.applies ? h("div", { class: "checks", style: "margin-top:6px" }, h("span", { class: "muted" }, "Asked for:"), S.doc.divisions.map((d) => h("label", {}, `${d.name} `,
+              select([["R", "required"], ["C", "conditional"], ["-", "not asked"]], q.applies[d.id], (v) => edit(() => { q.applies[d.id] = v; }), { "aria-label": `${q.label}: ${d.name}`, id: `qa-${q.key}-${d.id}` })))) : null))))));
+  }
+
+  // ---------- divisions and the review lists the checks read
+  function lists() {
+    const words = (it) => it.keywords.join(", ");
+    return h("div", {},
+      h("div", { class: "card" }, h("h2", {}, "Divisions"), h("p", { class: "hint" }, "New demand asks which division it is for. The division decides which vendor office reviews the request (named in the record and in the review flags) and, in the Questions tab, which ownership questions are asked."),
+        h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Division"), h("th", {}, "Vendor office"))),
+          h("tbody", {}, S.doc.divisions.map((d) => h("tr", {},
+            h("td", {}, h("input", { type: "text", id: `d-${d.id}-name`, "aria-label": `Name of ${d.id}`, style: "width:320px", class: changed("divisions", d.id, "name"), value: d.name, oninput: (e) => editQuiet(() => { d.name = e.target.value; }) }), " ", h("span", { class: "muted" }, d.id)),
+            h("td", {}, h("input", { type: "text", id: `d-${d.id}-office`, "aria-label": `Vendor office of ${d.id}`, style: "width:380px", class: changed("divisions", d.id, "vendor_office"), value: d.vendor_office, oninput: (e) => editQuiet(() => { d.vendor_office = e.target.value; }) }))))))),
+      S.doc.lists.map((l) => h("div", { class: "card", "data-list": l.key }, h("h2", {}, l.label), h("p", { class: "hint" }, `${l.description} Maintained by ${l.owner}.`),
+        h("p", { class: "hint" }, "Search words are matched as whole words in what the requester writes; end a word with * to match longer words too (\"lobbyist*\" finds lobbyists)."),
+        h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Name shown in the flag"), h("th", {}, "Search words, separated by commas"), h("th", {}))),
+          h("tbody", {}, l.items.map((it, i) => h("tr", {},
+            h("td", {}, h("input", { type: "text", "aria-label": "Name", style: "width:300px", value: it.name, oninput: (e) => editQuiet(() => { it.name = e.target.value; }) })),
+            h("td", {}, h("input", { type: "text", "aria-label": `Search words for ${it.name}`, style: "width:100%", value: words(it), oninput: (e) => editQuiet(() => { it.keywords = e.target.value.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean); }) })),
+            h("td", {}, h("button", { class: "btn s x", type: "button", "aria-label": `Remove ${it.name}`, onclick: () => edit(() => { l.items.splice(i, 1); }) }, "✕")))))),
+        h("p", {}, h("button", { class: "btn s", type: "button", onclick: () => edit(() => { l.items.push({ name: "New entry", keywords: [] }); }) }, "+ entry")))));
   }
 
   // ---------- guidance: texts per category that examples and suggestions are built from
@@ -317,7 +340,7 @@
     $app.replaceChildren();
     if (!S.st) { $app.append(login()); return; }
     const prob = problems();
-    const body = { thresholds, channels, categories, rules, questions, guidance, versions, decisions }[S.tab]();
+    const body = { thresholds, channels, categories, rules, questions, guidance, lists, versions, decisions }[S.tab]();
     $app.append(
       h("header", { class: "top" }, h("h1", {}, "Rules and settings"), h("span", { class: "muted", style: "color:#d6deef" }, S.actor ? `Signed in as ${S.actor}` : ""), h("span", { class: "sp" }),
         h("a", { href: "./" }, "Open the intake"), h("button", { class: "btn s", type: "button", onclick: () => { if (S.unsaved && !confirm("Leave without saving?")) return; S.code = ""; sessionStorage.removeItem("adm"); S.st = null; S.extra = {}; render(); } }, "Sign out")),

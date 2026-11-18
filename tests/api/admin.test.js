@@ -71,7 +71,7 @@ async function editPublishFlow(url) {
       assert.equal(savedDraft.dirty, true);
       assert.equal(param(savedDraft.draft, "formMin").value, 20000);
       assert.equal(param(savedDraft.draft, "leadMin").label, param(start.draft, "leadMin").label);
-      assert.deepEqual([savedDraft.draft.params.length, savedDraft.draft.channels.length, savedDraft.draft.rules.length, "extra" in savedDraft.draft], [start.draft.params.length, 4, 4, false]);
+      assert.deepEqual([savedDraft.draft.params.length, savedDraft.draft.channels.length, savedDraft.draft.rules.length, "extra" in savedDraft.draft], [start.draft.params.length, 4, start.draft.rules.length, false]);
       assert.deepEqual([savedDraft.draft.categories[0].keywords, savedDraft.draft.categories[0].cm_mandatory], [undefined, false]);
       assert.equal(savedDraft.draft.rules.find((r) => r.id === "R11").outcomes[0].lead, "procurement");
       // the page still gets the published version
@@ -194,4 +194,16 @@ test("a stored version from before placeholders were listed is still valid: plac
   assert.deepEqual(validateConfig(configFrom(old, 2, "database")), []);
   const forged = structuredClone(SEED); forged.rules.find((r) => r.id === "R02").placeholders.push("lead_threshold");
   assert.deepEqual(configFrom(forged, 2, "database").rules.find((r) => r.id === "R02").placeholders, ["contract", "supplier", "remaining", "expires"]);
+});
+
+test("a stored version from before a rule, question or fact existed gets it from the seed", () => {
+  const { SEED, validateConfig, configFrom } = require(path.join(ROOT, "api", "_lib", "seed.js"));
+  const old = structuredClone(SEED);
+  old.rules = old.rules.filter((r) => !["R07", "R08"].includes(r.id));
+  old.questions = old.questions.filter((q) => q.key !== "division");
+  old.facts = old.facts.filter((f) => f.key !== "division");
+  delete old.divisions; delete old.lists;
+  const cfg = configFrom(old, 2, "database");
+  assert.deepEqual(validateConfig(cfg), []);
+  assert.deepEqual([cfg.rules.map((r) => r.id).slice(-2), cfg.questions.some((q) => q.key === "division"), cfg.divisions.length], [["R07", "R08"], true, 5]);
 });

@@ -5,7 +5,7 @@
 const crypto = require("crypto");
 const Engine = require("../../engine.js");
 
-const PARTS = ["params", "channels", "categories", "facts", "rules", "questions", "guidance"];
+const PARTS = ["params", "channels", "categories", "facts", "rules", "questions", "guidance", "divisions", "lists"];
 const SEED = {
   params: require("../../db/seed/params.json"),
   channels: require("../../db/seed/channels.json"),
@@ -14,6 +14,8 @@ const SEED = {
   rules: require("../../db/seed/rules.json"),
   questions: require("../../db/seed/questions.json"),
   guidance: require("../../db/seed/guidance.json"),
+  divisions: require("../../db/seed/divisions.json"),
+  lists: require("../../db/seed/lists.json"),
 };
 
 // a document saved before a part existed gets that part from the seed
@@ -21,6 +23,10 @@ const withDefaults = (doc) => {
   const out = Object.fromEntries(PARTS.map((k) => [k, Array.isArray(doc && doc[k]) ? doc[k] : structuredClone(SEED[k])]));
   // the placeholders a rule fills are set by the code, so they always come from the seed
   out.rules = out.rules.map((r) => { const seed = SEED.rules.find((x) => x.id === (r && r.id)); return seed ? { ...r, placeholders: [...(seed.placeholders || [])] } : r; });
+  // a rule added to the code after the document was saved comes from the seed (R07 and R08 for versions 1 and 2)
+  SEED.rules.forEach((r) => { if (!out.rules.some((x) => x && x.id === r.id)) out.rules.push(structuredClone(r)); });
+  // likewise a question or a fact added later
+  for (const part of ["questions", "facts"]) SEED[part].forEach((q) => { if (!out[part].some((x) => x && x.key === q.key)) out[part].push(structuredClone(q)); });
   return out;
 };
 const bodyOf = (doc) => withDefaults(doc);
@@ -60,6 +66,8 @@ function validateConfig(cfg) {
     if (!have) errors.push(`guidance ${g.key} is missing`);
     else if ("_" in g.texts && !String((have.texts || {})._ || "").trim()) errors.push(`guidance ${g.label}: the text for any other category is empty`);
   }
+  for (const d of SEED.divisions) { const have = cfg.divisions.find((x) => x.id === d.id); if (!have || !String(have.name || "").trim() || !String(have.vendor_office || "").trim()) errors.push(`division ${d.id} has no name or vendor office`); }
+  for (const l of SEED.lists) { const have = cfg.lists.find((x) => x.key === l.key); if (!have) errors.push(`list ${l.key} is missing`); else (have.items || []).forEach((it, i) => { if (!String(it.name || "").trim() || !(it.keywords || []).length) errors.push(`${l.label}, entry ${i + 1}: needs a name and at least one search word`); }); }
   const ids = cfg.rules.map((r) => r.id);
   ids.filter((id, i) => ids.indexOf(id) !== i).forEach((id) => errors.push(`rule ${id} is defined twice`));
   for (const id of SEED.rules.map((r) => r.id)) if (!ids.includes(id)) errors.push(`rule ${id} is missing`);

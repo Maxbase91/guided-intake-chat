@@ -8,7 +8,7 @@ Dummy data only.
 - `index.html`: the app (vanilla JS, inline CSS and script, reference data and the built-in configuration as JSON blocks). No build step.
 - `engine.js`: the decision-table engine, loaded by the page with a script tag and by Node with `require`.
 - `db/seed/*.json`: thresholds, channels, category cards, facts, rules (decision tables with their test cases and
-  reason texts), question texts and category guidance.
+  reason texts), question texts and category guidance, divisions and the review lists (test data, not the bank's).
   `node scripts/build_defaults.js` writes them into the `config-defaults` block of `index.html`; run it after every seed change.
 - `api/llm.js`: Vercel Node serverless function (CommonJS). LLM proxy: Gemini → Groq → Mistral → OpenRouter `:free`.
 - `vercel.json`: function timeout (60 s) and security headers.
