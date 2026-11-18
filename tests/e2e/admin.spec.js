@@ -274,3 +274,23 @@ test("category search words are edited on the admin page and change which catego
   expect(await page.evaluate(() => [CFG.version, CONTRACTS.some((c) => c.id === "CTR-9001")])).toEqual([7, true]);
   expect(errors).toEqual([]);
 });
+
+test("a review flag is a rule card: its title, level, reviewer and text are edited, and new conversations show them", async ({ page }) => {
+  const errors = await signIn(page);
+  await page.click("[data-tab=rules]");
+  await page.selectOption("#ruleStep", "Category checks");
+  await expect(page.locator("[data-rule]")).toHaveCount(6);       // R31 to R36
+  await page.fill("#fl-R33-clients-title", "Client hospitality approval");
+  await page.selectOption("#fl-R33-clients-level", "w");
+  await page.fill("#fl-R33-clients-owner", "Compliance desk");
+  await page.locator("#rule-R33").getByLabel("Reason text of row 4").fill("Client hospitality: Compliance approves the guest list and the cost per guest.");
+  await page.click("#saveBtn");
+  await expect(status(page)).toContainText("All rules pass their tests");
+  accept(page, "Client hospitality reviewed by Compliance");
+  await page.click("#publishBtn");
+  await expect(status(page)).toContainText("Published: version 8");
+  await openApp(page, { kind: "admin" });
+  const got = await page.evaluate((t) => withExampleState(t, () => S.det.controls.find((c) => /hospitality/i.test(c[1]))), DINNER);
+  expect(got).toEqual(["w", "Client hospitality approval", "Client hospitality: Compliance approves the guest list and the cost per guest.", "Compliance desk", false]);
+  expect(errors).toEqual([]);
+});

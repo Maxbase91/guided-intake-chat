@@ -6,21 +6,21 @@
     "mode": "enforce",
     "clause": "",
     "decides": "Whether a catalogue item or a supplier's shop covers the need.",
-    "placeholders": ["items", "is_are", "shop", "supplier", "max_order"],
+    "placeholders": ["items","is_are","shop","supplier","max_order"],
     "outcomes": [
-      {"key": "covered_item", "label": "A catalogue item covers it"},
-      {"key": "covered_shop", "label": "A supplier's shop covers it"},
-      {"key": "not_covered", "label": "Not covered"}
+      {"key":"covered_item","label":"A catalogue item covers it"},
+      {"key":"covered_shop","label":"A supplier's shop covers it"},
+      {"key":"not_covered","label":"Not covered"}
     ],
     "rows": [
-      {"when": [{"fact": "catalogue_match", "op": "is", "value": "item"}], "then": "covered_item", "text": "{items} {is_are} in the catalogue, so you can order directly at the agreed price."},
-      {"when": [{"fact": "catalogue_match", "op": "is", "value": "shop"}], "then": "covered_shop", "text": "The {shop} of {supplier} is in the catalogue for orders up to {max_order}, so you order there directly at the agreed prices."},
-      {"when": [], "then": "not_covered"}
+      {"when":[{"fact":"catalogue_match","op":"is","value":"item"}],"then":"covered_item","text":"{items} {is_are} in the catalogue, so you can order directly at the agreed price."},
+      {"when":[{"fact":"catalogue_match","op":"is","value":"shop"}],"then":"covered_shop","text":"The {shop} of {supplier} is in the catalogue for orders up to {max_order}, so you order there directly at the agreed prices."},
+      {"when":[],"then":"not_covered"}
     ],
     "tests": [
-      {"name": "A catalogue item fits", "given": {"catalogue_match": "item"}, "expect": "covered_item"},
-      {"name": "A supplier's shop fits", "given": {"catalogue_match": "shop"}, "expect": "covered_shop"},
-      {"name": "Nothing in the catalogue", "given": {"catalogue_match": "none"}, "expect": "not_covered"}
+      {"name":"A catalogue item fits","given":{"catalogue_match":"item"},"expect":"covered_item"},
+      {"name":"A supplier's shop fits","given":{"catalogue_match":"shop"},"expect":"covered_shop"},
+      {"name":"Nothing in the catalogue","given":{"catalogue_match":"none"},"expect":"not_covered"}
     ]
   },
   {
@@ -30,20 +30,20 @@
     "mode": "enforce",
     "clause": "",
     "decides": "Whether an active framework contract is used.",
-    "placeholders": ["contract", "supplier", "remaining", "expires"],
+    "placeholders": ["contract","supplier","remaining","expires"],
     "outcomes": [
-      {"key": "use_contract", "label": "Use the existing contract"},
-      {"key": "not_covered", "label": "Not covered"}
+      {"key":"use_contract","label":"Use the existing contract"},
+      {"key":"not_covered","label":"Not covered"}
     ],
     "rows": [
-      {"when": [{"fact": "contract_match", "op": "is", "value": true}, {"fact": "demand_type", "op": "is", "value": "contingent_labour"}], "then": "use_contract", "text": "External workers come through the {contract} with {supplier}, so this is a call-off with a role profile. No new competition is needed."},
-      {"when": [{"fact": "contract_match", "op": "is", "value": true}], "then": "use_contract", "text": "The {contract} with {supplier} already covers this, with {remaining} left until {expires}. No new competition is needed."},
-      {"when": [], "then": "not_covered"}
+      {"when":[{"fact":"contract_match","op":"is","value":true},{"fact":"demand_type","op":"is","value":"contingent_labour"}],"then":"use_contract","text":"External workers come through the {contract} with {supplier}, so this is a call-off with a role profile. No new competition is needed."},
+      {"when":[{"fact":"contract_match","op":"is","value":true}],"then":"use_contract","text":"The {contract} with {supplier} already covers this, with {remaining} left until {expires}. No new competition is needed."},
+      {"when":[],"then":"not_covered"}
     ],
     "tests": [
-      {"name": "A framework covers it", "given": {"contract_match": true}, "expect": "use_contract"},
-      {"name": "External workers through the staffing framework", "given": {"contract_match": true, "demand_type": "contingent_labour"}, "expect": "use_contract"},
-      {"name": "No framework, or the requester looks wider", "given": {"contract_match": false}, "expect": "not_covered"}
+      {"name":"A framework covers it","given":{"contract_match":true},"expect":"use_contract"},
+      {"name":"External workers through the staffing framework","given":{"contract_match":true,"demand_type":"contingent_labour"},"expect":"use_contract"},
+      {"name":"No framework, or the requester looks wider","given":{"contract_match":false},"expect":"not_covered"}
     ]
   },
   {
@@ -53,33 +53,33 @@
     "mode": "enforce",
     "clause": "",
     "decides": "Who leads the sourcing of new demand: procurement, or the division through its divisional vendor office.",
-    "placeholders": ["intro", "amount", "form_threshold", "lead_threshold"],
+    "placeholders": ["intro","amount","form_threshold","lead_threshold"],
     "outcomes": [
-      {"key": "renewal", "label": "Procurement leads through the renewals calendar", "lead": "procurement", "status": "decided", "form": false},
-      {"key": "pending_value", "label": "Procurement-led until the value is known", "lead": "procurement", "status": "pending_value", "form": true},
-      {"key": "lead_threshold", "label": "Procurement leads", "lead": "procurement", "status": "decided", "form": true},
-      {"key": "cm_mandatory", "label": "Procurement leads (mandatory category)", "lead": "procurement", "status": "decided", "form": true},
-      {"key": "cm_decides", "label": "The Category Manager decides", "lead": "category_manager", "status": "pending_category_manager", "form": true},
-      {"key": "division", "label": "The division leads", "lead": "division", "status": "decided", "form": false}
+      {"key":"renewal","label":"Procurement leads through the renewals calendar","lead":"procurement","status":"decided","form":false},
+      {"key":"pending_value","label":"Procurement-led until the value is known","lead":"procurement","status":"pending_value","form":true},
+      {"key":"lead_threshold","label":"Procurement leads","lead":"procurement","status":"decided","form":true},
+      {"key":"cm_mandatory","label":"Procurement leads (mandatory category)","lead":"procurement","status":"decided","form":true},
+      {"key":"cm_decides","label":"The Category Manager decides","lead":"category_manager","status":"pending_category_manager","form":true},
+      {"key":"division","label":"The division leads","lead":"division","status":"decided","form":false}
     ],
     "rows": [
-      {"when": [{"fact": "cat_renewals_calendar", "op": "is", "value": true}, {"fact": "request_type", "op": "is", "value": "renewal"}], "then": "renewal", "text": "This is a market data renewal. It goes through the renewals calendar, so procurement leads it and no sourcing request form is needed."},
-      {"when": [{"fact": "value_known", "op": "is", "value": false}], "then": "pending_value", "text": "{intro} The value is not known yet, so I assume procurement-led demand until it is."},
-      {"when": [{"fact": "annual_value", "op": "gte", "value": {"param": "leadMin"}}], "then": "lead_threshold", "text": "{intro} At {amount} it is at or above the {lead_threshold} threshold, so procurement leads the sourcing with an RFP."},
-      {"when": [{"fact": "annual_value", "op": "gte", "value": {"param": "formMin"}}, {"fact": "cat_cm_mandatory", "op": "is", "value": true}], "then": "cm_mandatory", "text": "{intro} At {amount} it is at or above {form_threshold} in a category the Category Manager must handle, so procurement leads the sourcing with an RFP."},
-      {"when": [{"fact": "annual_value", "op": "gte", "value": {"param": "formMin"}}], "then": "cm_decides", "text": "{intro} At {amount} it is between {form_threshold} and {lead_threshold}, so the Category Manager decides whether procurement leads. Until then I treat it as procurement-led demand."},
-      {"when": [], "then": "division", "text": "{intro} At {amount} it is under the {form_threshold} threshold, so your division leads the sourcing: you collect at least three quotes, with procurement's guidance. No sourcing request form is needed."}
+      {"when":[{"fact":"cat_renewals_calendar","op":"is","value":true},{"fact":"request_type","op":"is","value":"renewal"}],"then":"renewal","text":"This is a market data renewal. It goes through the renewals calendar, so procurement leads it and no sourcing request form is needed."},
+      {"when":[{"fact":"value_known","op":"is","value":false}],"then":"pending_value","text":"{intro} The value is not known yet, so I assume procurement-led demand until it is."},
+      {"when":[{"fact":"annual_value","op":"gte","value":{"param":"leadMin"}}],"then":"lead_threshold","text":"{intro} At {amount} it is at or above the {lead_threshold} threshold, so procurement leads the sourcing with an RFP."},
+      {"when":[{"fact":"annual_value","op":"gte","value":{"param":"formMin"}},{"fact":"cat_cm_mandatory","op":"is","value":true}],"then":"cm_mandatory","text":"{intro} At {amount} it is at or above {form_threshold} in a category the Category Manager must handle, so procurement leads the sourcing with an RFP."},
+      {"when":[{"fact":"annual_value","op":"gte","value":{"param":"formMin"}}],"then":"cm_decides","text":"{intro} At {amount} it is between {form_threshold} and {lead_threshold}, so the Category Manager decides whether procurement leads. Until then I treat it as procurement-led demand."},
+      {"when":[],"then":"division","text":"{intro} At {amount} it is under the {form_threshold} threshold, so your division leads the sourcing: you collect at least three quotes, with procurement's guidance. No sourcing request form is needed."}
     ],
     "tests": [
-      {"name": "Market data renewal", "given": {"cat_renewals_calendar": true, "request_type": "renewal", "value_known": true, "annual_value": {"param": "formMin", "plus": -1}, "cat_cm_mandatory": false}, "expect": "renewal"},
-      {"name": "Market data extension follows the thresholds", "given": {"cat_renewals_calendar": true, "request_type": "extension", "value_known": true, "annual_value": {"param": "formMin", "plus": -1}, "cat_cm_mandatory": false}, "expect": "division"},
-      {"name": "Value not known yet", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": false, "cat_cm_mandatory": false}, "expect": "pending_value"},
-      {"name": "At the upper threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": {"param": "leadMin"}, "cat_cm_mandatory": false}, "expect": "lead_threshold"},
-      {"name": "Just under the upper threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": {"param": "leadMin", "plus": -1}, "cat_cm_mandatory": false}, "expect": "cm_decides"},
-      {"name": "Mandatory category between the thresholds", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": {"param": "formMin", "plus": 1}, "cat_cm_mandatory": true}, "expect": "cm_mandatory"},
-      {"name": "At the lower threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": {"param": "formMin"}, "cat_cm_mandatory": false}, "expect": "cm_decides"},
-      {"name": "Just under the lower threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": {"param": "formMin", "plus": -1}, "cat_cm_mandatory": false}, "expect": "division"},
-      {"name": "Mandatory category under the lower threshold", "given": {"cat_renewals_calendar": false, "request_type": "new", "value_known": true, "annual_value": {"param": "formMin", "plus": -1}, "cat_cm_mandatory": true}, "expect": "division"}
+      {"name":"Market data renewal","given":{"cat_renewals_calendar":true,"request_type":"renewal","value_known":true,"annual_value":{"param":"formMin","plus":-1},"cat_cm_mandatory":false},"expect":"renewal"},
+      {"name":"Market data extension follows the thresholds","given":{"cat_renewals_calendar":true,"request_type":"extension","value_known":true,"annual_value":{"param":"formMin","plus":-1},"cat_cm_mandatory":false},"expect":"division"},
+      {"name":"Value not known yet","given":{"cat_renewals_calendar":false,"request_type":"new","value_known":false,"cat_cm_mandatory":false},"expect":"pending_value"},
+      {"name":"At the upper threshold","given":{"cat_renewals_calendar":false,"request_type":"new","value_known":true,"annual_value":{"param":"leadMin"},"cat_cm_mandatory":false},"expect":"lead_threshold"},
+      {"name":"Just under the upper threshold","given":{"cat_renewals_calendar":false,"request_type":"new","value_known":true,"annual_value":{"param":"leadMin","plus":-1},"cat_cm_mandatory":false},"expect":"cm_decides"},
+      {"name":"Mandatory category between the thresholds","given":{"cat_renewals_calendar":false,"request_type":"new","value_known":true,"annual_value":{"param":"formMin","plus":1},"cat_cm_mandatory":true},"expect":"cm_mandatory"},
+      {"name":"At the lower threshold","given":{"cat_renewals_calendar":false,"request_type":"new","value_known":true,"annual_value":{"param":"formMin"},"cat_cm_mandatory":false},"expect":"cm_decides"},
+      {"name":"Just under the lower threshold","given":{"cat_renewals_calendar":false,"request_type":"new","value_known":true,"annual_value":{"param":"formMin","plus":-1},"cat_cm_mandatory":false},"expect":"division"},
+      {"name":"Mandatory category under the lower threshold","given":{"cat_renewals_calendar":false,"request_type":"new","value_known":true,"annual_value":{"param":"formMin","plus":-1},"cat_cm_mandatory":true},"expect":"division"}
     ]
   },
   {
@@ -91,28 +91,28 @@
     "decides": "Which buying channel is recommended. It combines the results of R01, R02 and R11 and takes no decision of its own.",
     "placeholders": ["amount"],
     "outcomes": [
-      {"key": "catalogue", "label": "Catalogue order", "channel": "catalogue"},
-      {"key": "contract", "label": "Existing contract", "channel": "contract"},
-      {"key": "simple", "label": "Business-led demand, short form for a small purchase", "channel": "business"},
-      {"key": "business", "label": "Business-led demand", "channel": "business"},
-      {"key": "procurement", "label": "Procurement-led demand", "channel": "procurement"}
+      {"key":"catalogue","label":"Catalogue order","channel":"catalogue"},
+      {"key":"contract","label":"Existing contract","channel":"contract"},
+      {"key":"simple","label":"Business-led demand, short form for a small purchase","channel":"business"},
+      {"key":"business","label":"Business-led demand","channel":"business"},
+      {"key":"procurement","label":"Procurement-led demand","channel":"procurement"}
     ],
     "rows": [
-      {"when": [{"fact": "r01", "op": "in", "value": ["covered_item", "covered_shop"]}], "then": "catalogue"},
-      {"when": [{"fact": "r02", "op": "is", "value": "use_contract"}], "then": "contract"},
-      {"when": [{"fact": "r11", "op": "is", "value": "division"}, {"fact": "simple_eligible", "op": "is", "value": true}, {"fact": "total_value", "op": "lte", "value": {"param": "simpleMax"}}], "then": "simple", "text": "At {amount} it is a small, simple purchase and no catalogue item or framework covers it, so you buy it directly: a purchase order with one quote, or your corporate card where the card policy allows."},
-      {"when": [{"fact": "r11", "op": "is", "value": "division"}], "then": "business"},
-      {"when": [], "then": "procurement"}
+      {"when":[{"fact":"r01","op":"in","value":["covered_item","covered_shop"]}],"then":"catalogue"},
+      {"when":[{"fact":"r02","op":"is","value":"use_contract"}],"then":"contract"},
+      {"when":[{"fact":"r11","op":"is","value":"division"},{"fact":"simple_eligible","op":"is","value":true},{"fact":"total_value","op":"lte","value":{"param":"simpleMax"}}],"then":"simple","text":"At {amount} it is a small, simple purchase and no catalogue item or framework covers it, so you buy it directly: a purchase order with one quote, or your corporate card where the card policy allows."},
+      {"when":[{"fact":"r11","op":"is","value":"division"}],"then":"business"},
+      {"when":[],"then":"procurement"}
     ],
     "tests": [
-      {"name": "Catalogue item", "given": {"r01": "covered_item", "r02": "not_covered"}, "expect": "catalogue"},
-      {"name": "Catalogue wins over a contract", "given": {"r01": "covered_shop", "r02": "use_contract"}, "expect": "catalogue"},
-      {"name": "Existing contract", "given": {"r01": "not_covered", "r02": "use_contract"}, "expect": "contract"},
-      {"name": "Small, simple purchase", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "division", "simple_eligible": true, "total_value": {"param": "simpleMax", "plus": -1}}, "expect": "simple"},
-      {"name": "Small but not simple", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "division", "simple_eligible": false, "total_value": {"param": "simpleMax", "plus": -1}}, "expect": "business"},
-      {"name": "Division leads", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "division", "simple_eligible": true, "total_value": {"param": "simpleMax", "plus": 1}}, "expect": "business"},
-      {"name": "Category Manager decides", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "cm_decides", "simple_eligible": true, "total_value": {"param": "formMin", "plus": 1}}, "expect": "procurement"},
-      {"name": "Value not known", "given": {"r01": "not_covered", "r02": "not_covered", "r11": "pending_value", "simple_eligible": true}, "expect": "procurement"}
+      {"name":"Catalogue item","given":{"r01":"covered_item","r02":"not_covered"},"expect":"catalogue"},
+      {"name":"Catalogue wins over a contract","given":{"r01":"covered_shop","r02":"use_contract"},"expect":"catalogue"},
+      {"name":"Existing contract","given":{"r01":"not_covered","r02":"use_contract"},"expect":"contract"},
+      {"name":"Small, simple purchase","given":{"r01":"not_covered","r02":"not_covered","r11":"division","simple_eligible":true,"total_value":{"param":"simpleMax","plus":-1}},"expect":"simple"},
+      {"name":"Small but not simple","given":{"r01":"not_covered","r02":"not_covered","r11":"division","simple_eligible":false,"total_value":{"param":"simpleMax","plus":-1}},"expect":"business"},
+      {"name":"Division leads","given":{"r01":"not_covered","r02":"not_covered","r11":"division","simple_eligible":true,"total_value":{"param":"simpleMax","plus":1}},"expect":"business"},
+      {"name":"Category Manager decides","given":{"r01":"not_covered","r02":"not_covered","r11":"cm_decides","simple_eligible":true,"total_value":{"param":"formMin","plus":1}},"expect":"procurement"},
+      {"name":"Value not known","given":{"r01":"not_covered","r02":"not_covered","r11":"pending_value","simple_eligible":true},"expect":"procurement"}
     ]
   },
   {
@@ -120,20 +120,20 @@
     "name": "Prohibited services",
     "step": "Sourcing checks",
     "mode": "advise",
-    "clause": "",
+    "clause": "Compliance policy: services the bank does not buy (test data)",
     "decides": "Whether the request names a service the bank does not buy from third parties. Proposal: run for every division; the corporate banking checklist requires it.",
-    "placeholders": ["item", "vendor_office"],
+    "placeholders": ["item","vendor_office"],
     "outcomes": [
-      {"key": "prohibited", "label": "Possibly a prohibited service", "flag": true, "level": "b", "title": "Prohibited service check"},
-      {"key": "clear", "label": "Clear"}
+      {"key":"prohibited","label":"Possibly a prohibited service","flag":true,"level":"b","title":"Prohibited service check","owner":"Vendor office and Compliance"},
+      {"key":"clear","label":"Clear"}
     ],
     "rows": [
-      {"when": [{"fact": "prohibited_match", "op": "is", "value": true}], "then": "prohibited", "text": "This looks like {item}, which the bank does not buy from third parties. The {vendor_office} and Compliance review it before anything else happens."},
-      {"when": [], "then": "clear"}
+      {"when":[{"fact":"prohibited_match","op":"is","value":true}],"then":"prohibited","text":"This looks like {item}, which the bank does not buy from third parties. The {vendor_office} and Compliance review it before anything else happens."},
+      {"when":[],"then":"clear"}
     ],
     "tests": [
-      {"name": "Names a listed service", "given": {"prohibited_match": true}, "expect": "prohibited"},
-      {"name": "Nothing listed", "given": {"prohibited_match": false}, "expect": "clear"}
+      {"name":"Names a listed service","given":{"prohibited_match":true},"expect":"prohibited"},
+      {"name":"Nothing listed","given":{"prohibited_match":false},"expect":"clear"}
     ]
   },
   {
@@ -141,20 +141,573 @@
     "name": "Country review",
     "step": "Sourcing checks",
     "mode": "advise",
-    "clause": "",
+    "clause": "Country risk list (test data)",
     "decides": "Whether the work, the data or the supplier involves a country that needs a vendor office review. Proposal: run for every division; the corporate banking checklist requires it.",
-    "placeholders": ["country", "vendor_office"],
+    "placeholders": ["country","vendor_office"],
     "outcomes": [
-      {"key": "review", "label": "Country review needed", "flag": true, "level": "w", "title": "Country review"},
-      {"key": "clear", "label": "Clear"}
+      {"key":"review","label":"Country review needed","flag":true,"level":"w","title":"Country review","owner":"Vendor office"},
+      {"key":"clear","label":"Clear"}
     ],
     "rows": [
-      {"when": [{"fact": "country_review", "op": "is", "value": true}], "then": "review", "text": "Part of this involves {country}, so the {vendor_office} reviews it before sourcing starts."},
-      {"when": [], "then": "clear"}
+      {"when":[{"fact":"country_review","op":"is","value":true}],"then":"review","text":"Part of this involves {country}, so the {vendor_office} reviews it before sourcing starts."},
+      {"when":[],"then":"clear"}
     ],
     "tests": [
-      {"name": "A listed country", "given": {"country_review": true}, "expect": "review"},
-      {"name": "No listed country", "given": {"country_review": false}, "expect": "clear"}
+      {"name":"A listed country","given":{"country_review":true},"expect":"review"},
+      {"name":"No listed country","given":{"country_review":false},"expect":"clear"}
+    ]
+  },
+  {
+    "id": "R20",
+    "name": "Approval to source",
+    "step": "Process controls",
+    "mode": "inform",
+    "clause": "Procurement policy: approval to source (test data)",
+    "decides": "Whether the budget owner must approve before sourcing starts.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"i","title":"Approval to source","owner":"Budget owner and procurement","approval":true},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"route","op":"is","value":"procurement"}],"then":"flag","text":"Budget owner confirms need and budget before the RFP starts."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Procurement-led","given":{"route":"procurement"},"expect":"flag"},
+      {"name":"Business-led","given":{"route":"business"},"expect":"none"},
+      {"name":"Catalogue","given":{"route":"catalogue"},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R21",
+    "name": "Category Manager decision",
+    "step": "Process controls",
+    "mode": "inform",
+    "clause": "Procurement policy: who leads the sourcing (test data)",
+    "decides": "Whether the Category Manager still has to decide who leads.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"i","title":"Category Manager decision","owner":"Category Manager"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"route","op":"is","value":"procurement"},{"fact":"lead_status","op":"is","value":"pending_category_manager"}],"then":"flag","text":"The Category Manager decides whether procurement leads. If not, your divisional vendor office may lead."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Between the thresholds","given":{"route":"procurement","lead_status":"pending_category_manager"},"expect":"flag"},
+      {"name":"Decided","given":{"route":"procurement","lead_status":"decided"},"expect":"none"},
+      {"name":"Value not known","given":{"route":"procurement","lead_status":"pending_value"},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R22",
+    "name": "Sourcing request form",
+    "step": "Process controls",
+    "mode": "inform",
+    "clause": "Procurement policy: sourcing request form (test data)",
+    "decides": "Whether a sourcing request form is raised with the request.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"i","title":"Sourcing request form","owner":"Procurement"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"route","op":"is","value":"procurement"},{"fact":"form_needed","op":"is","value":true}],"then":"flag","text":"Raised with the request once it is submitted."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Procurement-led with a form","given":{"route":"procurement","form_needed":true},"expect":"flag"},
+      {"name":"Renewals calendar, no form","given":{"route":"procurement","form_needed":false},"expect":"none"},
+      {"name":"Business-led","given":{"route":"business","form_needed":false},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R23",
+    "name": "Quotes",
+    "step": "Process controls",
+    "mode": "inform",
+    "clause": "Procurement policy: quotes for business-led demand (test data)",
+    "decides": "How many quotes the business collects when it buys on its own.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"i","title":"Three quotes","owner":"The business"},
+      {"key":"one_quote","label":"One quote","flag":true,"level":"i","title":"One quote","owner":"The business"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"route","op":"is","value":"business"}],"then":"flag","text":"The business collects at least three comparable quotes; procurement reviews the choice."},
+      {"when":[{"fact":"route","op":"is","value":"simple"}],"then":"one_quote","text":"One written quote or a published price is enough; keep it with the order."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Business-led","given":{"route":"business"},"expect":"flag"},
+      {"name":"Small, simple purchase","given":{"route":"simple"},"expect":"one_quote"},
+      {"name":"Procurement-led","given":{"route":"procurement"},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R24",
+    "name": "No splitting",
+    "step": "Process controls",
+    "mode": "inform",
+    "clause": "Procurement policy: no splitting of demand (test data)",
+    "decides": "Reminds the requester that one need must not be split to stay under a threshold.",
+    "placeholders": ["form_threshold","simple_max"],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"i","title":"No splitting","owner":"The business"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"route","op":"is","value":"business"}],"then":"flag","text":"One need must not be split into several requests to stay under {form_threshold}."},
+      {"when":[{"fact":"route","op":"is","value":"simple"}],"then":"flag","text":"One need must not be split into several orders to stay under {simple_max}."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Business-led","given":{"route":"business"},"expect":"flag"},
+      {"name":"Small, simple purchase","given":{"route":"simple"},"expect":"flag"},
+      {"name":"Procurement-led","given":{"route":"procurement"},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R25",
+    "name": "Confirm contract use",
+    "step": "Process controls",
+    "mode": "inform",
+    "clause": "Contract management policy (test data)",
+    "decides": "Whether the contract owner confirms that the scope fits the existing contract.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"i","title":"Confirm contract use","owner":"Contract owner","approval":true},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"route","op":"is","value":"contract"}],"then":"flag","text":"Contract owner confirms the scope fits."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Existing contract","given":{"route":"contract"},"expect":"flag"},
+      {"name":"Catalogue","given":{"route":"catalogue"},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R26",
+    "name": "Data protection review",
+    "step": "Reviews",
+    "mode": "advise",
+    "clause": "GDPR Article 28 (processors); data protection policy",
+    "decides": "Whether the provider will see personal or client data.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"w","title":"Data protection review","owner":"Data protection"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"personal_data","op":"is","value":true}],"then":"flag","text":"The provider will see personal or client data."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Personal data","given":{"personal_data":true},"expect":"flag"},
+      {"name":"No personal data","given":{"personal_data":false},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R27",
+    "name": "ICT review (DORA)",
+    "step": "Reviews",
+    "mode": "advise",
+    "clause": "DORA Articles 28–30; ICT third-party risk policy",
+    "decides": "Whether new demand or external workers involve an ICT service under DORA.",
+    "placeholders": ["ict_type"],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"w","title":"ICT review (DORA)","owner":"Risk and IT security"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"ict_service","op":"is","value":true},{"fact":"route","op":"in","value":["business","procurement"]},{"fact":"ict_ongoing","op":"is","value":true}],"then":"flag","text":"Likely an ICT service: {ict_type}."},
+      {"when":[{"fact":"ict_service","op":"is","value":true},{"fact":"route","op":"in","value":["business","procurement"]}],"then":"flag","text":"Possibly an ICT service: {ict_type}. The review confirms."},
+      {"when":[{"fact":"ict_service","op":"is","value":true},{"fact":"demand_type","op":"is","value":"contingent_labour"},{"fact":"ict_ongoing","op":"is","value":true}],"then":"flag","text":"Likely an ICT service: {ict_type}."},
+      {"when":[{"fact":"ict_service","op":"is","value":true},{"fact":"demand_type","op":"is","value":"contingent_labour"}],"then":"flag","text":"Possibly an ICT service: {ict_type}. The review confirms."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Ongoing ICT service, new demand","given":{"ict_service":true,"route":"procurement","ict_ongoing":true},"expect":"flag"},
+      {"name":"One-off ICT work, business-led","given":{"ict_service":true,"route":"business","ict_ongoing":false},"expect":"flag"},
+      {"name":"External IT workers on a framework","given":{"ict_service":true,"route":"contract","demand_type":"contingent_labour"},"expect":"flag"},
+      {"name":"ICT on an existing contract","given":{"ict_service":true,"route":"contract","demand_type":"services"},"expect":"none"},
+      {"name":"No ICT","given":{"ict_service":false,"route":"procurement"},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R28",
+    "name": "Outsourcing assessment",
+    "step": "Reviews",
+    "mode": "advise",
+    "clause": "EBA Guidelines on outsourcing arrangements; outsourcing group standard",
+    "decides": "Whether new demand for services is, or may be, outsourcing under the group standard.",
+    "placeholders": ["result","standard"],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"w","title":"Outsourcing assessment","owner":"Outsourcing management"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"route","op":"in","value":["business","procurement"]},{"fact":"goods","op":"is","value":false},{"fact":"outsourcing","op":"is","value":"yes"}],"then":"flag","text":"{result} under {standard}."},
+      {"when":[{"fact":"route","op":"in","value":["business","procurement"]},{"fact":"goods","op":"is","value":false},{"fact":"outsourcing","op":"is","value":"tbd"}],"then":"flag","text":"Whether this is outsourcing is still open."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Outsourcing","given":{"route":"procurement","goods":false,"outsourcing":"yes"},"expect":"flag"},
+      {"name":"Still open","given":{"route":"business","goods":false,"outsourcing":"tbd"},"expect":"flag"},
+      {"name":"Not outsourcing","given":{"route":"procurement","goods":false,"outsourcing":"no"},"expect":"none"},
+      {"name":"Goods","given":{"route":"procurement","goods":true,"outsourcing":"yes"},"expect":"none"},
+      {"name":"Existing contract","given":{"route":"contract","goods":false,"outsourcing":"yes"},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R29",
+    "name": "Critical or important function check",
+    "step": "Reviews",
+    "mode": "advise",
+    "clause": "DORA Article 28; EBA Guidelines on outsourcing arrangements, section 4",
+    "decides": "Whether new demand for services may support a critical or important function.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"w","title":"Critical or important function check","owner":"Risk function"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"route","op":"in","value":["business","procurement"]},{"fact":"goods","op":"is","value":false},{"fact":"important_function","op":"is","value":true}],"then":"flag","text":"It may support a critical or important business function."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Important function","given":{"route":"procurement","goods":false,"important_function":true},"expect":"flag"},
+      {"name":"Not important","given":{"route":"procurement","goods":false,"important_function":false},"expect":"none"},
+      {"name":"Goods","given":{"route":"business","goods":true,"important_function":true},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R30",
+    "name": "Access review",
+    "step": "Reviews",
+    "mode": "advise",
+    "clause": "Information security policy: third-party access (test data)",
+    "decides": "Whether the provider gets access to money, accounts or privileged systems.",
+    "placeholders": ["access_level"],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"w","title":"Access review","owner":"Information security"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"route","op":"in","value":["business","procurement"]},{"fact":"goods","op":"is","value":false},{"fact":"access_money","op":"is","value":true},{"fact":"access_level","op":"in","value":["privileged","administrative"]}],"then":"flag","text":"Money or account access; {access_level} access."},
+      {"when":[{"fact":"route","op":"in","value":["business","procurement"]},{"fact":"goods","op":"is","value":false},{"fact":"access_money","op":"is","value":true}],"then":"flag","text":"Money or account access."},
+      {"when":[{"fact":"route","op":"in","value":["business","procurement"]},{"fact":"goods","op":"is","value":false},{"fact":"access_level","op":"in","value":["privileged","administrative"]}],"then":"flag","text":"{access_level} access."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Money and admin access","given":{"route":"procurement","goods":false,"access_money":true,"access_level":"administrative"},"expect":"flag"},
+      {"name":"Money only","given":{"route":"business","goods":false,"access_money":true,"access_level":"read"},"expect":"flag"},
+      {"name":"Privileged only","given":{"route":"procurement","goods":false,"access_money":false,"access_level":"privileged"},"expect":"flag"},
+      {"name":"Read access","given":{"route":"procurement","goods":false,"access_money":false,"access_level":"read"},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R31",
+    "name": "Auditor independence check",
+    "step": "Category checks",
+    "mode": "inform",
+    "clause": "Audit Regulation (EU) 537/2014, Article 5; auditor independence policy",
+    "decides": "Consulting, audit and tax work: whether the firm is our statutory auditor.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"i","title":"Auditor independence check","owner":"Audit Committee"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"category_guessed","op":"is","value":true}],"then":"none"},
+      {"when":[{"fact":"route","op":"is","value":"catalogue"},{"fact":"catalogue_category","op":"is_not","value":"marketing"}],"then":"none"},
+      {"when":[{"fact":"category","op":"in","value":["consulting","audit-tax"]}],"then":"flag","text":"If the firm is our statutory auditor, non-audit work needs Audit Committee approval first."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Consulting","given":{"category":"consulting","category_guessed":false,"route":"procurement"},"expect":"flag"},
+      {"name":"Audit and tax","given":{"category":"audit-tax","category_guessed":false,"route":"business"},"expect":"flag"},
+      {"name":"Guessed category","given":{"category":"consulting","category_guessed":true,"route":"procurement"},"expect":"none"},
+      {"name":"Legal","given":{"category":"legal","category_guessed":false,"route":"procurement"},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R32",
+    "name": "Instructed through Legal",
+    "step": "Category checks",
+    "mode": "inform",
+    "clause": "Legal policy: instructing external counsel (test data)",
+    "decides": "External counsel: engaged by Legal only.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"i","title":"Instructed through Legal","owner":"Legal"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"category_guessed","op":"is","value":true}],"then":"none"},
+      {"when":[{"fact":"route","op":"is","value":"catalogue"},{"fact":"catalogue_category","op":"is_not","value":"marketing"}],"then":"none"},
+      {"when":[{"fact":"category","op":"is","value":"legal"}],"then":"flag","text":"External counsel is engaged by Legal, after a conflict check with the firm."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Legal","given":{"category":"legal","category_guessed":false,"route":"procurement"},"expect":"flag"},
+      {"name":"Guessed","given":{"category":"legal","category_guessed":true,"route":"procurement"},"expect":"none"},
+      {"name":"Consulting","given":{"category":"consulting","category_guessed":false,"route":"procurement"},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R33",
+    "name": "Gifts and hospitality approval",
+    "step": "Category checks",
+    "mode": "advise",
+    "clause": "Gifts and entertainment policy; anti-bribery policy",
+    "decides": "Client hospitality and events: approval under the gifts and entertainment policy; stricter when public officials may attend.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"officials","label":"Public officials may attend","flag":true,"level":"w","title":"Gifts and hospitality approval","owner":"Compliance"},
+      {"key":"clients","label":"Client hospitality","flag":true,"level":"i","title":"Gifts and hospitality approval","owner":"Compliance"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"category_guessed","op":"is","value":true}],"then":"none"},
+      {"when":[{"fact":"route","op":"is","value":"catalogue"},{"fact":"catalogue_category","op":"is_not","value":"marketing"}],"then":"none"},
+      {"when":[{"fact":"category","op":"is","value":"marketing"},{"fact":"hospitality_guests","op":"is","value":"officials"}],"then":"officials","text":"Public officials may attend: Compliance approves the invitation and the cost per guest before it goes out."},
+      {"when":[{"fact":"category","op":"is","value":"marketing"},{"fact":"hospitality_guests","op":"is","value":"clients"}],"then":"clients","text":"Client hospitality needs approval under the gifts and entertainment policy."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Officials","given":{"category":"marketing","hospitality_guests":"officials","category_guessed":false,"route":"business"},"expect":"officials"},
+      {"name":"Clients","given":{"category":"marketing","hospitality_guests":"clients","category_guessed":false,"route":"business"},"expect":"clients"},
+      {"name":"Client gifts from the catalogue","given":{"category":"marketing","hospitality_guests":"clients","category_guessed":false,"route":"catalogue","catalogue_category":"marketing"},"expect":"clients"},
+      {"name":"No guests","given":{"category":"marketing","hospitality_guests":"none","category_guessed":false,"route":"business"},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R34",
+    "name": "Data licence check",
+    "step": "Category checks",
+    "mode": "inform",
+    "clause": "Market data licensing policy (test data)",
+    "decides": "Market data: the price and permitted use depend on who uses the data and how.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"i","title":"Data licence check","owner":"Market Data team"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"category_guessed","op":"is","value":true}],"then":"none"},
+      {"when":[{"fact":"route","op":"is","value":"catalogue"},{"fact":"catalogue_category","op":"is_not","value":"marketing"}],"then":"none"},
+      {"when":[{"fact":"category","op":"is","value":"market-data"}],"then":"flag","text":"The price and permitted use depend on who uses the data and how: on screen, in applications or models, or passed on to clients."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Market data","given":{"category":"market-data","category_guessed":false,"route":"procurement"},"expect":"flag"},
+      {"name":"Software","given":{"category":"software","category_guessed":false,"route":"procurement"},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R35",
+    "name": "Data transfer check",
+    "step": "Category checks",
+    "mode": "advise",
+    "clause": "GDPR Chapter V (transfers to third countries)",
+    "decides": "Data of an EU entity stored or processed outside the EU.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"w","title":"Data transfer check","owner":"Data protection"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"category_guessed","op":"is","value":true}],"then":"none"},
+      {"when":[{"fact":"route","op":"is","value":"catalogue"},{"fact":"catalogue_category","op":"is_not","value":"marketing"}],"then":"none"},
+      {"when":[{"fact":"data_outside_eu","op":"is","value":true}],"then":"flag","text":"Data may be stored or processed outside the EU: a transfer assessment is needed before contract."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Outside the EU","given":{"data_outside_eu":true,"category_guessed":false,"route":"procurement"},"expect":"flag"},
+      {"name":"In the EU","given":{"data_outside_eu":false,"category_guessed":false,"route":"procurement"},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R36",
+    "name": "Record-keeping check",
+    "step": "Category checks",
+    "mode": "advise",
+    "clause": "MiFID II Article 16(7); record-keeping policy",
+    "decides": "Voice recording and messaging: records must be complete and retrievable.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"w","title":"Record-keeping check","owner":"Compliance"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"category_guessed","op":"is","value":true}],"then":"none"},
+      {"when":[{"fact":"route","op":"is","value":"catalogue"},{"fact":"catalogue_category","op":"is_not","value":"marketing"}],"then":"none"},
+      {"when":[{"fact":"ops_domain","op":"is","value":"voice"}],"then":"flag","text":"Recorded calls and messages must be complete and retrievable for the regulatory retention period."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Voice recording","given":{"ops_domain":"voice","category_guessed":false,"route":"procurement"},"expect":"flag"},
+      {"name":"Payments","given":{"ops_domain":"payments","category_guessed":false,"route":"procurement"},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R37",
+    "name": "Offshoring check",
+    "step": "Reviews",
+    "mode": "advise",
+    "clause": "Outsourcing group standard: offshoring (test data)",
+    "decides": "Whether work happens outside the requester's country.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"w","title":"Offshoring check","owner":"Risk and IT security"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"offshore","op":"is","value":true}],"then":"flag","text":"Work happens outside your country."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Offshore","given":{"offshore":true},"expect":"flag"},
+      {"name":"Onshore","given":{"offshore":false},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R38",
+    "name": "Subcontractor check",
+    "step": "Reviews",
+    "mode": "advise",
+    "clause": "EBA Guidelines on outsourcing arrangements, section 13.1 (sub-outsourcing)",
+    "decides": "Whether the supplier may use subcontractors.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"w","title":"Subcontractor check","owner":"Risk and IT security"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"subcontracting","op":"is","value":true}],"then":"flag","text":"The supplier may use subcontractors."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Subcontractors","given":{"subcontracting":true},"expect":"flag"},
+      {"name":"None","given":{"subcontracting":false},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R39",
+    "name": "Site access",
+    "step": "Process controls",
+    "mode": "inform",
+    "clause": "Physical security policy (test data)",
+    "decides": "Whether building access must be arranged for work on site.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"i","title":"Site access","owner":"Corporate security"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"route","op":"in","value":["contract","business","procurement"]},{"fact":"goods","op":"is","value":false},{"fact":"on_site","op":"is","value":true}],"then":"flag","text":"Building access is arranged before the start."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"On site","given":{"route":"procurement","goods":false,"on_site":true},"expect":"flag"},
+      {"name":"Goods delivered","given":{"route":"procurement","goods":true,"on_site":true},"expect":"none"},
+      {"name":"Small purchase","given":{"route":"simple","goods":false,"on_site":true},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R40",
+    "name": "Material spend review",
+    "step": "Reviews",
+    "mode": "advise",
+    "clause": "Procurement policy: material spend (test data)",
+    "decides": "Whether the total value reaches the materiality threshold.",
+    "placeholders": ["materiality"],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"w","title":"Material spend review","owner":"Procurement"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"total_value","op":"gte","value":{"param":"materialityMin"}}],"then":"flag","text":"Value is {materiality} or more."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"At the threshold","given":{"total_value":{"param":"materialityMin"}},"expect":"flag"},
+      {"name":"Just under","given":{"total_value":{"param":"materialityMin","plus":-1}},"expect":"none"},
+      {"name":"Value not known","given":{},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R41",
+    "name": "Non-preferred supplier",
+    "step": "Reviews",
+    "mode": "advise",
+    "clause": "Procurement policy: preferred suppliers (test data)",
+    "decides": "Whether a named supplier is not preferred for the category.",
+    "placeholders": ["suppliers"],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"b","title":"Non-preferred supplier","owner":"Procurement"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"route","op":"in","value":["business","procurement"]},{"fact":"non_preferred_suppliers","op":"gte","value":2}],"then":"flag","text":"{suppliers} are not preferred suppliers for this category."},
+      {"when":[{"fact":"route","op":"in","value":["business","procurement"]},{"fact":"non_preferred_suppliers","op":"gte","value":1}],"then":"flag","text":"{suppliers} is not a preferred supplier for this category."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Two suppliers","given":{"route":"procurement","non_preferred_suppliers":2},"expect":"flag"},
+      {"name":"One supplier","given":{"route":"business","non_preferred_suppliers":1},"expect":"flag"},
+      {"name":"Preferred","given":{"route":"procurement","non_preferred_suppliers":0},"expect":"none"},
+      {"name":"Existing contract","given":{"route":"contract","non_preferred_suppliers":1},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R42",
+    "name": "Single-source justification",
+    "step": "Reviews",
+    "mode": "advise",
+    "clause": "Procurement policy: single sourcing (test data)",
+    "decides": "Whether the requester asked for one named supplier without competition.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"b","title":"Single-source justification","owner":"Procurement"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"route","op":"is","value":"procurement"},{"fact":"sole_source","op":"is","value":true}],"then":"flag","text":"You asked for one named supplier. Procurement checks the reason."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Single source","given":{"route":"procurement","sole_source":true},"expect":"flag"},
+      {"name":"Competition","given":{"route":"procurement","sole_source":false},"expect":"none"},
+      {"name":"Business-led","given":{"route":"business","sole_source":true},"expect":"none"}
+    ]
+  },
+  {
+    "id": "R43",
+    "name": "Risk questionnaire",
+    "step": "Process controls",
+    "mode": "inform",
+    "clause": "Third-party risk management policy (test data)",
+    "decides": "Whether the supplier risk questionnaire is pre-filled from the conversation.",
+    "placeholders": [],
+    "outcomes": [
+      {"key":"flag","label":"Flag raised","flag":true,"level":"i","title":"Risk questionnaire, pre-filled","owner":"Risk function"},
+      {"key":"none","label":"No flag"}
+    ],
+    "rows": [
+      {"when":[{"fact":"route","op":"in","value":["contract","business","procurement"]},{"fact":"goods","op":"is","value":false}],"then":"flag","text":"Answers come from this conversation. You only confirm them."},
+      {"when":[],"then":"none"}
+    ],
+    "tests": [
+      {"name":"Services","given":{"route":"procurement","goods":false},"expect":"flag"},
+      {"name":"Goods","given":{"route":"procurement","goods":true},"expect":"none"},
+      {"name":"Catalogue","given":{"route":"catalogue","goods":false},"expect":"none"}
     ]
   }
 ]

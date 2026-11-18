@@ -6,7 +6,7 @@
 (function () {
   "use strict";
   const $app = document.getElementById("app");
-  const S = { code: sessionStorage.getItem("adm") || "", actor: localStorage.getItem("adm-name") || "", st: null, doc: null, tab: "thresholds", unsaved: false, extra: {}, busy: false, qFilter: "", gKey: "", refFilter: {}, refNote: {} };
+  const S = { code: sessionStorage.getItem("adm") || "", actor: localStorage.getItem("adm-name") || "", st: null, doc: null, tab: "thresholds", unsaved: false, extra: {}, busy: false, qFilter: "", ruleStep: "", gKey: "", refFilter: {}, refNote: {} };
   const TABS = [["thresholds", "Thresholds"], ["channels", "Channels"], ["categories", "Categories"], ["rules", "Rules"], ["questions", "Questions"], ["guidance", "Guidance"], ["lists", "Divisions and lists"], ["reference", "Reference data"], ["versions", "Versions and changes"], ["decisions", "Decision log"]];
 
   // ---------- small helpers
@@ -238,13 +238,34 @@
       h("p", { class: "hint" }, rule.decides),
       h("details", {}, h("summary", {}, "Name, source and mode"), text("name", "Name", "min(520px,100%)"), text("decides", "What it decides", "100%"), text("clause", "Rests on (policy and clause)", "100%"),
         h("label", { style: "display:block;margin:6px 0" }, h("span", { class: "muted" }, "Mode"), h("br"), select([["enforce", "Enforce: the outcome is binding"], ["advise", "Advise: a warning; the requester may continue with a reason"], ["inform", "Inform: shown only"]], rule.mode, (v) => edit(() => { rule.mode = v; })))),
+      flagOutcomes(rule),
       h("p", { class: "hint", style: "margin-top:10px" }, "The rows are checked from top to bottom. The first row whose conditions all hold gives the outcome."),
       bad.length ? h("div", { class: "problems" }, h("b", {}, "This rule has problems"), h("ul", {}, bad.map((b) => h("li", {}, b.replace(rule.id + ": ", ""))))) : null,
       rule.rows.map((_, i) => ruleRow(rule, i)),
       h("p", {}, h("button", { class: "btn s", type: "button", onclick: () => edit(() => { const f = S.doc.facts[0]; rule.rows.splice(rule.rows.length - 1, 0, { when: [{ fact: f.key, op: "is", value: defaultValue(f, "is") }], then: rule.outcomes[0].key }); }) }, "+ row above \"otherwise\"")),
       tests(rule));
   }
-  const rules = () => h("div", {}, S.doc.rules.map(ruleCard));
+  // the flag an outcome raises: its title, how it is shown, and who reviews it
+  const LEVELS = [["i", "Information (blue)"], ["w", "Review needed (amber)"], ["b", "Procurement checks first (red)"]];
+  function flagOutcomes(rule) {
+    const flagged = rule.outcomes.filter((o) => o.flag);
+    if (!flagged.length) return null;
+    return h("div", { class: "row", style: "background:#fff" }, h("div", { class: "muted" }, "The flag the requester and the reviewers see"),
+      h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Outcome"), h("th", {}, "Title"), h("th", {}, "Shown as"), h("th", {}, "Reviewed or approved by"))),
+        h("tbody", {}, flagged.map((o) => h("tr", { "data-outcome": o.key },
+          h("td", {}, o.label),
+          h("td", {}, h("input", { type: "text", id: `fl-${rule.id}-${o.key}-title`, "aria-label": `Title of ${rule.id} ${o.label}`, style: "width:260px", value: o.title || "", oninput: (e) => editQuiet(() => { o.title = e.target.value; }) })),
+          h("td", {}, select(LEVELS, o.level, (v) => edit(() => { o.level = v; }), { id: `fl-${rule.id}-${o.key}-level`, "aria-label": `Level of ${rule.id} ${o.label}` })),
+          h("td", {}, h("input", { type: "text", id: `fl-${rule.id}-${o.key}-owner`, "aria-label": `Reviewer of ${rule.id} ${o.label}`, style: "width:240px", value: o.owner || "", oninput: (e) => editQuiet(() => { o.owner = e.target.value; }) })))))));
+  }
+  // many rules: pick a step to see only its cards
+  function rules() {
+    const steps = [...new Set(S.doc.rules.map((r) => r.step))], list = S.doc.rules.filter((r) => !S.ruleStep || r.step === S.ruleStep);
+    return h("div", {}, h("div", { class: "card" }, h("p", { class: "hint", style: "margin:0 0 8px" }, "Routing rules decide the channel; the other cards raise the review flags the requester and the reviewers see. Each card runs on its own."),
+      h("div", { class: "checks" }, h("label", {}, "Show ", select([["", `All steps (${S.doc.rules.length} rules)`], ...steps.map((st) => [st, `${st} (${S.doc.rules.filter((r) => r.step === st).length})`])], S.ruleStep, (v) => { S.ruleStep = v; render(); }, { id: "ruleStep", "aria-label": "Show the rules of one step" })),
+        h("span", { class: "muted" }, "Jump to: "), list.map((r) => h("a", { href: `#rule-${r.id}`, style: "font-size:13px" }, r.id)))),
+      list.map(ruleCard));
+  }
 
   // ---------- question texts: only those the chat asks the same way every time; the others depend on the request
   function questions() {

@@ -252,3 +252,17 @@ test("an upload is one line in the change log; published reference data is serve
   assert.ok(live.contracts.some((c) => c.id === "CTR-9001"));
   assert.notEqual(live.ref_checksum, before);
 });
+
+test("a review flag's title, level and reviewer can be changed; whether an outcome raises a flag cannot", () => {
+  const { sanitize } = require(path.join(ROOT, "api", "_lib", "validate.js"));
+  const { SEED, validateConfig, configFrom } = require(path.join(ROOT, "api", "_lib", "seed.js"));
+  const doc = structuredClone(SEED), out0 = (d, id, key) => d.rules.find((r) => r.id === id).outcomes.find((o) => o.key === key);
+  Object.assign(out0(doc, "R40", "flag"), { title: "  Large spend review ", level: "b", owner: "Chief Procurement Officer" });
+  Object.assign(out0(doc, "R26", "flag"), { level: "red", title: "", flag: false, approval: true });
+  Object.assign(out0(doc, "R40", "none"), { flag: true, title: "Sneaky", level: "b" });
+  const out = sanitize(doc);
+  assert.deepEqual([out0(out, "R40", "flag").title, out0(out, "R40", "flag").level, out0(out, "R40", "flag").owner], ["Large spend review", "b", "Chief Procurement Officer"]);
+  assert.deepEqual([out0(out, "R26", "flag").title, out0(out, "R26", "flag").level, out0(out, "R26", "flag").flag, out0(out, "R26", "flag").approval], ["Data protection review", "w", true, undefined]);
+  assert.deepEqual([out0(out, "R40", "none").flag, out0(out, "R40", "none").title], [undefined, undefined]);
+  assert.deepEqual(validateConfig(configFrom(out, 0, "draft")), []);
+});

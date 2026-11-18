@@ -17,7 +17,8 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await expect(panel(page)).toContainText("€100,000");
     await expect(panel(page)).toContainText("30–60");
     await expect(panel(page)).toContainText("Sponsor and stakeholders / Teams involved");   // the project lines, read from the code
-    await expect(panel(page)).toContainText("Bank checks by category");
+    await expect(panel(page)).toContainText("Review flags are rule cards too");
+    await expect(panel(page)).toContainText("Auditor independence check");   // the flag table, read from the rule cards
     expect(await page.evaluate(() => document.querySelector(".docwrap").scrollWidth - document.querySelector(".docwrap").clientWidth)).toBeLessThanOrEqual(0);
     await page.keyboard.press("Escape");
     await expect(panel(page)).toHaveCount(0);

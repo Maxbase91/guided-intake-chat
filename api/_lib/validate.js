@@ -10,6 +10,7 @@ const { SEED } = require("./seed");
 const text = (v, max, dflt = "") => (typeof v === "string" ? v.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").trim().slice(0, max) : dflt);
 const int = (v, min, max, dflt) => (Number.isInteger(v) && v >= min && v <= max ? v : dflt);
 const MODES = ["enforce", "advise", "inform"];
+const LEVELS = ["i", "w", "b"];   // a review flag: information, review needed, procurement checks
 const MAX = { rows: 30, conditions: 6, tests: 40, list: 20 };
 const FACTS = Object.fromEntries(SEED.facts.map((f) => [f.key, f]));
 
@@ -26,7 +27,7 @@ const condition = (c) => (c && typeof c === "object" ? { fact: text(c.fact, 40),
 
 function rule(seedRule, r) {
   r = r && typeof r === "object" ? r : {};
-  const labels = new Map((Array.isArray(r.outcomes) ? r.outcomes : []).map((o) => [o && o.key, o && o.label]));
+  const sent = new Map((Array.isArray(r.outcomes) ? r.outcomes : []).filter((o) => o && typeof o === "object").map((o) => [o.key, o]));
   const rows = (Array.isArray(r.rows) ? r.rows : []).slice(0, MAX.rows).filter((x) => x && typeof x === "object").map((x) => {
     const row = { when: (Array.isArray(x.when) ? x.when : []).slice(0, MAX.conditions).map(condition).filter(Boolean), then: text(x.then, 40) };
     const t = text(x.text, 600);
@@ -40,7 +41,12 @@ function rule(seedRule, r) {
   return {
     id: seedRule.id, name: text(r.name, 120, seedRule.name), step: seedRule.step, placeholders: [...(seedRule.placeholders || [])],
     mode: MODES.includes(r.mode) ? r.mode : seedRule.mode, clause: text(r.clause, 300), decides: text(r.decides, 400, seedRule.decides),
-    outcomes: seedRule.outcomes.map((o) => ({ ...o, label: text(labels.get(o.key), 120, o.label) || o.label })),
+    // which outcomes exist, and which raise a flag, is fixed; a flag's title, level and reviewer can be changed
+    outcomes: seedRule.outcomes.map((o) => {
+      const x = sent.get(o.key) || {}, out = { ...o, label: text(x.label, 120, o.label) || o.label };
+      if (o.flag) Object.assign(out, { title: text(x.title, 80) || o.title, level: LEVELS.includes(x.level) ? x.level : o.level, owner: text(x.owner, 80) || o.owner || "" });
+      return out;
+    }),
     rows, tests,
   };
 }

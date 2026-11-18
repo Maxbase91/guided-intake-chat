@@ -7,7 +7,7 @@ const { codeOk, sleep, WRONG_CODE_DELAY_MS, limitFrom, overLimit, tooMany, jsonB
 const { getStore } = require("./_lib/store");
 const { SEED } = require("./_lib/seed");
 
-const MAX_BYTES = 16 * 1024, MAX_ROWS = 50;
+const MAX_BYTES = 64 * 1024, MAX_ROWS = 50;   // up to 50 rule rows, each with the typed facts of the conversation
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CODE = /^[a-z0-9][a-z0-9_-]{0,39}$/;      // an outcome, a category id, an enum value
 const RULE = /^R\d{2}$/;

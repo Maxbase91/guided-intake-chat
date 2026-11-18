@@ -50,7 +50,7 @@ npm start           # local server on http://localhost:3000 (npm run start:mock 
 
 ### Rules and configuration
 
-Thresholds, channel names, category flags and the routing rules are data, not code:
+Thresholds, channel names, category flags, the routing rules and the review flags are data, not code:
 
 - `db/seed/*.json` is the starting configuration. Each rule is a decision table with its own test cases.
 - `node scripts/build_defaults.js` writes it into `index.html` as the built-in defaults (run it after a seed change).
@@ -66,8 +66,8 @@ Without a database everything still works: the page runs on its built-in default
 
 ### Admin page
 
-`/admin.html` is where procurement maintains thresholds, channel names, category flags, the rules and their reason
-texts, question texts and the category guidance behind examples and suggestions, divisions and their vendor offices,
+`/admin.html` is where procurement maintains thresholds, channel names, category flags, the routing rules and their reason
+texts, every review flag and category check (when it is raised, its text, how it is shown and who reviews it), question texts and the category guidance behind examples and suggestions, divisions and their vendor offices,
 which questions each division is asked, the lists behind the prohibited-service and country checks, category search
 words, and the reference data (Level 4 list, suppliers, framework contracts, catalogue) by CSV download and upload. It needs
 `ADMIN_CODE`. Changes are saved as a draft, checked against each rule's own test cases, and published as a new

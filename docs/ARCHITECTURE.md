@@ -44,7 +44,7 @@ suppliers, frameworks and catalogue (§7).
 | 2 | Reference data | `CATEGORIES` (20 buying categories with type and keywords), `L4`, `CONTRACTS`, `PREFERRED_L4`, `CATALOGUE` (from the data block), legal entities, rule sets (EBA/GL/2019/02, EBA/GL/2026/09) |
 | 3 | Routes | `CHANNELS`, `FACTS` (every question: label, wording, example, choices), `requiredFor(route, f)`, `STAGES`, kind-of-work rules (`kindOf`, `isOngoing`) |
 | 4 | State | One global `S`: messages, facts `S.f`, derived facts, route `S.det`, open questions `S.missing`, suggestions, quality, description `S.sd` |
-| 5 | Rules engine | Category and Level 4 matching, `determine()` (route and channel), `whoLeads()` (who leads new demand, on the annual value), `controlsFor()` (reviews), `nextSteps()`, ICT and outsourcing decision tree, answer checks (`findIssue`), dates, money, suppliers |
+| 5 | Rules engine | Category and Level 4 matching, `determine()` (route and channel), `whoLeads()` (who leads new demand, on the annual value), `reviewFlags()` (review flags from the rule cards), `nextSteps()`, ICT and outsourcing decision tree, answer checks (`findIssue`), dates, money, suppliers |
 | 6 | AI client | `callLLM()` (POST to `/api/llm`, 58 s timeout, short retries on a fast 429), chat system prompt and state block |
 | 7 | Conversation loop | `handleTurn()`: corrections, questions back, suggestion edits, the AI call or rules-only reading, screening, merging, checks, next question |
 | 8 | Results | `determine`'s route card, `buildDoc()` (description or purchase request), quality score, submit and JSON payload |
@@ -115,6 +115,15 @@ vendor office needs (`orgFacts`, from `applies` in `questions`: R required, C co
 rules run for everything but a catalogue order: R07 (a service in the list `prohibited_services`) and R08 (a country
 in `review_countries`, found in the request, the location, the data location or the supplier). A flagged outcome
 becomes a review flag on the route card naming the vendor office; the record and the request name it too.
+
+**Review flags.** Every other flag is a rule card too: R20 to R43 (process controls such as approval to source and
+three quotes; reviews such as data protection, ICT under DORA, outsourcing, access, offshoring, material spend and
+non-preferred suppliers; and the category checks such as auditor independence and gifts and hospitality). `flagView()`
+works out the facts they read (`route`, `personal_data`, `outsourcing`, `hospitality_guests`…) and the values their
+texts fill; `reviewFlags()` runs each card through the engine. A flagged outcome carries its title, level
+(`i` information, `w` review needed, `b` procurement checks first) and reviewer, which the admin page may change;
+whether an outcome raises a flag is fixed by the seed. The decision log records the cards that raised a flag. How it
+works and the Decision tree list the flags from the cards, so they follow what is published.
 
 **Routes and channels.** `determine()` returns a route, which is the question profile: `catalogue`, `contract`, `simple`,
 `business` or `procurement`. The buying channel shown to the requester is one of four (`CHANNELS`): a small, simple

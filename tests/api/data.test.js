@@ -69,7 +69,7 @@ test("POST /api/decisions refuses free text, unknown facts and malformed batches
     ["too many rows", batch({ decisions: Array.from({ length: 51 }, (_, i) => ({ seq: i, rule: "R11", row: 1, outcome: "a" })) }), "1 to 50"],
     ["an unknown source", batch({ config_source: "elsewhere" }), "configuration"],
     ["no body", undefined, "missing"],
-    ["an oversized body", batch({ pad: "x".repeat(17000) }), "too large"],
+    ["an oversized body", batch({ pad: "x".repeat(66000) }), "too large"],
   ]) {
     const r = await post(body);
     assert.equal(r.status, 400, name);

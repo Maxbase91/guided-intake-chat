@@ -58,7 +58,21 @@ test("every rule in the seed is valid and passes its own test cases", () => {
     assert.ok(r.tests.length >= 2, `${r.id} has test cases`);
     for (const t of Engine.runTests(r, params)) assert.ok(t.ok, `${r.id}: ${t.name} → ${t.got}, expected ${t.expect}`);
   }
-  assert.deepEqual(cfg.rules.map((r) => r.id), ["R01", "R02", "R11", "R19", "R07", "R08"]);
+  assert.deepEqual(cfg.rules.map((r) => r.id), ["R01", "R02", "R11", "R19", "R07", "R08", ...Array.from({ length: 24 }, (_, i) => `R${20 + i}`)]);
+});
+
+test("every review flag has a title, a level and a reviewer, and every flag rule has an \"otherwise\" row with no flag", () => {
+  const flagRules = cfg.rules.filter((r) => r.outcomes.some((o) => o.flag));
+  assert.equal(flagRules.length, 26);
+  for (const r of flagRules) {
+    for (const o of r.outcomes.filter((x) => x.flag)) {
+      assert.ok(o.title && ["i", "w", "b"].includes(o.level) && o.owner, `${r.id} ${o.key}: title, level and reviewer`);
+      assert.equal(r.mode, r.outcomes.some((x) => x.flag && x.level !== "i") ? "advise" : "inform", `${r.id}: mode follows the level`);
+    }
+    assert.ok(!r.outcomes.find((o) => o.key === r.rows.at(-1).then).flag, `${r.id}: the otherwise row raises no flag`);
+    assert.ok(r.clause, `${r.id}: names the policy it rests on`);
+    assert.ok(r.tests.some((t) => r.outcomes.find((o) => o.key === t.expect).flag) && r.tests.some((t) => !r.outcomes.find((o) => o.key === t.expect).flag), `${r.id}: tests both ways`);
+  }
 });
 
 test("validation names what is wrong with a rule in plain words", () => {
