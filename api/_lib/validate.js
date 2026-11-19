@@ -10,7 +10,8 @@ const { SEED } = require("./seed");
 const text = (v, max, dflt = "") => (typeof v === "string" ? v.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").trim().slice(0, max) : dflt);
 const int = (v, min, max, dflt) => (Number.isInteger(v) && v >= min && v <= max ? v : dflt);
 const MODES = ["enforce", "advise", "inform"];
-const LEVELS = ["i", "w", "b"];   // a review flag: information, review needed, procurement checks
+const LEVELS = ["i", "w", "b"];
+const DOMAIN_TEXTS = ["bg", "aud", "fun", "ben", "kpi", "sl", "reg", "out", "qual", "personal", "important", "deps", "notes", "mh"];   // a review flag: information, review needed, procurement checks
 const MAX = { rows: 30, conditions: 6, tests: 40, list: 20 };
 const FACTS = Object.fromEntries(SEED.facts.map((f) => [f.key, f]));
 
@@ -71,6 +72,7 @@ function sanitize(doc) {
   const params = by(doc.params, "key"), channels = by(doc.channels, "key"), categories = by(doc.categories, "id"), rules = by(doc.rules, "id");
   const questions = by(Array.isArray(doc.questions) ? doc.questions : [], "key"), guidance = by(Array.isArray(doc.guidance) ? doc.guidance : [], "key");
   const divisions = by(Array.isArray(doc.divisions) ? doc.divisions : [], "id"), lists = by(Array.isArray(doc.lists) ? doc.lists : [], "key");
+  const nextSteps = by(Array.isArray(doc.next_steps) ? doc.next_steps : [], "key"), entities = by(Array.isArray(doc.entities) ? doc.entities : [], "id"), domains = by(Array.isArray(doc.domains) ? doc.domains : [], "id");
   const catIds = new Set(["_", ...SEED.categories.map((c) => c.id)]);
   return {
     params: SEED.params.map((p) => { const v = (params.get(p.key) || {}).value; return { ...p, value: typeof v === "number" && isFinite(v) && v >= 0 && v <= 1e12 ? v : p.value }; }),
@@ -90,6 +92,8 @@ function sanitize(doc) {
       if ("ex" in q) out.ex = typeof x.ex === "string" ? text(x.ex, 400) : q.ex;
       if ("why" in q) out.why = typeof x.why === "string" ? text(x.why, 400) : q.why;
       // which divisions are asked: R required, C conditional (asked for new demand), - not asked
+      // answer buttons: only for questions whose answer the code records and never reads
+      if (q.choices) { const c = (Array.isArray(x.choices) ? x.choices : q.choices).slice(0, 6).map((v) => text(v, 60)).filter(Boolean); out.choices = c.length ? c : [...q.choices]; }
       if (q.applies) out.applies = Object.fromEntries(SEED.divisions.map((d) => { const v = x.applies && x.applies[d.id]; return [d.id, ["R", "C", "-"].includes(v) ? v : q.applies[d.id] || "R"]; }));
       return out;
     }),
@@ -103,6 +107,18 @@ function sanitize(doc) {
     }),
     ...reference(doc),
     divisions: SEED.divisions.map((d) => { const x = divisions.get(d.id) || {}; return { id: d.id, name: text(x.name, 80) || d.name, vendor_office: text(x.vendor_office, 100) || d.vendor_office }; }),
+    // next steps per channel: 1 to 5 texts; which placeholders each fills is set by the code
+    next_steps: SEED.next_steps.map((n) => { const x = nextSteps.get(n.key) || {}, steps = (Array.isArray(x.steps) ? x.steps : n.steps).slice(0, 5).map((t) => text(t, 300)).filter(Boolean); return { ...n, steps: steps.length ? steps : [...n.steps] }; }),
+    // legal entities: the ids are fixed (the code reads EU for the data transfer check); short codes match in capitals only
+    entities: SEED.entities.map((e) => { const x = entities.get(e.id) || {};
+      return { id: e.id, name: text(x.name, 80) || e.name, country: text(x.country, 60) || e.country, keywords: Array.isArray(x.keywords) ? words(x.keywords, 30) : [...e.keywords],
+        codes: Array.isArray(x.codes) ? [...new Set(x.codes.map((c) => text(String(c), 6).replace(/[^A-Za-z]/g, "")).filter((c) => c.length >= 2))].slice(0, 6) : [...e.codes] }; }),
+    // operations domains: search words and the guidance texts; the ids and which are operations domains are fixed
+    domains: SEED.domains.map((d) => { const x = domains.get(d.id) || {}, out = { id: d.id, ops: d.ops, name: text(x.name, 80) || d.name, keywords: Array.isArray(x.keywords) ? words(x.keywords, 40) : [...d.keywords] };
+      for (const k of DOMAIN_TEXTS) if (k in d) out[k] = typeof x[k] === "string" ? text(x[k], 600) || (k === "important" ? null : d[k]) : x[k] === null && k === "important" ? null : d[k];
+      return out; }),
+    // the welcome screen's examples
+    examples: (Array.isArray(doc.examples) ? doc.examples : SEED.examples).slice(0, 12).filter((e) => e && typeof e === "object").map((e) => ({ group: text(e.group, 40), label: text(e.label, 40), text: text(e.text, 300) })).filter((e) => e.text && e.label),
     // review lists: entries with a name and search words ("word", or "stem*" for longer words too)
     lists: SEED.lists.map((l) => {
       const x = lists.get(l.key) || {}, items = Array.isArray(x.items) ? x.items : l.items;

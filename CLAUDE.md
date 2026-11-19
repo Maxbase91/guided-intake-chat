@@ -51,7 +51,8 @@ access codes, keys or personal data.
 - `index.html` sections: 1 Configuration (`CONFIG`) … 9 Render … 11 Wiring (access gate, start-up).
   Thresholds, channel names, category flags, the routing rules (R01, R02, R11, R19) and the review-flag rules (R07, R08,
   R20–R43) are data: change them in
-  `db/seed/`, not in the script. `applyConfig()` fills the constants; `determine()` runs the rules through `Engine`.
+  `db/seed/`, not in the script. So are the next steps (`next_steps.json`), legal entities, operations domains, welcome
+  examples, word and answer-check limits and the quality weights. `applyConfig()` fills the constants; `determine()` runs the rules through `Engine`.
   "How it works" (`specModel()`) and "Decision tree" (`treeModel()` / `treeFigure()`) are generated from the code:
   update them when route, check or quality logic changes.
 - `api/llm.js`: `GET /api/llm` (config, no secrets), `?verify=1` (access code), `?check=1` (live provider check, needs

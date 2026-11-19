@@ -1,0 +1,11 @@
+[
+  {"group":"New demand","label":"Software, RFP","text":"A new HR system to replace our payroll tool."},
+  {"group":"New demand","label":"Outsourcing","text":"KYC periodic reviews for our corporate clients by an external provider for 2 years, around 600k."},
+  {"group":"New demand","label":"Offshore","text":"An offshore team in Poland to run accounts payable invoice processing for 3 years, about 900k."},
+  {"group":"New demand","label":"Over €1 million","text":"Replace our core treasury management system, budget 2.5 million over 5 years."},
+  {"group":"New demand","label":"Market data","text":"An ESG ratings data feed for our research team, around 120k a year."},
+  {"group":"New demand","label":"Under €100k","text":"An agency for a client dinner for 40 people, around 30k."},
+  {"group":"Other routes","label":"Catalogue","text":"We need 15 laptops for new joiners in Frankfurt."},
+  {"group":"Other routes","label":"Call-off","text":"More support from Lakeshore Advisory for our operations team."},
+  {"group":"Other routes","label":"External workers","text":"Two Java developers as contractors for 9 months."}
+]

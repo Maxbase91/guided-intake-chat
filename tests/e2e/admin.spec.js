@@ -294,3 +294,39 @@ test("a review flag is a rule card: its title, level, reviewer and text are edit
   expect(got).toEqual(["w", "Client hospitality approval", "Client hospitality: Compliance approves the guest list and the cost per guest.", "Compliance desk", false]);
   expect(errors).toEqual([]);
 });
+
+test("next steps, a word limit, answer buttons, an entity, a domain and a welcome example are edited and published", async ({ page }) => {
+  const errors = await signIn(page);
+  await page.click("[data-tab=nextsteps]");
+  await page.fill("#ns-procurement-1", "A buyer contacts you within 1 working day to plan the RFP.");
+  await page.fill("#ns-business-0", "You ask at least 3 suppliers for a quote{preferred}{nonsense}.");
+  await page.click("#saveBtn");
+  await expect(page.locator(".problems")).toContainText("{nonsense}");      // a placeholder this step does not fill is refused
+  await page.fill("#ns-business-0", "You ask at least 4 suppliers for a quote{preferred}, using the service description.");
+  await page.click("[data-tab=thresholds]");
+  await page.fill("#p-headMax", "60");
+  await page.click("[data-tab=questions]");
+  await page.fill("#qFilter", "pay");
+  await page.fill("#q-pricing_model-choices", "Fixed price\nPer milestone\nNot sure");
+  await page.click("[data-tab=lists]");
+  await page.fill("#en-EU-keywords", (await page.inputValue("#en-EU-keywords")) + ", lisbon");
+  await page.click("[data-tab=texts]");
+  await page.fill("#ex-0", "A new HR system to replace our payroll tool, about 700k.");
+  await page.selectOption("#dKey", "voice");
+  await page.fill("#dm-voice-keywords", (await page.inputValue("#dm-voice-keywords")) + ", dictaphone");
+  await page.click("#saveBtn");
+  await expect(status(page)).toContainText("All rules pass their tests");
+  accept(page, "Texts, limits and lists");
+  await page.click("#publishBtn");
+  await expect(status(page)).toContainText("Published: version 9");
+  await openApp(page, { kind: "admin" });
+  const got = await page.evaluate(() => ({
+    proc: withExampleState("A new HR system to replace our payroll tool, about 800k.", () => S.det.steps[1]),
+    biz: withExampleState("Translation of our annual report, around 12k.", () => [S.det.steps[0], execLimits().head]),   // under the 20k form threshold of version 1; the dinner is a call-off since version 6
+    choices: FACTS.pricing_model.choices, lisbon: (ENTITIES.find((e) => e.re.test("our Lisbon office")) || {}).id,
+    voice: withExampleState("Dictaphones for our trading floor, about 20k.", () => (bankDomain(S.f) || {}).id), first: TRIES[0][2] }));
+  expect(got).toEqual({ proc: "A buyer contacts you within 1 working day to plan the RFP.", biz: ["You ask at least 4 suppliers for a quote, ideally including Coho Creative and Polyglot Language Partners, using the service description.", 60],
+    choices: ["Fixed price", "Per milestone", "Not sure"], lisbon: "EU", voice: "voice", first: "A new HR system to replace our payroll tool, about 700k." });
+  await expect(page.locator("[data-try]").first()).toBeVisible();
+  expect(errors).toEqual([]);
+});

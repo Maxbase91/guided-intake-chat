@@ -6,8 +6,8 @@
 (function () {
   "use strict";
   const $app = document.getElementById("app");
-  const S = { code: sessionStorage.getItem("adm") || "", actor: localStorage.getItem("adm-name") || "", st: null, doc: null, tab: "thresholds", unsaved: false, extra: {}, busy: false, qFilter: "", ruleStep: "", gKey: "", refFilter: {}, refNote: {} };
-  const TABS = [["thresholds", "Thresholds"], ["channels", "Channels"], ["categories", "Categories"], ["rules", "Rules"], ["questions", "Questions"], ["guidance", "Guidance"], ["lists", "Divisions and lists"], ["reference", "Reference data"], ["versions", "Versions and changes"], ["decisions", "Decision log"]];
+  const S = { code: sessionStorage.getItem("adm") || "", actor: localStorage.getItem("adm-name") || "", st: null, doc: null, tab: "thresholds", unsaved: false, extra: {}, busy: false, qFilter: "", ruleStep: "", gKey: "", dKey: "", refFilter: {}, refNote: {} };
+  const TABS = [["thresholds", "Thresholds"], ["channels", "Channels"], ["categories", "Categories"], ["rules", "Rules"], ["questions", "Questions"], ["guidance", "Guidance"], ["nextsteps", "Next steps"], ["lists", "Divisions and lists"], ["texts", "Domains and examples"], ["reference", "Reference data"], ["versions", "Versions and changes"], ["decisions", "Decision log"]];
 
   // ---------- small helpers
   function h(tag, attrs, ...kids) {
@@ -68,8 +68,8 @@
       out.push(...Engine.validateRule(rule, registry, params));
       Engine.runTests(rule, params).filter((t) => !t.ok).forEach((t) => out.push(`${rule.id}: test "${t.name}" expects ${t.expect}, got ${t.got}`));
     });
-    // the reference data is checked by the server when the draft is saved
-    if (!S.unsaved) (S.st.problems || []).filter((p) => /^(Level 4|Supplier|Contract|Catalogue)/.test(p)).forEach((p) => out.push(p));
+    // the reference data, next steps, entities, domains, examples and the order of limits are checked by the server when the draft is saved
+    if (!S.unsaved) (S.st.problems || []).filter((p) => /^(Level 4|Supplier|Contract|Catalogue|next steps|legal entity|operations domain|welcome examples|headline|executive description|typical day rate|quality)/.test(p)).forEach((p) => out.push(p));
     return out;
   }
   function edit(fn) { fn(); S.unsaved = !same(S.doc, S.st.draft); S.error = ""; render(); }
@@ -121,15 +121,17 @@
   }
 
   // ---------- tabs
-  const changed = (part, key, field) => { const id = part === "categories" || part === "rules" || part === "divisions" ? "id" : "key"; const a = S.st.draft[part].find((x) => x[id] === key), b = S.doc[part].find((x) => x[id] === key); return a && b && !same(a[field], b[field]) ? "changed" : ""; };
+  const changed = (part, key, field) => { const id = ["categories", "rules", "divisions", "entities", "domains"].includes(part) ? "id" : "key"; const a = (S.st.draft[part] || []).find((x) => x[id] === key), b = S.doc[part].find((x) => x[id] === key); return a && b && !same(a[field], b[field]) ? "changed" : ""; };
 
   function thresholds() {
-    return h("div", { class: "card" }, h("h2", {}, "Thresholds"), h("p", { class: "hint" }, "Amounts are in euros. The rules read these values by name, so a change here changes every rule that uses the threshold."),
-      h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Threshold"), h("th", {}, "Value"), h("th", {}, "Unit"), h("th", {}, "Effect"))),
-        h("tbody", {}, S.doc.params.map((p) => h("tr", {},
+    const groups = [...new Set(S.doc.params.map((p) => p.group || "Other"))];
+    return h("div", {}, groups.map((g, i) => h("div", { class: "card", "data-group": g }, h("h2", {}, g),
+      i === 0 ? h("p", { class: "hint" }, "Amounts are in euros. The rules and checks read these values by name, so a change here changes everything that uses them.") : null,
+      h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Setting"), h("th", {}, "Value"), h("th", {}, "Unit"), h("th", {}, "Effect"))),
+        h("tbody", {}, S.doc.params.filter((p) => (p.group || "Other") === g).map((p) => h("tr", {},
           h("td", {}, h("label", { for: "p-" + p.key }, h("b", {}, p.label))),
-          h("td", {}, h("input", { type: "number", id: "p-" + p.key, min: "0", step: "1", class: changed("params", p.key, "value"), value: p.value, oninput: (e) => editQuiet(() => { p.value = e.target.value === "" ? NaN : Number(e.target.value); }), onchange: later })),
-          h("td", { class: "muted" }, p.unit), h("td", { class: "muted" }, p.description))))));
+          h("td", {}, h("input", { type: "number", id: "p-" + p.key, min: "0", step: "any", class: changed("params", p.key, "value"), value: p.value, oninput: (e) => editQuiet(() => { p.value = e.target.value === "" ? NaN : Number(e.target.value); }), onchange: later })),
+          h("td", { class: "muted" }, p.unit), h("td", { class: "muted" }, p.description))))))));
   }
 
   function channels() {
@@ -207,7 +209,7 @@
     if (fact.type === "bool") control = select([["", "–"], ["true", "yes"], ["false", "no"]], v === undefined ? "" : String(v), (x) => set(x === "" ? undefined : x === "true"));
     else if (fact.type === "enum") control = select([["", "–"], ...fact.values.map((x) => [x, x])], v ?? "", (x) => set(x === "" ? undefined : x));
     else if (fact.type === "number") {
-      const rel = v && typeof v === "object", opts = [["", "–"], ["n", "number"], ...S.doc.params.filter((p) => /EUR/.test(p.unit)).flatMap((p) => [[`${p.key}|-1`, `just under ${num(p.value)}`], [`${p.key}|0`, `exactly ${num(p.value)}`], [`${p.key}|1`, `just over ${num(p.value)}`]])];
+      const rel = v && typeof v === "object", opts = [["", "–"], ["n", "number"], ...S.doc.params.filter((p) => /EUR/.test(p.unit) && (p.group || "Routing") === "Routing").flatMap((p) => [[`${p.key}|-1`, `just under ${num(p.value)}`], [`${p.key}|0`, `exactly ${num(p.value)}`], [`${p.key}|1`, `just over ${num(p.value)}`]])];
       const cur = v === undefined ? "" : rel ? `${v.param}|${v.plus || 0}` : "n";
       const pick = select(opts.some(([o]) => o === cur) ? opts : [...opts, [cur, cur]], cur, (x) => set(x === "" ? undefined : x === "n" ? 0 : (() => { const [param, plus] = x.split("|"); return Number(plus) ? { param, plus: Number(plus) } : { param }; })()));
       control = rel || v === undefined ? pick : h("span", {}, pick, h("input", { type: "number", "aria-label": fact.label, value: v, oninput: (e) => editQuiet(() => { t.given[fact.key] = Number(e.target.value); }), onchange: later }));
@@ -280,6 +282,8 @@
         h("tbody", {}, list.map((q) => h("tr", { "data-q": q.key },
           h("td", { style: "width:280px" }, h("input", { type: "text", id: `q-${q.key}-label`, "aria-label": `Label of ${q.key}`, style: "width:100%", class: changed("questions", q.key, "label"), value: q.label, oninput: (e) => editQuiet(() => { q.label = e.target.value; }) }), h("div", { class: "muted" }, q.key)),
           h("td", {}, "q" in q ? area(q, "q", "Question") : h("div", { class: "muted" }, "Worded from the request (in the code)"), "ex" in q ? area(q, "ex", "Example") : null, "why" in q ? area(q, "why", "Why we ask") : null,
+            q.choices ? h("label", { style: "display:block;margin:4px 0" }, h("span", { class: "muted" }, "Answer buttons, one per line (the answer is recorded as written; up to 6)"),
+              h("textarea", { id: `q-${q.key}-choices`, rows: "3", class: changed("questions", q.key, "choices"), oninput: (e) => editQuiet(() => { q.choices = e.target.value.split("\n").map((x) => x.trim()).filter(Boolean); }) }, q.choices.join("\n"))) : null,
             q.applies ? h("div", { class: "checks", style: "margin-top:6px" }, h("span", { class: "muted" }, "Asked for:"), S.doc.divisions.map((d) => h("label", {}, `${d.name} `,
               select([["R", "required"], ["C", "conditional"], ["-", "not asked"]], q.applies[d.id], (v) => edit(() => { q.applies[d.id] = v; }), { "aria-label": `${q.label}: ${d.name}`, id: `qa-${q.key}-${d.id}` })))) : null))))));
   }
@@ -293,6 +297,13 @@
           h("tbody", {}, S.doc.divisions.map((d) => h("tr", {},
             h("td", {}, h("input", { type: "text", id: `d-${d.id}-name`, "aria-label": `Name of ${d.id}`, style: "width:320px", class: changed("divisions", d.id, "name"), value: d.name, oninput: (e) => editQuiet(() => { d.name = e.target.value; }) }), " ", h("span", { class: "muted" }, d.id)),
             h("td", {}, h("input", { type: "text", id: `d-${d.id}-office`, "aria-label": `Vendor office of ${d.id}`, style: "width:380px", class: changed("divisions", d.id, "vendor_office"), value: d.vendor_office, oninput: (e) => editQuiet(() => { d.vendor_office = e.target.value; }) }))))))),
+      h("div", { class: "card", "data-entities": "" }, h("h2", {}, "Legal entities"), h("p", { class: "hint" }, "The entity that receives the service and signs the contract. It is recognised from the search words (any case) or the short codes (capitals only, so \"US\" is not \"us\"). EU is the entity the data transfer check reads."),
+        h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Entity"), h("th", {}, "Country"), h("th", {}, "Search words"), h("th", {}, "Short codes"))),
+          h("tbody", {}, S.doc.entities.map((e) => h("tr", {},
+            h("td", {}, h("input", { type: "text", id: `en-${e.id}-name`, "aria-label": `Name of ${e.id}`, style: "width:240px", class: changed("entities", e.id, "name"), value: e.name, oninput: (ev) => editQuiet(() => { e.name = ev.target.value; }) }), " ", h("span", { class: "muted" }, e.id)),
+            h("td", {}, h("input", { type: "text", "aria-label": `Country of ${e.id}`, style: "width:140px", value: e.country, oninput: (ev) => editQuiet(() => { e.country = ev.target.value; }) })),
+            h("td", {}, h("input", { type: "text", id: `en-${e.id}-keywords`, "aria-label": `Search words for ${e.id}`, style: "width:100%", value: e.keywords.join(", "), oninput: (ev) => editQuiet(() => { e.keywords = ev.target.value.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean); }) })),
+            h("td", {}, h("input", { type: "text", "aria-label": `Short codes for ${e.id}`, style: "width:90px", value: e.codes.join(", "), oninput: (ev) => editQuiet(() => { e.codes = ev.target.value.split(",").map((x) => x.trim()).filter(Boolean); }) }))))))),
       S.doc.lists.map((l) => h("div", { class: "card", "data-list": l.key }, h("h2", {}, l.label), h("p", { class: "hint" }, `${l.description} Maintained by ${l.owner}.`),
         h("p", { class: "hint" }, "Search words are matched as whole words in what the requester writes; end a word with * to match longer words too (\"lobbyist*\" finds lobbyists)."),
         h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Name shown in the flag"), h("th", {}, "Search words, separated by commas"), h("th", {}))),
@@ -382,6 +393,44 @@
             oninput: (e) => editQuiet(() => { if (e.target.value.trim()) g.texts[id] = e.target.value; else delete g.texts[id]; }) }, g.texts[id] || "")))))));
   }
 
+  // ---------- next steps per channel: what the route card tells the requester happens next
+  function nextsteps() {
+    return h("div", {}, h("div", { class: "card" }, h("h2", {}, "Next steps"), h("p", { class: "hint" }, "The steps the route card shows for each channel. Placeholders are filled from the request; an optional one, such as {needed} or {preferred}, fills as nothing when it does not apply.")),
+      S.doc.next_steps.map((n) => h("div", { class: "card", "data-steps": n.key }, h("h3", {}, n.label),
+        h("p", { class: "muted" }, n.placeholders.length ? "Placeholders: " + n.placeholders.map((x) => `{${x}}`).join(" ") : "No placeholders"),
+        n.steps.map((t, i) => h("div", { class: "row", style: "display:flex;gap:8px;align-items:flex-start" }, h("span", { class: "rownum" }, `${i + 1}.`),
+          h("textarea", { id: `ns-${n.key}-${i}`, "aria-label": `${n.label}, step ${i + 1}`, rows: "2", class: changed("next_steps", n.key, "steps"), oninput: (e) => editQuiet(() => { n.steps[i] = e.target.value; }) }, t),
+          h("button", { class: "btn s x", type: "button", "aria-label": `Remove step ${i + 1}`, disabled: n.steps.length < 2, onclick: () => edit(() => { n.steps.splice(i, 1); }) }, "✕"))),
+        n.steps.length < 5 ? h("p", {}, h("button", { class: "btn s", type: "button", onclick: () => edit(() => { n.steps.push("New step"); }) }, "+ step")) : null)));
+  }
+
+  // ---------- operations domains (guidance and search words) and the welcome screen's examples
+  const DOMAIN_FIELDS = [["bg", "Example background (why now)"], ["aud", "Target audience"], ["fun", "Supported functions"], ["ben", "Key benefits"], ["kpi", "Success measures"], ["sl", "Service levels"],
+    ["reg", "Regulatory and governance benefits"], ["out", "Out of scope"], ["mh", "Must-haves"], ["qual", "Supplier qualifications"], ["deps", "What we provide"], ["personal", "Personal data usually involved"],
+    ["important", "Why it may support a critical or important function (empty: usually not)"], ["notes", "Notes for the buyer"]];
+  function texts() {
+    const d = S.doc.domains.find((x) => x.id === S.dKey) || S.doc.domains[0];
+    S.dKey = d.id;
+    const csv = (list) => list.join(", "), fromCsv = (v) => v.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+    return h("div", {},
+      h("div", { class: "card", "data-examples": "" }, h("h2", {}, "Welcome examples"), h("p", { class: "hint" }, "The example requests on the welcome screen, in groups. At least 3, up to 12."),
+        h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Group"), h("th", {}, "Label"), h("th", {}, "Request"), h("th", {}))),
+          h("tbody", {}, S.doc.examples.map((x, i) => h("tr", {},
+            h("td", {}, h("input", { type: "text", "aria-label": `Group of example ${i + 1}`, style: "width:130px", value: x.group, oninput: (e) => editQuiet(() => { x.group = e.target.value; }) })),
+            h("td", {}, h("input", { type: "text", "aria-label": `Label of example ${i + 1}`, style: "width:150px", value: x.label, oninput: (e) => editQuiet(() => { x.label = e.target.value; }) })),
+            h("td", {}, h("input", { type: "text", id: `ex-${i}`, "aria-label": `Request of example ${i + 1}`, style: "width:100%", value: x.text, oninput: (e) => editQuiet(() => { x.text = e.target.value; }) })),
+            h("td", {}, h("button", { class: "btn s x", type: "button", "aria-label": `Remove example ${i + 1}`, disabled: S.doc.examples.length <= 3, onclick: () => edit(() => { S.doc.examples.splice(i, 1); }) }, "✕")))))),
+        S.doc.examples.length < 12 ? h("p", {}, h("button", { class: "btn s", type: "button", onclick: () => edit(() => { S.doc.examples.push({ group: "New demand", label: "New example", text: "Describe a request here." }); }) }, "+ example")) : null),
+      h("div", { class: "card", "data-domain": d.id }, h("h2", {}, "Operations and service domains"),
+        h("p", { class: "hint" }, "A domain is recognised from its search words (the one mentioned first wins) and gives the examples and suggested answers for that kind of work. The flags for record keeping and critical functions read the domain too."),
+        h("p", {}, h("label", {}, h("span", { class: "muted" }, "Domain "), select(S.doc.domains.map((x) => [x.id, x.name]), d.id, (v) => { S.dKey = v; render(); }, { id: "dKey" }))),
+        h("label", { style: "display:block;margin:6px 0" }, h("span", { class: "muted" }, "Name"), h("br"), h("input", { type: "text", id: `dm-${d.id}-name`, style: "width:min(420px,100%)", class: changed("domains", d.id, "name"), value: d.name, oninput: (e) => editQuiet(() => { d.name = e.target.value; }) })),
+        h("label", { style: "display:block;margin:6px 0" }, h("span", { class: "muted" }, "Search words, separated by commas (whole words; end with * for longer words too)"), h("br"),
+          h("input", { type: "text", id: `dm-${d.id}-keywords`, style: "width:100%", class: changed("domains", d.id, "keywords"), value: csv(d.keywords), oninput: (e) => editQuiet(() => { d.keywords = fromCsv(e.target.value); }) })),
+        DOMAIN_FIELDS.filter(([k]) => k in d).map(([k, label]) => h("label", { style: "display:block;margin:6px 0" }, h("span", { class: "muted" }, label),
+          h("textarea", { id: `dm-${d.id}-${k}`, rows: "2", class: changed("domains", d.id, k), oninput: (e) => editQuiet(() => { d[k] = k === "important" && !e.target.value.trim() ? null : e.target.value; }) }, d[k] || "")))));
+  }
+
   // ---------- versions, change log, decision log (read from the server when the tab opens)
   function load(key, query) { if (S.extra[key] === undefined) { S.extra[key] = null; api("GET", null, query).then((d) => { S.extra[key] = d; render(); }, (e) => { S.extra[key] = { error: e.message }; render(); }); } return S.extra[key]; }
   const short = (v) => { const s = v === null || v === undefined ? "–" : typeof v === "object" ? JSON.stringify(v) : String(v); return s.length > 140 ? s.slice(0, 140) + "…" : s; };
@@ -428,7 +477,7 @@
     $app.replaceChildren();
     if (!S.st) { $app.append(login()); return; }
     const prob = problems();
-    const body = { thresholds, channels, categories, rules, questions, guidance, lists, reference, versions, decisions }[S.tab]();
+    const body = { thresholds, channels, categories, rules, questions, guidance, nextsteps, lists, texts, reference, versions, decisions }[S.tab]();
     $app.append(
       h("header", { class: "top" }, h("h1", {}, "Rules and settings"), h("span", { class: "muted", style: "color:#d6deef" }, S.actor ? `Signed in as ${S.actor}` : ""), h("span", { class: "sp" }),
         h("a", { href: "./" }, "Open the intake"), h("button", { class: "btn s", type: "button", onclick: () => { if (S.unsaved && !confirm("Leave without saving?")) return; S.code = ""; sessionStorage.removeItem("adm"); S.st = null; S.extra = {}; render(); } }, "Sign out")),

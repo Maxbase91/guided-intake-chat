@@ -12,7 +12,7 @@ const DECISION_CAP = 2000, LOCK_WINDOW_MIN = 15;
 const conflict = () => Object.assign(new Error("The draft was changed by someone else. Reload and try again."), { code: "conflict" });
 // key order must not count: a document read back from a jsonb column has its keys in another order
 const same = (a, b) => JSON.stringify(canon(a ?? null)) === JSON.stringify(canon(b ?? null));
-const KEY = { categories: "id", rules: "id", divisions: "id", l4: "code", suppliers: "name", contracts: "id", catalogue: "id" };
+const KEY = { categories: "id", rules: "id", divisions: "id", next_steps: "key", entities: "id", domains: "id", examples: "text", l4: "code", suppliers: "name", contracts: "id", catalogue: "id" };
 const keyOf = (part, item) => item[KEY[part] || "key"];
 
 // what changed between two documents, one entry per item: [{ part, item, before, after }]

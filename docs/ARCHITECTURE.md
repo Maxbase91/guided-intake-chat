@@ -125,6 +125,14 @@ texts fill; `reviewFlags()` runs each card through the engine. A flagged outcome
 whether an outcome raises a flag is fixed by the seed. The decision log records the cards that raised a flag. How it
 works and the Decision tree list the flags from the cards, so they follow what is published.
 
+**Texts, limits and lists.** The next steps per channel (`next_steps`, one text list per variant with fixed
+placeholders), the legal entities (`entities`: search words and case-sensitive short codes), the operations domains
+(`domains`: search words and guidance texts; the domain mentioned first wins) and the welcome examples (`examples`) are
+parts of the configuration. `applyConfig()` fills `NEXT_STEPS`, `ENTITIES`, `DOMAINS` and `TRIES` and builds the
+matchers with `kwAlt()`. Word limits, answer-check limits and the quality-score weights are thresholds (groups Text
+limits, Answer checks, Quality score). Answer buttons are editable only for questions whose answer the code records
+and never reads; the others feed the rules and stay code.
+
 **Routes and channels.** `determine()` returns a route, which is the question profile: `catalogue`, `contract`, `simple`,
 `business` or `procurement`. The buying channel shown to the requester is one of four (`CHANNELS`): a small, simple
 purchase (`simple`) is business-led demand with the short form (`channelOf`, `chan`).

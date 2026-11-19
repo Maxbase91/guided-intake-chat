@@ -7,7 +7,7 @@ const Engine = require("../../engine.js");
 
 // reference data: the Level 4 list, suppliers, framework contracts and the catalogue (example data in the seed)
 const REF_PARTS = ["l4", "suppliers", "contracts", "catalogue"];
-const PARTS = ["params", "channels", "categories", "facts", "rules", "questions", "guidance", "divisions", "lists", ...REF_PARTS];
+const PARTS = ["params", "channels", "categories", "facts", "rules", "questions", "guidance", "divisions", "lists", "next_steps", "entities", "domains", "examples", ...REF_PARTS];
 const SEED = {
   params: require("../../db/seed/params.json"),
   channels: require("../../db/seed/channels.json"),
@@ -18,6 +18,10 @@ const SEED = {
   guidance: require("../../db/seed/guidance.json"),
   divisions: require("../../db/seed/divisions.json"),
   lists: require("../../db/seed/lists.json"),
+  next_steps: require("../../db/seed/next_steps.json"),
+  entities: require("../../db/seed/entities.json"),
+  domains: require("../../db/seed/domains.json"),
+  examples: require("../../db/seed/examples.json"),
   l4: require("../../db/seed/l4.json"),
   suppliers: require("../../db/seed/suppliers.json"),
   contracts: require("../../db/seed/contracts.json"),
@@ -31,8 +35,12 @@ const withDefaults = (doc) => {
   out.rules = out.rules.map((r) => { const seed = SEED.rules.find((x) => x.id === (r && r.id)); return seed ? { ...r, placeholders: [...(seed.placeholders || [])] } : r; });
   // a rule added to the code after the document was saved comes from the seed (R07 and R08 for versions 1 and 2)
   SEED.rules.forEach((r) => { if (!out.rules.some((x) => x && x.id === r.id)) out.rules.push(structuredClone(r)); });
-  // likewise a question or a fact added later
-  for (const part of ["questions", "facts"]) SEED[part].forEach((q) => { if (!out[part].some((x) => x && x.key === q.key)) out[part].push(structuredClone(q)); });
+  // likewise a question, a fact or a threshold added later; a step list's placeholders come from the code
+  for (const part of ["questions", "facts", "params"]) SEED[part].forEach((q) => { if (!out[part].some((x) => x && x.key === q.key)) out[part].push(structuredClone(q)); });
+  out.params = out.params.map((p) => { const seed = SEED.params.find((x) => x.key === (p && p.key)); return seed ? { ...seed, value: p.value } : p; });
+  out.next_steps = out.next_steps.map((n) => { const seed = SEED.next_steps.find((x) => x.key === (n && n.key)); return seed ? { ...n, label: seed.label, placeholders: [...seed.placeholders] } : n; });
+  // a question saved before its answer buttons were editable keeps the seed's buttons
+  out.questions = out.questions.map((q) => { const seed = SEED.questions.find((x) => x.key === (q && q.key)); return seed && seed.choices && !Array.isArray(q.choices) ? { ...q, choices: [...seed.choices] } : q; });
   return out;
 };
 const bodyOf = (doc) => withDefaults(doc);
@@ -75,10 +83,34 @@ function validateConfig(cfg) {
   }
   for (const d of SEED.divisions) { const have = cfg.divisions.find((x) => x.id === d.id); if (!have || !String(have.name || "").trim() || !String(have.vendor_office || "").trim()) errors.push(`division ${d.id} has no name or vendor office`); }
   for (const l of SEED.lists) { const have = cfg.lists.find((x) => x.key === l.key); if (!have) errors.push(`list ${l.key} is missing`); else (have.items || []).forEach((it, i) => { if (!String(it.name || "").trim() || !(it.keywords || []).length) errors.push(`${l.label}, entry ${i + 1}: needs a name and at least one search word`); }); }
+  errors.push(...validateTexts(cfg, params));
   errors.push(...validateReference(cfg));
   const ids = cfg.rules.map((r) => r.id);
   ids.filter((id, i) => ids.indexOf(id) !== i).forEach((id) => errors.push(`rule ${id} is defined twice`));
   for (const id of SEED.rules.map((r) => r.id)) if (!ids.includes(id)) errors.push(`rule ${id} is missing`);
+  return errors;
+}
+
+// next steps, entities, domains, welcome examples and the limits that must be in order
+function validateTexts(cfg, P) {
+  const errors = [];
+  const order = (lo, hi, what) => { if (P[lo] > P[hi]) errors.push(`${what}: the lower limit is above the upper one`); };
+  order("headMinProc", "headMaxProc", "headline, procurement-led"); order("execMinProc", "execMaxProc", "executive description, procurement-led");
+  order("headMin", "headMax", "headline, other routes"); order("execMin", "execMax", "executive description, other routes");
+  order("checkDayTypicalMin", "checkDayTypicalMax", "typical day rate");
+  if (!(P.qualityStrong > P.qualityGood && P.qualityGood > P.qualityFair)) errors.push("quality ratings: Strong must start above Good, and Good above Fair");
+  if (P.qualityFloor > 100 || P.qualityStrong > 100 || P.qualityMin > 100) errors.push("quality score: limits are out of 100");
+  for (const n of SEED.next_steps) {
+    const have = cfg.next_steps.find((x) => x.key === n.key);
+    if (!have || !(have.steps || []).length) { errors.push(`next steps, ${n.label}: no steps`); continue; }
+    have.steps.forEach((t, i) => {
+      if (!String(t || "").trim()) errors.push(`next steps, ${n.label}, step ${i + 1}: empty`);
+      for (const m of String(t || "").matchAll(/\{(\w+)\}/g)) if (!n.placeholders.includes(m[1])) errors.push(`next steps, ${n.label}, step ${i + 1}: uses {${m[1]}}, which is not filled here (${n.placeholders.map((x) => `{${x}}`).join(" ") || "no placeholders"})`);
+    });
+  }
+  for (const e of SEED.entities) { const have = cfg.entities.find((x) => x.id === e.id); if (!have || !String(have.name || "").trim() || !((have.keywords || []).length + (have.codes || []).length)) errors.push(`legal entity ${e.id}: needs a name and at least one search word or short code`); }
+  for (const d of SEED.domains) { const have = cfg.domains.find((x) => x.id === d.id); if (!have || !String(have.name || "").trim() || !(have.keywords || []).length) errors.push(`operations domain ${d.id}: needs a name and at least one search word`); }
+  if (cfg.examples.length < 3) errors.push("welcome examples: at least 3");
   return errors;
 }
 

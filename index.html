@@ -1007,16 +1007,41 @@ body.doc-open{overflow:hidden}
 </script>
 <script id="config-defaults" type="application/json">
 {
-"version":0,"source":"builtin","checksum":"b00bf59dad26","ref_checksum":"85cd1fc29cbe",
+"version":0,"source":"builtin","checksum":"6f585715e441","ref_checksum":"85cd1fc29cbe",
 "params":[
-{"key":"simpleMax","value":5000,"unit":"EUR","label":"Small, simple purchase up to","description":"Business-led demand with the short form: one quote or a corporate card, and a purchase request instead of a service description."},
-{"key":"catalogueNoQtyMax","value":50000,"unit":"EUR","label":"Catalogue order without a quantity up to","description":"The most a catalogue order can be when no quantity is given."},
-{"key":"formMin","value":100000,"unit":"EUR a year","label":"Sourcing request form from","description":"Below it the division leads with three quotes. From it the Category Manager decides, or procurement leads in mandatory categories."},
-{"key":"leadMin","value":500000,"unit":"EUR a year","label":"Procurement leads from","description":"Procurement leads the sourcing with an RFP."},
-{"key":"materialityMin","value":1000000,"unit":"EUR","label":"Material spend review from","description":"Adds the material spend review."},
-{"key":"qualityMin","value":75,"unit":"points","label":"Quality needed before submitting","description":"Below it the chat offers an improvement round."},
-{"key":"answerTip","value":5,"unit":"rating","label":"Tips for thin answers","description":"One tip when a new-demand answer rates this or lower (0 = off)."},
-{"key":"l4Match","value":75,"unit":"%","label":"Level 4 candidates shown from","description":"After the first message every candidate at this match or more is offered."}
+{"key":"simpleMax","value":5000,"unit":"EUR","label":"Small, simple purchase up to","description":"Business-led demand with the short form: one quote or a corporate card, and a purchase request instead of a service description.","group":"Routing"},
+{"key":"catalogueNoQtyMax","value":50000,"unit":"EUR","label":"Catalogue order without a quantity up to","description":"The most a catalogue order can be when no quantity is given.","group":"Routing"},
+{"key":"formMin","value":100000,"unit":"EUR a year","label":"Sourcing request form from","description":"Below it the division leads with three quotes. From it the Category Manager decides, or procurement leads in mandatory categories.","group":"Routing"},
+{"key":"leadMin","value":500000,"unit":"EUR a year","label":"Procurement leads from","description":"Procurement leads the sourcing with an RFP.","group":"Routing"},
+{"key":"materialityMin","value":1000000,"unit":"EUR","label":"Material spend review from","description":"Adds the material spend review.","group":"Routing"},
+{"key":"qualityMin","value":75,"unit":"points","label":"Quality needed before submitting","description":"Below it the chat offers an improvement round.","group":"Quality score"},
+{"key":"answerTip","value":5,"unit":"rating","label":"Tips for thin answers","description":"One tip when a new-demand answer rates this or lower (0 = off).","group":"Quality score"},
+{"key":"l4Match","value":75,"unit":"%","label":"Level 4 candidates shown from","description":"After the first message every candidate at this match or more is offered.","group":"Category matching"},
+{"key":"headMaxProc","value":100,"unit":"words","label":"Headline, procurement-led: at most","description":"The service description's headline for procurement-led demand.","group":"Text limits"},
+{"key":"headMinProc","value":50,"unit":"words","label":"Headline, procurement-led: at least","description":"Shorter is flagged as too thin.","group":"Text limits"},
+{"key":"execMaxProc","value":250,"unit":"words","label":"Executive description, procurement-led: at most","description":"The executive description for procurement-led demand.","group":"Text limits"},
+{"key":"execMinProc","value":150,"unit":"words","label":"Executive description, procurement-led: at least","description":"Shorter is flagged as too thin.","group":"Text limits"},
+{"key":"headMax","value":70,"unit":"words","label":"Headline, other routes: at most","description":"Business-led demand and existing contracts.","group":"Text limits"},
+{"key":"headMin","value":40,"unit":"words","label":"Headline, other routes: at least","description":"Shorter is flagged as too thin.","group":"Text limits"},
+{"key":"execMax","value":150,"unit":"words","label":"Executive description, other routes: at most","description":"Business-led demand and existing contracts.","group":"Text limits"},
+{"key":"execMin","value":90,"unit":"words","label":"Executive description, other routes: at least","description":"Shorter is flagged as too thin.","group":"Text limits"},
+{"key":"checkBigWorkMin","value":5000,"unit":"EUR","label":"Budget for consulting, IT, legal or cloud work queried below","description":"The chat asks whether this is really the total.","group":"Answer checks"},
+{"key":"checkDayMin","value":400,"unit":"EUR","label":"Advisory work: a day per person queried below","description":"Budget ÷ (people × months × 20 days), for consulting, IT, legal and audit work.","group":"Answer checks"},
+{"key":"checkDayTypicalMin","value":1000,"unit":"EUR","label":"Typical day rate quoted: from","description":"Named in that question as the usual cost per person and day.","group":"Answer checks"},
+{"key":"checkDayTypicalMax","value":2000,"unit":"EUR","label":"Typical day rate quoted: to","description":"Named in that question as the usual cost per person and day.","group":"Answer checks"},
+{"key":"checkLongWorkMin","value":3000,"unit":"EUR","label":"Three months or more of work queried below","description":"Services only, not goods.","group":"Answer checks"},
+{"key":"checkLargeMax","value":20000000,"unit":"EUR","label":"A total is confirmed above","description":"The chat asks the requester to confirm a very large figure.","group":"Answer checks"},
+{"key":"checkRateTolerance","value":50,"unit":"%","label":"External workers: total may differ from day rate × days by","description":"A larger gap is queried.","group":"Answer checks"},
+{"key":"qualityWarn","value":15,"unit":"points","label":"Points off per warning","description":"A confirmed issue, an unanswered question, a missing data location.","group":"Quality score"},
+{"key":"qualityInfo","value":5,"unit":"points","label":"Points off per note","description":"An estimate, an open budget approval, a tight timeline.","group":"Quality score"},
+{"key":"qualityIncomplete","value":0.5,"unit":"points","label":"Points off per missing percent of details","description":"The share of the questions this route needs that are still open.","group":"Quality score"},
+{"key":"qualityPartial","value":3,"unit":"points","label":"Points off per thin section","description":"A section of the service description that is partial or to be determined.","group":"Quality score"},
+{"key":"qualityRisk","value":8,"unit":"points","label":"Points off per risky section","description":"A section rated as a risk.","group":"Quality score"},
+{"key":"qualityCap","value":30,"unit":"points","label":"Section points off at most","description":"The cap on the section penalties together.","group":"Quality score"},
+{"key":"qualityFloor","value":35,"unit":"points","label":"Lowest score","description":"The score never goes below this.","group":"Quality score"},
+{"key":"qualityStrong","value":90,"unit":"points","label":"Rated Strong from","description":"Rating bands shown with the score.","group":"Quality score"},
+{"key":"qualityGood","value":75,"unit":"points","label":"Rated Good from","description":"Rating bands shown with the score.","group":"Quality score"},
+{"key":"qualityFair","value":55,"unit":"points","label":"Rated Fair from","description":"Below it the rating is Needs work.","group":"Quality score"}
 ],
 "channels":[
 {"key":"catalogue","name":"Catalogue order","days":"1–3","lead_days":3,"doc":"Purchase request"},
@@ -1145,7 +1170,7 @@ body.doc-open{overflow:hidden}
 {"key":"entity","label":"Provisioning legal entity","q":"Which legal entity of the bank will receive this service and sign the contract?","ex":"It goes on the contract and into the register of third-party arrangements."},
 {"key":"in_house","label":"Work the bank could do itself","q":"Is this work the bank does itself today, or could realistically do itself?","ex":"This is the key question for whether it counts as outsourcing: it can apply even if we have never done it ourselves, as long as a bank could realistically do it."},
 {"key":"deps_pack","label":"Dependencies and assumptions","q":"What will we need to provide, and what is the provider assuming?","ex":""},
-{"key":"other_risks","label":"Anything else","ex":""},
+{"key":"other_risks","label":"Anything else","ex":"","choices":["Nothing else"]},
 {"key":"confirm_derived","label":"Checked by you","q":"Please check what I've worked out.","ex":""},
 {"key":"audience_fn","label":"Who it is for","ex":""},
 {"key":"value_props","label":"Benefits and value","ex":""},
@@ -1168,7 +1193,7 @@ body.doc-open{overflow:hidden}
 {"key":"impact_delay","label":"If it doesn't go ahead","q":"What happens if this doesn't go ahead, or is delayed?","ex":"Think of operations, regulators, clients or cost. For example: \"we miss the audit deadline\" or \"manual work continues, nothing serious\"."},
 {"key":"must_haves","label":"Must-haves"},
 {"key":"acceptance","label":"Acceptance criteria","q":"How will you know the work has been done well?"},
-{"key":"evaluation_priority","label":"Most important","q":"When we compare offers, what matters most to you?","ex":""},
+{"key":"evaluation_priority","label":"Most important","q":"When we compare offers, what matters most to you?","ex":"","choices":["Best price","Best quality","Fastest delivery","A balance"]},
 {"key":"supplier_requirements","label":"Supplier must have","q":"Must the supplier have any certifications or specific experience?"},
 {"key":"current_supplier","label":"Today's provider","q":"Is this replacing or continuing something you have today?","ex":"If so, who provides it now? \"No, it's new\" is fine."},
 {"key":"volume","label":"Volume","ex":""},
@@ -1176,16 +1201,16 @@ body.doc-open{overflow:hidden}
 {"key":"data_details","label":"Data involved","q":"What kind of data will they see, and where would it be stored?","ex":"For example: \"employee names and salaries, stored in the EU\".","why":"This shapes the data protection review."},
 {"key":"criticality","label":"If it stopped","q":"If this stopped working for a day, what would happen?","ex":"For example: \"clients couldn't log in\" or \"a short delay, nothing serious\".","why":"It tells us how critical the supplier is."},
 {"key":"subcontracting","label":"Subcontractors","q":"Is the supplier likely to use subcontractors or teams in other countries?","ex":""},
-{"key":"pricing_model","label":"Payment model","q":"How would you prefer to pay?","ex":"A fixed price suits a clear scope, a day rate suits flexible work, and a monthly fee suits an ongoing service."},
+{"key":"pricing_model","label":"Payment model","q":"How would you prefer to pay?","ex":"A fixed price suits a clear scope, a day rate suits flexible work, and a monthly fee suits an ongoing service.","choices":["Fixed price","Day rate","Monthly fee","Not sure"]},
 {"key":"service_levels","label":"Service levels","q":"Which service levels matter to you?"},
-{"key":"ip_ownership","label":"Who owns the work","q":"Should we own what the supplier creates, such as designs, code or materials?","ex":""},
-{"key":"performance","label":"Supplier so far","ex":"Anything to fix in the renewal is useful to know."},
+{"key":"ip_ownership","label":"Who owns the work","q":"Should we own what the supplier creates, such as designs, code or materials?","ex":"","choices":["Yes, we own it","Shared use is fine","Not sure"]},
+{"key":"performance","label":"Supplier so far","ex":"Anything to fix in the renewal is useful to know.","choices":["Very well","Okay","Some issues"]},
 {"key":"hosting","label":"Who runs it","q":"Who will host and run the software: the provider (SaaS or a managed service), or our own Technology team?","ex":"This decides the outsourcing check: software the provider runs for us usually counts as outsourcing, software we install and run ourselves does not."},
 {"key":"phasing","label":"Phasing","q":"Should any part be delivered first?","ex":"For example: \"the KYC part first, trading in a second release\"."},
 {"key":"division","label":"Division","q":"Which division is this for?","ex":"","why":"It decides which vendor office reviews the request and which questions apply."},
-{"key":"demand_owner","label":"Demand owner","q":"Who owns this demand on the business side?","ex":"A name, or \"I am\". The demand owner decides on it and answers the buyer's questions.","applies":{"corporate":"R","investment":"R","corporate_investment":"R","private":"R","technology":"R"}},
-{"key":"sponsor","label":"Sponsor and budget approver","q":"Who sponsors this and approves the budget?","ex":"A name or a role, for example \"the head of operations\".","applies":{"corporate":"R","investment":"R","corporate_investment":"R","private":"C","technology":"R"}},
-{"key":"spend_type","label":"Spend type","q":"Does this keep today's business running, or is it a change or a project?","ex":"","why":"Finance books running costs and change costs differently.","applies":{"corporate":"R","investment":"R","corporate_investment":"-","private":"-","technology":"R"}}
+{"key":"demand_owner","label":"Demand owner","q":"Who owns this demand on the business side?","ex":"A name, or \"I am\". The demand owner decides on it and answers the buyer's questions.","applies":{"corporate":"R","investment":"R","corporate_investment":"R","private":"R","technology":"R"},"choices":["I am","Not decided yet"]},
+{"key":"sponsor","label":"Sponsor and budget approver","q":"Who sponsors this and approves the budget?","ex":"A name or a role, for example \"the head of operations\".","applies":{"corporate":"R","investment":"R","corporate_investment":"R","private":"C","technology":"R"},"choices":["My head of department","Not decided yet"]},
+{"key":"spend_type","label":"Spend type","q":"Does this keep today's business running, or is it a change or a project?","ex":"","why":"Finance books running costs and change costs differently.","applies":{"corporate":"R","investment":"R","corporate_investment":"-","private":"-","technology":"R"},"choices":["Keeps the business running","A change or a project","Not sure"]}
 ],
 "guidance":[
 {"key":"deliverables_example","const":"DELIV_EX","label":"Example deliverables","use":"example","description":"Shown as the example with the deliverables question.","source":"Category guidance","owner":"Category Managers","texts":{"_":"the main result you expect, for example a report, a working system or a delivered service","audit-tax":"a transfer pricing study, documentation for the tax authorities and a short briefing for Finance","bpo":"all supplier invoices processed within 3 days, supplier queries answered and a monthly report","cloud":"a hosting environment with 99.9% uptime and migration support","consulting":"a current-state process map, a target process design and a rollout plan","facilities":"a cleaning schedule, monthly service reports and a named site contact","hr-services":"a shortlist of five qualified candidates within six weeks, interview support and reference checks","it-services":"a tested software release, technical documentation and a handover to support","legal":"a written legal opinion and draft contract wording","market-data":"a real-time data feed for two desks with an API","marketing":"venue and catering, the agenda and guest management","software":"user licences, set-up and training for the admin team","telecom":"50 mobile contracts with data bundles and a support line","training":"three course sessions for 20 people, course materials and attendance records"}},
@@ -1209,6 +1234,48 @@ body.doc-open{overflow:hidden}
 "lists":[
 {"key":"prohibited_services","label":"Services the bank does not buy from third parties","description":"A request that names one of these is flagged for the vendor office and Compliance (rule R07). Test data, not the bank's list.","source":"Compliance policy","owner":"Compliance","items":[{"name":"lobbying or political contributions","keywords":["lobbying","lobbyist*","political donation*","campaign contribution*"]},{"name":"facilitation payments or introducer fees to officials","keywords":["facilitation payment*","introducer fee*"]},{"name":"unlicensed cryptocurrency custody","keywords":["crypto custody","cryptocurrency custody","crypto wallet*"]},{"name":"covert surveillance of employees","keywords":["covert surveillance","spy on employees","secretly monitor*"]}]},
 {"key":"review_countries","label":"Countries that need a vendor office review","description":"Work, data or a supplier in one of these countries is flagged for the vendor office (rule R08). Test data based on public sanctions lists, not the bank's list.","source":"Country risk list","owner":"Risk function","items":[{"name":"North Korea","keywords":["north korea","dprk","pyongyang"]},{"name":"Iran","keywords":["iran","tehran"]},{"name":"Syria","keywords":["syria","damascus"]},{"name":"Russia","keywords":["russia","moscow","st petersburg"]},{"name":"Belarus","keywords":["belarus","minsk"]}]}
+],
+"next_steps":[
+{"key":"catalogue_shop","label":"Catalogue order from a supplier's shop","placeholders":["shop","supplier","max_order","delivery","needed"],"steps":["Open the {shop} ({supplier}) from the catalogue and add what you need, up to {max_order}.","Delivery to {delivery}{needed}.","Submit the basket. It goes to your budget owner for approval."]},
+{"key":"catalogue_item","label":"Catalogue order of fixed-price items","placeholders":["items","quantity","delivery","needed"],"steps":["Add {items} to your basket{quantity}.","Delivery to {delivery}{needed}.","Submit. Standard items go straight through."]},
+{"key":"simple","label":"Small, simple purchase (business-led, short form)","placeholders":["quote_from"],"steps":["Get one quote{quote_from}.","Raise a purchase order with the quote attached, or pay with your corporate card where the card policy allows.","When it arrives, confirm receipt so the invoice can be paid."]},
+{"key":"contract_people","label":"Existing contract: external workers","placeholders":["supplier","contract_id"],"steps":["The role profile goes to {supplier} under {contract_id}.","They shortlist candidates for you to interview.","Onboarding and system access follow after selection."]},
+{"key":"contract_calloff","label":"Existing contract: call-off","placeholders":["supplier","contract_id"],"steps":["A call-off is raised against {contract_id} with {supplier}.","The scope of work from this conversation is attached.","The contract owner confirms, then the order goes out."]},
+{"key":"business","label":"Business-led demand","placeholders":["preferred"],"steps":["You ask at least 3 suppliers for a quote{preferred}, using the service description.","Procurement checks the quotes and the supplier before you choose.","The purchase request is raised with the chosen quote attached."]},
+{"key":"procurement","label":"Procurement-led demand","placeholders":[],"steps":["Submit. A procurement-led sourcing project is created with the service description attached.","A buyer contacts you within 2 working days to plan the RFP and the evaluation team.","Risk, ICT and supplier checks run in parallel with the RFP."]}
+],
+"entities":[
+{"id":"EU","name":"EU banking entity (Germany)","country":"Germany","keywords":["frankfurt","germany","german","berlin","munich","hamburg","cologne","düsseldorf","stuttgart","europe"],"codes":["EU"]},
+{"id":"UK","name":"UK banking entity (London)","country":"United Kingdom","keywords":["london","united kingdom","england","english","britain","british","edinburgh"],"codes":["UK"]},
+{"id":"SG","name":"Singapore branch","country":"Singapore","keywords":["singapore"],"codes":[]},
+{"id":"HK","name":"Hong Kong branch","country":"Hong Kong","keywords":["hong kong"],"codes":[]},
+{"id":"US","name":"US entity (New York)","country":"United States","keywords":["new york","united states","america","american"],"codes":["US","USA"]},
+{"id":"AU","name":"Australia branch","country":"Australia","keywords":["sydney","melbourne","australia"],"codes":[]},
+{"id":"CA","name":"Canada branch","country":"Canada","keywords":["toronto","canada"],"codes":[]}
+],
+"domains":[
+{"id":"kyc","ops":true,"name":"KYC and financial crime operations","keywords":["kyc","know your customer","know your client","client onboarding","customer due diligence","cdd","edd","periodic review","aml","anti-money","anti money","financial crime","sanctions screening","transaction monitoring","name screening","alert review","alert handling"],"bg":"periodic reviews are overdue for 400 corporate clients and the regulator flagged it; if it slips, we face a formal finding","aud":"Client onboarding and periodic review teams in Operations (first line of defence), usually in onboarding hubs; relationship managers in Corporate, Commercial and Private Banking whose clients wait on KYC","fun":"Client Onboarding / KYC Operations as process owner, Financial Crime Compliance as second-line oversight, and the client-facing businesses","ben":"faster client onboarding; clearing the backlog of overdue periodic reviews; consistent quality of KYC files; flexible capacity for peaks and remediation","kpi":"turnaround time per case (onboarding and periodic review); backlog and overdue reviews; quality-check pass rate; rework rate","sl":"Standard cases completed within 5 working days and high-risk cases within 10; at least 98% of files pass quality checks; overdue periodic reviews reduced to zero by an agreed date","reg":"Evidence for regulators that customer due diligence is complete and on time; a clear audit trail per client file; fewer findings on overdue reviews","out":"Final risk-rating and client acceptance decisions, which stay with the bank; exit decisions for clients; changes to our onboarding systems","qual":"Analysts trained in customer due diligence and enhanced due diligence; recognised AML certification (for example ACAMS) for team leads; background-checked staff","personal":"client names, ID documents, addresses, ownership structures and source-of-wealth information","important":"KYC and financial crime work, which large banks usually treat as supporting a critical or important function","deps":"Access to the onboarding and screening systems; our KYC procedures and risk-rating rules; a named Financial Crime Compliance contact for escalations","notes":"Usually run in Operations hubs, often nearshore or offshore; client data access makes data protection and outsourcing reviews likely; regulators expect the bank to keep the risk decisions."},
+{"id":"payops","ops":true,"name":"Payments and securities operations","keywords":["payment operations","payments operations","payment processing","payments processing","payment investigations","payments investigations","swift","reconciliation","trade settlement","settlement","corporate actions","custody","securities operations","cash management operations"],"bg":"payment exceptions pile up at month end and cut-offs are missed; if it slips, clients are paid late","aud":"Payments, settlements and reconciliations teams in Operations, and the businesses whose clients rely on timely payments","fun":"Operations (process owner), Treasury and Finance, with Operational Risk oversight","ben":"fewer failed or late payments; faster investigation of exceptions; capacity for volume peaks","kpi":"straight-through processing rate; exceptions cleared within the cut-off; open reconciliation breaks by age; failed settlements","sl":"All items processed before the daily cut-off; 99.9% accuracy; reconciliation breaks investigated within 1 working day","reg":"Operational resilience for an important business service; a clear audit trail of every payment","out":"Payment authorisation and release, which stay with the bank; changes to the payment systems","qual":"Staff experienced in payments or securities operations at a bank; background-checked","personal":"client account details, payment data and counterparties","important":"payments and settlement work, which large banks usually treat as an important business service","deps":"System access with dual control; cut-off times and procedures; a named Operations contact","notes":"Money movement makes this high risk: dual control, access reviews and operational resilience requirements apply."},
+{"id":"ap","ops":true,"name":"Accounts payable and finance operations","keywords":["accounts payable","invoice processing","supplier invoice","purchase-to-pay","purchase to pay","p2p","expense processing","general ledger","record-to-report","record to report"],"bg":"invoices are paid late and we pay about €20,000 a year in late fees; if it slips, supplier complaints grow","aud":"Accounts Payable and Finance Operations teams, and the suppliers and budget holders who wait on payment","fun":"Finance (process owner), Procurement for the purchase-to-pay process, and Tax","ben":"suppliers paid on time; fewer duplicate or wrong payments; less manual work at month end","kpi":"invoices processed within the agreed days; first-time match rate; duplicate payments prevented; supplier queries closed on time","sl":"95% of invoices processed within 3 working days; accuracy of at least 99%; supplier queries answered within 2 working days","reg":"Clean controls for the annual audit; correct VAT treatment","out":"Approval and payment release, which stay with us; changes to our finance systems","qual":"Staff experienced in accounts payable for large companies; background-checked","personal":"supplier bank details and contact data","important":null,"deps":"Access to the finance system and invoice inbox; approval workflows; a named Finance contact","notes":"Usually run from a finance shared-service centre; bank details make fraud controls important."},
+{"id":"hrops","ops":true,"name":"HR operations and payroll","keywords":["payroll","hr operations","recruitment process","benefits administration","onboarding of staff","onboarding of employees"],"bg":"payroll runs on an old tool and spreadsheets; if it slips, we miss the statutory reporting deadline","aud":"HR operations and payroll teams, and all employees in the countries covered","fun":"HR (process owner), Finance for payroll accounting, and Information Security","ben":"accurate and on-time pay; less manual work; better employee experience","kpi":"payroll accuracy; payroll delivered on time; employee queries closed on time","sl":"Payroll 100% on time; accuracy of at least 99.9%; employee queries answered within 2 working days","reg":"Compliance with tax and social security rules in each country; data protection for employee data","out":"Pay and grading decisions, which stay with HR","qual":"Payroll specialists for each country covered; background-checked","personal":"employee names, salaries, bank details and personal records","important":"payroll, which banks often treat as a critical service for staff","deps":"Employee master data; pay rules per country; a named HR contact","notes":"Employee data makes data protection reviews certain; multi-country payroll needs local expertise."},
+{"id":"contact","ops":true,"name":"Client contact centre","keywords":["contact center","contact centre","call center","call centre","client service desk","customer service","complaints handling"],"aud":"Retail or wealth clients who call or write in, and the client service teams in Operations","fun":"Client service / Operations, with Compliance for conduct and complaints handling","ben":"shorter waiting times; consistent answers; capacity for peaks","kpi":"calls answered within the target time; first-contact resolution; complaint handling time; client satisfaction","sl":"80% of calls answered within 30 seconds; complaints acknowledged within 1 working day and resolved within the regulatory deadline","reg":"Fair treatment of clients and complaints handling to regulatory standards","out":"Decisions on refunds or compensation beyond agreed limits","qual":"Trained client service agents; product training for the bank's products; background-checked","personal":"client names, account details and conversation records","important":"client service, which large banks usually treat as an important business service","deps":"Scripts and product information; access to client systems; escalation routes","notes":"Conduct risk and client data access; call recording and complaint rules apply."},
+{"id":"regrep","ops":true,"name":"Regulatory reporting","keywords":["regulatory reporting","prudential reporting","corep","finrep","liquidity reporting","transaction reporting","emir","mifid reporting"],"aud":"Regulatory Reporting and Finance teams, and the senior managers who sign off the returns","fun":"Finance / Regulatory Reporting, with Risk for data and Compliance","ben":"returns submitted on time and correct; less manual adjustment; fewer resubmissions","kpi":"returns submitted on time; resubmissions; data quality issues closed","sl":"All returns ready for sign-off 2 working days before the deadline","reg":"Accurate and timely returns to supervisors; a clear data lineage","out":"Sign-off and submission of returns, which stay with the bank","qual":"Specialists in the relevant regulatory returns; experience at large banks","personal":null,"important":"regulatory reporting, which supervisors expect to be resilient","deps":"Source data and reconciliations; reporting calendar; a named Finance contact","notes":"Senior managers stay accountable for the returns; deadlines are fixed by supervisors."},
+{"id":"servicedesk","ops":false,"name":"IT service desk and managed IT","keywords":["service desk","help desk","helpdesk","managed service","managed it service","end user support","end user computing","desktop support","infrastructure support"],"aud":"All colleagues who need IT support, and the Technology teams that run the services","fun":"Technology (service owner) and Information Security","ben":"faster fixes; support around the clock; predictable cost","kpi":"incidents resolved within target; first-contact resolution; user satisfaction; backlog of tickets","sl":"Priority 1 incidents answered within 15 minutes and fixed within 4 hours; 80% of calls answered within 60 seconds","reg":"Operational resilience and ICT risk management in line with regulatory expectations","out":"Changes to systems outside the agreed services; hardware purchases","qual":"ITIL-trained staff; certified engineers for the technologies supported; background-checked","personal":"colleague names and contact details; possibly access to systems with client data","important":"IT services that support banking systems, which may count as critical or important","deps":"Access to the ticketing tool and systems; knowledge articles; escalation to our Technology teams","notes":"ICT third-party risk rules apply (for example DORA in the EU); privileged access needs strict control."},
+{"id":"cyber","ops":false,"name":"Cyber security services","keywords":["cyber","penetration test","pen test","pentest","security operations","soc","threat intelligence","vulnerability scan","vulnerability management","red team"],"aud":"The Chief Information Security Office and the Technology teams responsible for the systems tested or monitored","fun":"Information Security (owner), Technology, and Operational Risk","ben":"risks found before attackers find them; faster detection and response; evidence for regulators and auditors","kpi":"findings reported within the agreed time; critical findings fixed on time; detection and response times","sl":"Critical findings reported within 24 hours; security incidents escalated within 15 minutes","reg":"Evidence of testing and monitoring expected by supervisors; ICT risk requirements","out":"Fixing the findings, unless agreed separately","qual":"Certified testers (for example CREST or OSCP); security-cleared staff","personal":"possibly client and employee data in the systems tested","important":null,"deps":"Scope and rules of engagement; test accounts and access; named Technology contacts","notes":"Testers get privileged access; rules of engagement and confidentiality are essential."},
+{"id":"trading","ops":false,"name":"Front-office trading platform","keywords":["trading system","trading platform","trading application","trading software","front-office system","front office system","front-office platform","front office platform","front-office trading system","front office trading system","front-office trading platform","front office trading platform","order management system","execution management","trade capture","position keeping","oms","ems"],"bg":"our trading platform is end of life and vendor support ends next year; if it slips, we trade on unsupported software","aud":"Traders, sales and structurers, with Middle Office, Market Risk and Operations using the trade data","fun":"Front office (business owner), Technology, Market Risk, Operations and Compliance","ben":"a supported, scalable platform in place of an end-of-life system; trades captured once and processed straight through; real-time positions and risk; fewer manual breaks between front and back office","kpi":"straight-through processing rate; platform availability in trading hours; trade capture latency; number of manual trade breaks","sl":"Availability of 99.95% in trading hours; priority 1 incidents answered within 15 minutes and fixed within 1 hour; month-end and market open covered","reg":"Transaction reporting and best-execution evidence; complete records for market abuse surveillance; operational resilience for an important business service","out":"Migration of historic trade data beyond the agreed period, unless agreed separately; changes to downstream finance and settlement systems; market data licences","qual":"Delivery teams with experience of trading platform implementations at banks; certified on the chosen platform","personal":"client names, accounts, positions and trading records","important":"trading platforms, which large banks usually treat as supporting a critical or important function","deps":"Access to booking, market data and reference data systems; a named front-office product owner; test environments and historic trade samples","mh":"real-time trade capture and position keeping, pre-trade limit checks and integration with booking and market data; it works if 98% of trades go straight through","notes":"Trading platforms are usually run by the bank (licensed) or hosted by the vendor (SaaS); hosting decides whether outsourcing and DORA rules apply in full."},
+{"id":"voice","ops":false,"name":"Trading voice and call recording","keywords":["call recording","voice recording","recorded line","trader voice","turret","mobile recording","recording of calls","recording of phone calls","recording of conversations","recording of messages"],"aud":"Traders, sales and other front-office staff whose calls and messages must be recorded, and the Compliance surveillance team","fun":"Front office, Technology for voice and mobile, and Compliance for record keeping and surveillance","ben":"complete records of client and trading conversations; faster retrieval for investigations and complaints; one service across desks","kpi":"share of required calls and messages recorded; time to retrieve a requested record; recording outages","sl":"Recording available 99.9% of trading hours; a requested record retrieved within 1 working day; outages reported within 1 hour","reg":"Record keeping of telephone conversations and electronic communications for investment services, kept for at least five years (up to seven if the supervisor asks); evidence for conduct investigations","out":"Surveillance analysis of the recordings, unless agreed separately; handsets, unless agreed separately","qual":"Experience recording regulated trading communications at banks; background-checked staff","personal":"recorded conversations with clients and colleagues, phone numbers and message content","important":null,"deps":"A list of the users and devices in scope; our retention rules; a named Compliance contact","notes":"Recordings must be complete, kept unaltered and retrievable for the whole retention period; gaps in recording must be reported."},
+{"id":"guarding","ops":false,"name":"Security guarding","keywords":["security guard","guarding","manned security","reception security","security officer"],"aud":"Everyone working at or visiting the sites covered, and the site security team","fun":"Corporate Security and Corporate Real Estate","ben":"safe and secure sites; controlled access for staff and visitors; fast response to incidents","kpi":"posts staffed as scheduled; incident response times; access-control breaches","sl":"All posts staffed for 100% of scheduled hours; alarms answered within 5 minutes; incident reports within 24 hours","reg":"Duty of care for staff and visitors; physical security of the bank's premises","out":"Building maintenance and cleaning; IT security monitoring","qual":"Guards licensed under local law and background-checked; trained in first aid and fire safety","personal":"visitor and staff names, access records and CCTV images","important":null,"deps":"Site plans and security procedures; access to the access-control system; a named site security contact","notes":"When the provider changes, guards may transfer to the new provider by law; allow for this in the timeline and costs."}
+],
+"examples":[
+{"group":"New demand","label":"Software, RFP","text":"A new HR system to replace our payroll tool."},
+{"group":"New demand","label":"Outsourcing","text":"KYC periodic reviews for our corporate clients by an external provider for 2 years, around 600k."},
+{"group":"New demand","label":"Offshore","text":"An offshore team in Poland to run accounts payable invoice processing for 3 years, about 900k."},
+{"group":"New demand","label":"Over €1 million","text":"Replace our core treasury management system, budget 2.5 million over 5 years."},
+{"group":"New demand","label":"Market data","text":"An ESG ratings data feed for our research team, around 120k a year."},
+{"group":"New demand","label":"Under €100k","text":"An agency for a client dinner for 40 people, around 30k."},
+{"group":"Other routes","label":"Catalogue","text":"We need 15 laptops for new joiners in Frankfurt."},
+{"group":"Other routes","label":"Call-off","text":"More support from Lakeshore Advisory for our operations team."},
+{"group":"Other routes","label":"External workers","text":"Two Java developers as contractors for 9 months."}
 ]
 }
 </script>
@@ -1268,15 +1335,8 @@ TAXONOMY.suppliers.forEach(sp=>sp.preferred_l4.forEach(c=>{ if(!PREFERRED_L4.has
 // the catalogue: fixed-price items, and punch-out shops (a supplier's shop for a whole Level 4, with a maximum order value)
 const CATALOGUE = (TAXONOMY.catalogue||[]).map(c=>{ const cat=(L4_BY_CODE.get(c.l4)||{}).cat; return {...c, kw:c.kw||[], cat, type:(CATEGORIES.find(x=>x.id===cat)||{}).type||"goods"}; });
 /* Provisioning legal entities (mock). The outsourcing test is one group-wide rule set for every entity (not per jurisdiction). */
-const ENTITIES = [
-  {id:"EU", name:"EU banking entity (Germany)", country:"Germany", re:/frankfurt|germany|german\b|berlin|munich|hamburg|cologne|düsseldorf|stuttgart|europe\b/i, abbr:/\bEU\b/},
-  {id:"UK", name:"UK banking entity (London)", country:"United Kingdom", re:/london|united kingdom|england|english\b|britain|british\b|edinburgh/i, abbr:/\bUK\b/},
-  {id:"SG", name:"Singapore branch", country:"Singapore", re:/singapore/i},
-  {id:"HK", name:"Hong Kong branch", country:"Hong Kong", re:/hong kong/i},
-  {id:"US", name:"US entity (New York)", country:"United States", re:/new york|united states|america(?:n)?\b/i, abbr:/\b(?:US|USA)\b/},
-  {id:"AU", name:"Australia branch", country:"Australia", re:/sydney|melbourne|australia/i},
-  {id:"CA", name:"Canada branch", country:"Canada", re:/toronto|canada/i}
-];
+// legal entities: from the configuration (applyConfig builds the matchers from their search words and short codes)
+const ENTITIES = [];
 // the group standard for "is this outsourcing?", and the rule set that will replace it (kept separate, never used for the result until switched on)
 const RULESETS = {
   current:{id:"EBA/GL/2019/02", short:"EBA/GL/2019/02", status:"Applicable (group standard)", issuer:"European Banking Authority",
@@ -1392,7 +1452,7 @@ const FACTS = {
   service_model:  {label:"Support and tools", sug:true, q:()=>"How will the technology be supported: support model, service hours and tools?", ex:()=>""},
   governance:     {label:"Governance and reporting", sug:true, q:f=>kindOf(f)==="project"?"How should the project be steered? Here's a standard set of status meetings, reports, change and escalation rules.":"How should the service be governed? Here's a standard set of meetings, reports, change and escalation rules.", ex:()=>""},
   supplier_terms: {label:"Supplier standard terms", q:f=>`Will the service rely on any of ${hasSupplier(f)?String(f.supplier).replace(/s?$/,m=>m?"s'":"'s"):"the provider's"} standard terms, policies or online documents?`, ex:()=>"Online terms can change without notice, so they need a fixed copy.", choices:["No","Yes","Not sure"]},
-  entity:         {label:"Provisioning legal entity", q:()=>"Which legal entity of the bank will receive this service and sign the contract?", ex:()=>"It goes on the contract and into the register of third-party arrangements.", choices:["UK banking entity (London)","EU banking entity (Germany)","US entity (New York)","Another entity"]},
+  entity:         {label:"Provisioning legal entity", q:()=>"Which legal entity of the bank will receive this service and sign the contract?", ex:()=>"It goes on the contract and into the register of third-party arrangements.", choices:()=>[...["UK","EU","US"].map(id=>entityById(id)).filter(Boolean).map(e=>e.name),"Another entity"]},
   in_house:       {label:"Work the bank could do itself", q:()=>"Is this work the bank does itself today, or could realistically do itself?", ex:()=>"This is the key question for whether it counts as outsourcing: it can apply even if we have never done it ourselves, as long as a bank could realistically do it.", choices:["Yes, we do it today","We could realistically do it","No, a bank wouldn't do this itself","Not sure"]},
   deps_pack:      {label:"Dependencies and assumptions", sug:true, q:()=>"What will we need to provide, and what is the provider assuming?", ex:()=>""},
   other_risks:    {label:"Anything else",   q:f=>kindOf(f)==="project"?"Anything else I should know, for example confidential or inside information, a conflict of interest or a fixed deadline?":kindOf(f)==="service"?"Anything else I should know, for example risks, constraints or a hand-over from today's provider, including staff who may transfer?":"Anything else I should know, for example risks, constraints or a hand-over from today's provider?", ex:()=>"", choices:["Nothing else"]},
@@ -1558,6 +1618,9 @@ const userText = () => " "+S.msgs.filter(m=>m.role==="user" && !m.l4).map(m=>m.t
 // whole words with an optional plural, so "pens" no longer hits "expenses" or "screen" hits "screening"; "consult*" is a stem
 const kwRe = (k, flags) => new RegExp(k.endsWith("*") ? "\\b"+k.slice(0,-1) : "\\b"+k+"(?:e?s)?\\b", flags);
 const kwHit = (t, k) => kwRe(k).test(t);
+// one matcher for a list of search words (exec gives the first mention, for "the domain named first wins")
+const reEsc = x => String(x).replace(/[.+?^${}()|[\]\\]/g,"\\$&");
+const kwAlt = (list, flags) => (list||[]).length ? new RegExp("(?:"+list.map(k=>k.endsWith("*") ? "\\b"+reEsc(k.slice(0,-1)) : "\\b"+reEsc(k)+"(?:e?s)?\\b").join("|")+")", flags) : null;
 // the category with the most keywords in the text. A goods noun right after "to" is a verb ("a tool to monitor alerts"), and after "trading",
 // "service" or "help" it names a team ("trading desk", "service desk"), so neither counts.
 // A tie goes to the category named last in the head of the first message, the words before "for", "to", "with", "that" or a comma:
@@ -1719,20 +1782,17 @@ function bankChecks(f){
   const D=S.det||{}, {view, values}=flagView(D.route||"procurement", D.contract||null, D.catalogue||[], f);
   return flagRules().filter(r=>r.step==="Category checks").map(r=>Engine.evaluate(r, view, CONFIG.thresholds)).filter(d=>d.attrs.flag).map(d=>toControl(d, values));
 }
+// next steps per channel are texts in the configuration (NEXT_STEPS); the code picks the variant and fills the placeholders
+const NEXT_STEPS = {};
 function nextSteps(route, cat, ctr){
-  const f=S.f;
-  switch(route){
-    case "catalogue": return cat.length && cat[0].kind==="shop"
-      ? [`Open the ${cat[0].name.toLowerCase()} (${cat[0].supplier}) from the catalogue and add what you need, up to ${money(cat[0].max_order)}.`, `Delivery to ${f.location||"your office"}${known(f.needed_by)?`, needed ${f.needed_by}`:""}.`, "Submit the basket. It goes to your budget owner for approval."]
-      : [`Add ${cat.map(i=>i.name).join(" and ")} to your basket${known(f.quantity)?` (${f.quantity})`:""}.`, `Delivery to ${f.location||"your office"}${known(f.needed_by)?`, needed ${f.needed_by}`:""}.`, "Submit. Standard items go straight through."];
-    case "simple":  return [`Get one quote${hasSupplier(f)?` from ${f.supplier}`:preferredFor(f).length?`, ideally from ${someNames(preferredFor(f))}`:""}.`, "Raise a purchase order with the quote attached, or pay with your corporate card where the card policy allows.", "When it arrives, confirm receipt so the invoice can be paid."];
-    case "contract":  return f.demand_type==="contingent_labour"
-      ? [`The role profile goes to ${ctr.supplier} under ${ctr.id}.`, "They shortlist candidates for you to interview.", "Onboarding and system access follow after selection."]
-      : [`A call-off is raised against ${ctr.id} with ${ctr.supplier}.`, "The scope of work from this conversation is attached.", "The contract owner confirms, then the order goes out."];
-    case "business":     return [`You ask at least 3 suppliers for a quote${preferredFor(f).length?`, ideally including ${someNames(preferredFor(f))}`:""}, using the service description.`, "Procurement checks the quotes and the supplier before you choose.", "The purchase request is raised with the chosen quote attached."];
-    case "procurement":  return ["Submit. A procurement-led sourcing project is created with the service description attached.", "A buyer contacts you within 2 working days to plan the RFP and the evaluation team.", "Risk, ICT and supplier checks run in parallel with the RFP."];
-  }
-  return [];
+  const f=S.f, pref=preferredFor(f), when=known(f.needed_by)?`, needed ${f.needed_by}`:"", delivery=f.location||"your office";
+  const pick = route==="catalogue" ? (cat.length && cat[0].kind==="shop" ? "catalogue_shop" : "catalogue_item") : route==="contract" ? (f.demand_type==="contingent_labour" ? "contract_people" : "contract_calloff") : route;
+  const values = {shop:cat[0]&&cat[0].name.toLowerCase(), supplier:route==="contract"&&ctr ? ctr.supplier : cat[0]&&cat[0].supplier, max_order:cat[0]&&cat[0].max_order!=null?money(cat[0].max_order):"",
+    items:cat.map(i=>i.name).join(" and "), quantity:known(f.quantity)?` (${f.quantity})`:"", delivery, needed:when, contract_id:ctr&&ctr.id,
+    quote_from:hasSupplier(f)?` from ${f.supplier}`:pref.length?`, ideally from ${someNames(pref)}`:"", preferred:pref.length?`, ideally including ${someNames(pref)}`:""};
+  // an empty value fills as nothing ("needed" and "preferred" are optional clauses)
+  const filled = Object.fromEntries(Object.entries(values).map(([k,v])=>[k, v==null?"":String(v)]));
+  return (NEXT_STEPS[pick]||[]).map(t=>String(t).replace(/\{(\w+)\}/g,(m,k)=>k in filled ? filled[k] : m));
 }
 
 /* ---------- ICT (DORA) and outsourcing: a decision tree run by rules, never a picker for the user (described in How it works and the Decision tree) ---------- */
@@ -2176,11 +2236,18 @@ function applyConfig(cfg){
   Object.keys(RULES).forEach(k=>delete RULES[k]); cfg.rules.forEach(r=>{ RULES[r.id]=r; });
   // question texts: only those the code asks the same way every time are data (the others depend on the request)
   (cfg.questions||[]).forEach(q=>{ const F=FACTS[q.key]; if(!F) return; F.label=q.label;
-    ["q","ex","why"].forEach(p=>{ if(typeof q[p]==="string"){ const t=q[p]; F[p]=()=>t; } }); });
+    ["q","ex","why"].forEach(p=>{ if(typeof q[p]==="string"){ const t=q[p]; F[p]=()=>t; } });
+    if(Array.isArray(q.choices) && q.choices.length) F.choices=[...q.choices]; });
   // guidance texts by category ("_" for any other category), filled into the objects the suggestions read
   if(Array.isArray(cfg.divisions)){ DIVISIONS.length=0; cfg.divisions.forEach(d=>DIVISIONS.push({...d})); }
   if(Array.isArray(cfg.lists)) cfg.lists.forEach(l=>{ LISTS[l.key]=l.items.map(x=>({...x})); });
   Object.keys(QUESTION_APPLIES).forEach(k=>delete QUESTION_APPLIES[k]); (cfg.questions||[]).forEach(q=>{ if(q.applies) QUESTION_APPLIES[q.key]={...q.applies}; });
+  // next steps, legal entities, operations domains and welcome examples (a copy saved before they existed keeps the current ones)
+  if(Array.isArray(cfg.next_steps)) cfg.next_steps.forEach(n=>{ NEXT_STEPS[n.key]=[...n.steps]; });
+  if(Array.isArray(cfg.entities)){ ENTITIES.length=0; cfg.entities.forEach(e=>ENTITIES.push({id:e.id, name:e.name, country:e.country, re:kwAlt(e.keywords,"i")||/$^/, abbr:e.codes&&e.codes.length?new RegExp(`\\b(?:${e.codes.map(reEsc).join("|")})\\b`):null})); }
+  if(Array.isArray(cfg.domains)){ DOMAINS.length=0; cfg.domains.forEach(d=>{ const {keywords, ...rest}=d; DOMAINS.push({...rest, re:kwAlt(keywords,"i")||/$^/}); }); }
+  if(Array.isArray(cfg.examples)){ TRIES.length=0; cfg.examples.forEach(e=>TRIES.push([e.group, e.label, e.text])); }
+  applyQuality(CONFIG.thresholds);
   (cfg.guidance||[]).forEach(g=>{ const o=GUIDANCE[g.key]; if(!o) return; Object.keys(o).forEach(k=>delete o[k]); Object.assign(o, g.texts); });
   // reference data: sent only when it differs from what the page has; the built-in configuration means the example data
   const REF=["l4","suppliers","contracts","catalogue"], ref = REF.every(k=>Array.isArray(cfg[k])) ? cfg : cfg.ref_checksum && cfg.ref_checksum!==CFG.ref_checksum && cfg.ref_checksum===DEFAULTS.ref_checksum ? BUILTIN_REF : null;
@@ -2226,7 +2293,7 @@ function offTopicIssue(k){
 
 // returns {fact, issue, message, choices} for the first real problem in what changed this turn, or null (described in How it works)
 function findIssue(changed){
-  const f=S.f, route=S.det&&S.det.route, ctx=userText();
+  const f=S.f, route=S.det&&S.det.route, ctx=userText(), T=CONFIG.thresholds;
   for(const k of changed) if(!S.offChecked[k] && offTopic(k, f[k])) return offTopicIssue(k);   // nonsense first, regardless of other checks
   for(const k of changed){
     if(S.challenged[k]) continue;
@@ -2247,17 +2314,17 @@ function findIssue(changed){
       const val=Number(v), mo=monthsOf(f.duration);
       if(f.demand_type==="contingent_labour" && known(f.day_rate)){
         const rate=parseMoney(f.day_rate), exp=rate&&rate<5000 ? rate*20*mo*(parseInt(f.headcount)||1) : null;
-        if(exp && Math.abs(val-exp)/exp>0.5) return {fact:k, issue:`doesn't match the day rate (about ${money(exp)} expected)`, message:`Just to check: at ${f.day_rate} for ${parseInt(f.headcount)||1} ${parseInt(f.headcount)>1?"people":"person"} over ${f.duration||"the assignment"}, I'd expect about ${money(exp)}. You said ${money(val)}. Which is right?`, choices:[`About ${money(exp)}`,`${money(val)} is right`]};
+        if(exp && Math.abs(val-exp)/exp>T.checkRateTolerance/100) return {fact:k, issue:`doesn't match the day rate (about ${money(exp)} expected)`, message:`Just to check: at ${f.day_rate} for ${parseInt(f.headcount)||1} ${parseInt(f.headcount)>1?"people":"person"} over ${f.duration||"the assignment"}, I'd expect about ${money(exp)}. You said ${money(val)}. Which is right?`, choices:[`About ${money(exp)}`,`${money(val)} is right`]};
       }
       // (not for a category the rules only guessed: "something nice for a retiring colleague" is no consulting work)
       const bigWork = !S.catGuess && (["consulting","it-services","legal","cloud"].includes(f.category) || (f.category==="software" && /\b(system|platform|replace|implementation|erp|crm)\b/.test(ctx)));
-      if(bigWork && val<5000) return {fact:k, issue:`looks low for ${catById(f.category).name.toLowerCase()} work`, message:`Just to check: ${money(val)} is low for ${catById(f.category).name.toLowerCase()} work like this. Is that the total budget, or should it be higher?`, choices:["Yes, that's the total"]};
+      if(bigWork && val<T.checkBigWorkMin) return {fact:k, issue:`looks low for ${catById(f.category).name.toLowerCase()} work`, message:`Just to check: ${money(val)} is low for ${catById(f.category).name.toLowerCase()} work like this. Is that the total budget, or should it be higher?`, choices:["Yes, that's the total"]};
       // people × months for advisory work: €80,000 for three consultants over 9 months is about €150 a consultant day
       const ppl=peopleCount(f), perDay=ppl && known(f.duration) ? val/(ppl*mo*20) : null;
-      if(perDay!=null && perDay<400 && ["consulting","it-services","legal","audit-tax"].includes(f.category))
-        return {fact:k, issue:`low for ${ppl} ${ppl>1?"people":"person"} over ${f.duration}`, message:`Just to check: ${money(val)} for ${ppl} ${ppl>1?"people":"person"} over ${f.duration} is about ${money(Math.round(perDay))} a day each. ${catById(f.category).name} usually costs €1,000 to €2,000 a day per person. Is ${money(val)} the total budget?`, choices:["Yes, that's the total"]};
-      if(known(f.duration) && mo>=3 && val<3000 && !GOODSLIKE(f)) return {fact:k, issue:`looks low for ${f.duration} of work`, message:`Just to check: ${money(val)} for ${f.duration} of work looks low. Is that the total budget?`, choices:["Yes, that's the total"]};
-      if(val>20000000) return {fact:k, issue:"very large amount", message:`Just to confirm: the total is ${money(val)}?`, choices:["Yes, that's right"]};
+      if(perDay!=null && perDay<T.checkDayMin && ["consulting","it-services","legal","audit-tax"].includes(f.category))
+        return {fact:k, issue:`low for ${ppl} ${ppl>1?"people":"person"} over ${f.duration}`, message:`Just to check: ${money(val)} for ${ppl} ${ppl>1?"people":"person"} over ${f.duration} is about ${money(Math.round(perDay))} a day each. ${catById(f.category).name} usually costs ${money(T.checkDayTypicalMin)} to ${money(T.checkDayTypicalMax)} a day per person. Is ${money(val)} the total budget?`, choices:["Yes, that's the total"]};
+      if(known(f.duration) && mo>=3 && val<T.checkLongWorkMin && !GOODSLIKE(f)) return {fact:k, issue:`looks low for ${f.duration} of work`, message:`Just to check: ${money(val)} for ${f.duration} of work looks low. Is that the total budget?`, choices:["Yes, that's the total"]};
+      if(val>T.checkLargeMax) return {fact:k, issue:"very large amount", message:`Just to confirm: the total is ${money(val)}?`, choices:["Yes, that's right"]};
     }
     if(k==="personal_data" && f.personal_data===false){
       const m=ctx.match(/\b(hr system|hr platform|payroll|salar(?:y|ies)|employee (?:records|names|details)|customer (?:records|names|details|data)|client (?:records|names|details)|patients?|crm|recruit\w*|candidates?)\b/);
@@ -2286,7 +2353,12 @@ function findIssue(changed){
 
 // overall assessment of the intake: completeness, clarity, consistency (described in How it works)
 // score = 100 − warn·warnings − info·notes − incomplete·(100 − % of needed details) − section penalty (capped), never below floor
+// the weights are thresholds in the configuration (applyConfig fills them); the rating names stay here
 const QUALITY={warn:15, info:5, incomplete:0.5, partialSection:3, riskSection:8, sectionCap:30, floor:35, bands:[[90,"Strong"],[75,"Good"],[55,"Fair"],[0,"Needs work"]]};
+function applyQuality(T){
+  Object.assign(QUALITY, {warn:T.qualityWarn, info:T.qualityInfo, incomplete:T.qualityIncomplete, partialSection:T.qualityPartial, riskSection:T.qualityRisk, sectionCap:T.qualityCap, floor:T.qualityFloor,
+    bands:[[T.qualityStrong,"Strong"],[T.qualityGood,"Good"],[T.qualityFair,"Fair"],[0,"Needs work"]]});
+}
 function computeQuality(aiRemarks){
   const f=S.f, route=S.det.route, req=S.req||[], pts=[];
   const label=k=>FACTS[k]?FACTS[k].label:k;
@@ -3534,119 +3606,8 @@ const CAT_FUN={software:"the business function that uses it, Technology, and Inf
   insurance:"Corporate Insurance, Legal and Finance"};
 // specific kinds of work, recognised from the request; each note is what a large bank typically sees
 // ops: operations the provider would run for us; a project that only touches them (an app for onboarding) takes their audience and benefits, not their service levels
-const DOMAINS=[
-  {ops:true, id:"kyc", name:"KYC and financial crime operations", bg:"periodic reviews are overdue for 400 corporate clients and the regulator flagged it; if it slips, we face a formal finding",
-   re:/\b(kyc|know your (?:customer|client)|client onboarding|customer due diligence|\bcdd\b|\bedd\b|periodic review|aml|anti[- ]money|financial crime|sanctions screening|transaction monitoring|name screening|alert (?:review|handling))\b/i,
-   aud:"Client onboarding and periodic review teams in Operations (first line of defence), usually in onboarding hubs; relationship managers in Corporate, Commercial and Private Banking whose clients wait on KYC",
-   fun:"Client Onboarding / KYC Operations as process owner, Financial Crime Compliance as second-line oversight, and the client-facing businesses",
-   ben:"faster client onboarding; clearing the backlog of overdue periodic reviews; consistent quality of KYC files; flexible capacity for peaks and remediation",
-   kpi:"turnaround time per case (onboarding and periodic review); backlog and overdue reviews; quality-check pass rate; rework rate",
-   sl:"Standard cases completed within 5 working days and high-risk cases within 10; at least 98% of files pass quality checks; overdue periodic reviews reduced to zero by an agreed date",
-   reg:"Evidence for regulators that customer due diligence is complete and on time; a clear audit trail per client file; fewer findings on overdue reviews",
-   out:"Final risk-rating and client acceptance decisions, which stay with the bank; exit decisions for clients; changes to our onboarding systems",
-   qual:"Analysts trained in customer due diligence and enhanced due diligence; recognised AML certification (for example ACAMS) for team leads; background-checked staff",
-   personal:"client names, ID documents, addresses, ownership structures and source-of-wealth information", important:"KYC and financial crime work, which large banks usually treat as supporting a critical or important function",
-   deps:"Access to the onboarding and screening systems; our KYC procedures and risk-rating rules; a named Financial Crime Compliance contact for escalations",
-   notes:"Usually run in Operations hubs, often nearshore or offshore; client data access makes data protection and outsourcing reviews likely; regulators expect the bank to keep the risk decisions."},
-  {ops:true, id:"payops", name:"Payments and securities operations", bg:"payment exceptions pile up at month end and cut-offs are missed; if it slips, clients are paid late",
-   re:/\b(payments? (?:operations|processing|investigations)|swift|reconciliation|trade settlement|settlements?|corporate actions|custody|securities operations|cash management operations)\b/i,
-   aud:"Payments, settlements and reconciliations teams in Operations, and the businesses whose clients rely on timely payments",
-   fun:"Operations (process owner), Treasury and Finance, with Operational Risk oversight",
-   ben:"fewer failed or late payments; faster investigation of exceptions; capacity for volume peaks", kpi:"straight-through processing rate; exceptions cleared within the cut-off; open reconciliation breaks by age; failed settlements",
-   sl:"All items processed before the daily cut-off; 99.9% accuracy; reconciliation breaks investigated within 1 working day",
-   reg:"Operational resilience for an important business service; a clear audit trail of every payment",
-   out:"Payment authorisation and release, which stay with the bank; changes to the payment systems",
-   qual:"Staff experienced in payments or securities operations at a bank; background-checked", personal:"client account details, payment data and counterparties",
-   important:"payments and settlement work, which large banks usually treat as an important business service", deps:"System access with dual control; cut-off times and procedures; a named Operations contact",
-   notes:"Money movement makes this high risk: dual control, access reviews and operational resilience requirements apply."},
-  {ops:true, id:"ap", name:"Accounts payable and finance operations", bg:"invoices are paid late and we pay about €20,000 a year in late fees; if it slips, supplier complaints grow",
-   re:/\b(accounts payable|invoice processing|supplier invoices?|purchase[- ]to[- ]pay|p2p|expense processing|general ledger|record[- ]to[- ]report)\b/i,
-   aud:"Accounts Payable and Finance Operations teams, and the suppliers and budget holders who wait on payment",
-   fun:"Finance (process owner), Procurement for the purchase-to-pay process, and Tax",
-   ben:"suppliers paid on time; fewer duplicate or wrong payments; less manual work at month end", kpi:"invoices processed within the agreed days; first-time match rate; duplicate payments prevented; supplier queries closed on time",
-   sl:"95% of invoices processed within 3 working days; accuracy of at least 99%; supplier queries answered within 2 working days",
-   reg:"Clean controls for the annual audit; correct VAT treatment", out:"Approval and payment release, which stay with us; changes to our finance systems",
-   qual:"Staff experienced in accounts payable for large companies; background-checked", personal:"supplier bank details and contact data",
-   important:null, deps:"Access to the finance system and invoice inbox; approval workflows; a named Finance contact",
-   notes:"Usually run from a finance shared-service centre; bank details make fraud controls important."},
-  {ops:true, id:"hrops", name:"HR operations and payroll", bg:"payroll runs on an old tool and spreadsheets; if it slips, we miss the statutory reporting deadline",
-   re:/\b(payroll|hr operations|recruitment process|benefits administration|onboarding of (?:staff|employees))\b/i,
-   aud:"HR operations and payroll teams, and all employees in the countries covered", fun:"HR (process owner), Finance for payroll accounting, and Information Security",
-   ben:"accurate and on-time pay; less manual work; better employee experience", kpi:"payroll accuracy; payroll delivered on time; employee queries closed on time",
-   sl:"Payroll 100% on time; accuracy of at least 99.9%; employee queries answered within 2 working days",
-   reg:"Compliance with tax and social security rules in each country; data protection for employee data", out:"Pay and grading decisions, which stay with HR",
-   qual:"Payroll specialists for each country covered; background-checked", personal:"employee names, salaries, bank details and personal records",
-   important:"payroll, which banks often treat as a critical service for staff", deps:"Employee master data; pay rules per country; a named HR contact",
-   notes:"Employee data makes data protection reviews certain; multi-country payroll needs local expertise."},
-  {ops:true, id:"contact", name:"Client contact centre",
-   re:/\b(contact cent(?:er|re)|call cent(?:er|re)|client service desk|customer service|complaints handling)\b/i,
-   aud:"Retail or wealth clients who call or write in, and the client service teams in Operations", fun:"Client service / Operations, with Compliance for conduct and complaints handling",
-   ben:"shorter waiting times; consistent answers; capacity for peaks", kpi:"calls answered within the target time; first-contact resolution; complaint handling time; client satisfaction",
-   sl:"80% of calls answered within 30 seconds; complaints acknowledged within 1 working day and resolved within the regulatory deadline",
-   reg:"Fair treatment of clients and complaints handling to regulatory standards", out:"Decisions on refunds or compensation beyond agreed limits",
-   qual:"Trained client service agents; product training for the bank's products; background-checked", personal:"client names, account details and conversation records",
-   important:"client service, which large banks usually treat as an important business service", deps:"Scripts and product information; access to client systems; escalation routes",
-   notes:"Conduct risk and client data access; call recording and complaint rules apply."},
-  {ops:true, id:"regrep", name:"Regulatory reporting",
-   re:/\b(regulatory reporting|prudential reporting|corep|finrep|liquidity reporting|transaction reporting|emir|mifid reporting)\b/i,
-   aud:"Regulatory Reporting and Finance teams, and the senior managers who sign off the returns", fun:"Finance / Regulatory Reporting, with Risk for data and Compliance",
-   ben:"returns submitted on time and correct; less manual adjustment; fewer resubmissions", kpi:"returns submitted on time; resubmissions; data quality issues closed",
-   sl:"All returns ready for sign-off 2 working days before the deadline", reg:"Accurate and timely returns to supervisors; a clear data lineage",
-   out:"Sign-off and submission of returns, which stay with the bank", qual:"Specialists in the relevant regulatory returns; experience at large banks", personal:null,
-   important:"regulatory reporting, which supervisors expect to be resilient", deps:"Source data and reconciliations; reporting calendar; a named Finance contact",
-   notes:"Senior managers stay accountable for the returns; deadlines are fixed by supervisors."},
-  {id:"servicedesk", name:"IT service desk and managed IT",
-   re:/\b(service desk|help ?desk|managed (?:it )?service|end user (?:support|computing)|desktop support|infrastructure support)\b/i,
-   aud:"All colleagues who need IT support, and the Technology teams that run the services", fun:"Technology (service owner) and Information Security",
-   ben:"faster fixes; support around the clock; predictable cost", kpi:"incidents resolved within target; first-contact resolution; user satisfaction; backlog of tickets",
-   sl:"Priority 1 incidents answered within 15 minutes and fixed within 4 hours; 80% of calls answered within 60 seconds",
-   reg:"Operational resilience and ICT risk management in line with regulatory expectations", out:"Changes to systems outside the agreed services; hardware purchases",
-   qual:"ITIL-trained staff; certified engineers for the technologies supported; background-checked", personal:"colleague names and contact details; possibly access to systems with client data",
-   important:"IT services that support banking systems, which may count as critical or important", deps:"Access to the ticketing tool and systems; knowledge articles; escalation to our Technology teams",
-   notes:"ICT third-party risk rules apply (for example DORA in the EU); privileged access needs strict control."},
-  {id:"cyber", name:"Cyber security services",
-   re:/\b(cyber|penetration test|pen ?test|security operations|\bsoc\b|threat intelligence|vulnerability (?:scan|management)|red team)\b/i,
-   aud:"The Chief Information Security Office and the Technology teams responsible for the systems tested or monitored", fun:"Information Security (owner), Technology, and Operational Risk",
-   ben:"risks found before attackers find them; faster detection and response; evidence for regulators and auditors", kpi:"findings reported within the agreed time; critical findings fixed on time; detection and response times",
-   sl:"Critical findings reported within 24 hours; security incidents escalated within 15 minutes", reg:"Evidence of testing and monitoring expected by supervisors; ICT risk requirements",
-   out:"Fixing the findings, unless agreed separately", qual:"Certified testers (for example CREST or OSCP); security-cleared staff", personal:"possibly client and employee data in the systems tested",
-   important:null, deps:"Scope and rules of engagement; test accounts and access; named Technology contacts",
-   notes:"Testers get privileged access; rules of engagement and confidentiality are essential."},
-  {id:"trading", name:"Front-office trading platform", bg:"our trading platform is end of life and vendor support ends next year; if it slips, we trade on unsupported software",
-   re:/\b(trading (?:system|platform|application|software)|front[- ]office (?:trading )?(?:system|platform)|order management system|execution management|trade capture|position keeping|\boms\b|\bems\b)\b/i,
-   aud:"Traders, sales and structurers, with Middle Office, Market Risk and Operations using the trade data", fun:"Front office (business owner), Technology, Market Risk, Operations and Compliance",
-   ben:"a supported, scalable platform in place of an end-of-life system; trades captured once and processed straight through; real-time positions and risk; fewer manual breaks between front and back office",
-   kpi:"straight-through processing rate; platform availability in trading hours; trade capture latency; number of manual trade breaks",
-   sl:"Availability of 99.95% in trading hours; priority 1 incidents answered within 15 minutes and fixed within 1 hour; month-end and market open covered",
-   reg:"Transaction reporting and best-execution evidence; complete records for market abuse surveillance; operational resilience for an important business service",
-   out:"Migration of historic trade data beyond the agreed period, unless agreed separately; changes to downstream finance and settlement systems; market data licences",
-   qual:"Delivery teams with experience of trading platform implementations at banks; certified on the chosen platform",
-   personal:"client names, accounts, positions and trading records", important:"trading platforms, which large banks usually treat as supporting a critical or important function",
-   deps:"Access to booking, market data and reference data systems; a named front-office product owner; test environments and historic trade samples",
-   mh:"real-time trade capture and position keeping, pre-trade limit checks and integration with booking and market data; it works if 98% of trades go straight through",
-   notes:"Trading platforms are usually run by the bank (licensed) or hosted by the vendor (SaaS); hosting decides whether outsourcing and DORA rules apply in full."},
-  {id:"voice", name:"Trading voice and call recording",
-   re:/\b(call recording|voice recording|recorded lines?|trader voice|turrets?|mobile recording|recording of (?:calls|phone calls|conversations|messages))\b/i,
-   aud:"Traders, sales and other front-office staff whose calls and messages must be recorded, and the Compliance surveillance team",
-   fun:"Front office, Technology for voice and mobile, and Compliance for record keeping and surveillance",
-   ben:"complete records of client and trading conversations; faster retrieval for investigations and complaints; one service across desks",
-   kpi:"share of required calls and messages recorded; time to retrieve a requested record; recording outages",
-   sl:"Recording available 99.9% of trading hours; a requested record retrieved within 1 working day; outages reported within 1 hour",
-   reg:"Record keeping of telephone conversations and electronic communications for investment services, kept for at least five years (up to seven if the supervisor asks); evidence for conduct investigations",
-   out:"Surveillance analysis of the recordings, unless agreed separately; handsets, unless agreed separately",
-   qual:"Experience recording regulated trading communications at banks; background-checked staff", personal:"recorded conversations with clients and colleagues, phone numbers and message content",
-   important:null, deps:"A list of the users and devices in scope; our retention rules; a named Compliance contact",
-   notes:"Recordings must be complete, kept unaltered and retrievable for the whole retention period; gaps in recording must be reported."},
-  {id:"guarding", name:"Security guarding",
-   re:/\b(security guards?|guarding|manned security|reception security|security officers?)\b/i,
-   aud:"Everyone working at or visiting the sites covered, and the site security team", fun:"Corporate Security and Corporate Real Estate",
-   ben:"safe and secure sites; controlled access for staff and visitors; fast response to incidents", kpi:"posts staffed as scheduled; incident response times; access-control breaches",
-   sl:"All posts staffed for 100% of scheduled hours; alarms answered within 5 minutes; incident reports within 24 hours",
-   reg:"Duty of care for staff and visitors; physical security of the bank's premises", out:"Building maintenance and cleaning; IT security monitoring",
-   qual:"Guards licensed under local law and background-checked; trained in first aid and fire safety", personal:"visitor and staff names, access records and CCTV images",
-   important:null, deps:"Site plans and security procedures; access to the access-control system; a named site security contact",
-   notes:"When the provider changes, guards may transfer to the new provider by law; allow for this in the timeline and costs."}
-];
+// operations domains: from the configuration (applyConfig builds each matcher from its search words)
+const DOMAINS=[];
 // "AML has nothing to do with this", "it's not payroll": a negated mention is no signal
 const unsaid = t => String(t||"").replace(/\b[\w-]+(?:\s+[\w-]+)?\s+(?:has|have|is|are)\s+nothing to do with\b/gi," ")
   .replace(/\b(?:nothing to do with|not about|not related to|unrelated to|isn'?t|aren'?t|is not|are not|not|no|without)\s+(?:(?:a|an|the|any|our)\s+)?[\w-]+(?:\s+(?:and|or)\s+[\w-]+)?/gi," ");
@@ -4335,7 +4296,7 @@ function clipWords(t, n){
   const cut=t.split(/\s+/).slice(0,n).join(" "), at=Math.max(cut.lastIndexOf(";"), cut.lastIndexOf(","), cut.lastIndexOf("."));
   return (at>cut.length/2 ? cut.slice(0,at) : cut).replace(/[\s,;:]+(?:and|or|with|for|of|the|a)?$/i,"").trim();
 }
-const execLimits = () => S.det&&S.det.route==="procurement" ? {head:100, exec:250, headMin:50, execMin:150} : {head:70, exec:150, headMin:40, execMin:90};
+const execLimits = () => { const T=CONFIG.thresholds; return S.det&&S.det.route==="procurement" ? {head:T.headMaxProc, exec:T.execMaxProc, headMin:T.headMinProc, execMin:T.execMinProc} : {head:T.headMax, exec:T.execMax, headMin:T.headMin, execMin:T.execMin}; };
 function clampWords(t, max){
   const paras=String(t||"").split(/\n{2,}/).map(p=>p.replace(/\s+/g," ").trim()).filter(Boolean); let n=0; const out=[];
   for(const p of paras){ const kept=[]; for(const sen of p.split(/(?<=[.!?])\s+/)){ const w=words(sen); if(n+w>max) break; kept.push(sen); n+=w; } if(kept.length) out.push(kept.join(" ")); if(n>=max) break; }
@@ -4800,17 +4761,8 @@ const fmtDate=d=>{const x=new Date(d);return isNaN(x)?d:x.toLocaleDateString("en
 const show=(k,v)=>k==="division"&&DIVISIONS.some(d=>d.id===v)?DIVISIONS.find(d=>d.id===v).name:k==="spend_type"&&/^(?:run|change)$/.test(String(v))?{run:"Keeps the business running",change:"A change or a project"}[v]:k==="hosting"&&/^(?:provider|own|unsure)$/.test(String(v))?{provider:"The provider hosts and runs it",own:"We install and run it ourselves",unsure:"Not sure yet"}[v]:v==="Confirmed"&&bundleOf(k)?(bundleOf(k).map(([,x])=>givenText(S.f[x])).filter(Boolean).join("; ")||"Confirmed"):isTBD(v)?"To be determined":k==="entity"&&entityById(v)?entityById(v).name:(k==="l4"||k==="l4_pick")&&l4ByCode(v)?`${l4ByCode(v).name} (${v})`:v===true?"Yes":v===false?"No":v==="unsure"?"Not sure":k==="value"?money(Number(v))+(S.f.value_is_estimate?" (est.)":""):["quantity","headcount"].includes(k)?fmtN(v):cap1(String(v));
 
 // examples on the welcome screen: mostly new demand, each showing a different path, then one per other route
-const TRIES=[
-  ["New demand","Software, RFP","A new HR system to replace our payroll tool."],
-  ["New demand","Outsourcing","KYC periodic reviews for our corporate clients by an external provider for 2 years, around 600k."],
-  ["New demand","Offshore","An offshore team in Poland to run accounts payable invoice processing for 3 years, about 900k."],
-  ["New demand","Over €1 million","Replace our core treasury management system, budget 2.5 million over 5 years."],
-  ["New demand","Market data","An ESG ratings data feed for our research team, around 120k a year."],
-  ["New demand","Under €100k","An agency for a client dinner for 40 people, around 30k."],
-  ["Other routes","Catalogue","We need 15 laptops for new joiners in Frankfurt."],
-  ["Other routes","Call-off","More support from Lakeshore Advisory for our operations team."],
-  ["Other routes","External workers","Two Java developers as contractors for 9 months."]
-];
+// the welcome screen's examples [group, label, text]: from the configuration
+const TRIES=[];
 /* ---------- replies type out like someone writing: fast, and line by line for long ones ----------
    One reply at a time; anything after it in the same turn (cards, notes, answer chips) waits until it is done.
    A click on the reply, typing or sending finishes it at once. With "reduce motion" switched on, text appears at once. */
@@ -5392,6 +5344,8 @@ function specModel(withCurrent){
     table(["Rule","Decides","Rows","Test cases","Mode"], Object.values(RULES).map(r=>[`${r.id} ${r.name}`, r.decides, String(r.rows.length), String((r.tests||[]).length), r.mode])),
     p(`**Checks for everything but a catalogue order** (rules R07 and R08, from lists on the admin page): a service the bank does not buy from third parties (${(LISTS.prohibited_services||[]).length} entries), and a country that needs a vendor office review (${(LISTS.review_countries||[]).length} entries, found in the request, the work location, the data location or the supplier). A hit is a review flag naming the division's vendor office; the lists in this version are test data.`),
     table(["Rule","Flag","Shown as","Reviewed or approved by","Rests on"], flagRulesAll().flatMap(r=>r.outcomes.filter(o=>o.flag).map(o=>[`${r.id} ${r.step}`, o.title, LEVEL_NAMES[o.level]||o.level, o.owner||"–", r.clause||"–"]))));
+  B.push(h(3,"Next steps on the route card"), p("Texts per channel, maintained on the admin page (Next steps); placeholders such as {supplier} are filled from the request."),
+    table(["Channel","Steps"], DEFAULTS.next_steps.map(n=>[n.label, (NEXT_STEPS[n.key]||[]).map((x,i)=>`${i+1}. ${x}`).join(" ")])));
 
   const catNames=fn=>CATEGORIES.filter(fn).map(c=>c.name).join(", "), lineNames=b=>b.map(([L])=>L).join(" / ");
   B.push(h(2,"6. What is asked, and when"),
@@ -5449,7 +5403,7 @@ function specModel(withCurrent){
     ul(["**Off-topic:** nothing to do with the request; asked again once, then recorded as “Not given”.",
       "**Too vague:** “tbd”, “stuff”, one or two words for a free-text item.",
       "**Data without a storage place:** asked once (always).",
-      "**Implausible amounts:** a day-rate mismatch over 50%, project work under €5,000, months of work under €3,000, over €20 million.",
+      `**Implausible amounts** (limits on the admin page): a day-rate mismatch over ${T.checkRateTolerance}%, consulting, IT, legal or cloud work under ${eur(T.checkBigWorkMin)}, advisory work under ${eur(T.checkDayMin)} a day per person, three months or more of work under ${eur(T.checkLongWorkMin)}, a total over ${eur(T.checkLargeMax)}.`,
       "**Contradictions:** “no personal data” or “no technology” against the request; “no impact” despite audit or regulatory context.",
       "**Dates:** in the past, or tighter than the route usually takes."]),
     p(`At most one follow-up per item and three per conversation (off-topic and data location are always asked). With AI, the AI's own judgement adds checks after the rules. A hidden 1–10 rating of each answer gives one tip for a thin new-demand answer when it is ${T.answerTip} or lower (at most three tips; 0 switches tips off).`),

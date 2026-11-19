@@ -266,3 +266,36 @@ test("a review flag's title, level and reviewer can be changed; whether an outco
   assert.deepEqual([out0(out, "R40", "none").flag, out0(out, "R40", "none").title], [undefined, undefined]);
   assert.deepEqual(validateConfig(configFrom(out, 0, "draft")), []);
 });
+
+test("next steps, entities, domains, examples and answer buttons: only known items and fields, with limits", () => {
+  const { sanitize } = require(path.join(ROOT, "api", "_lib", "validate.js"));
+  const { SEED, validateConfig, configFrom } = require(path.join(ROOT, "api", "_lib", "seed.js"));
+  const doc = structuredClone(SEED), part = (d, k, key, id = "key") => d[k].find((x) => x[id] === key);
+  part(doc, "next_steps", "simple").steps = ["Get one quote{quote_from}.", "Pay {nonsense}.", ...Array(6).fill("x")];
+  part(doc, "next_steps", "simple").placeholders = ["nonsense"];             // placeholders come from the seed
+  doc.next_steps.push({ key: "secret", label: "?", steps: ["?"] });
+  part(doc, "entities", "US", "id").codes = ["US", "u$a!", "toolongcode", "x"];
+  doc.entities.push({ id: "XX", name: "New entity", keywords: ["x"] });
+  Object.assign(part(doc, "domains", "voice", "id"), { ops: true, important: "", keywords: ["Dictaphone*", "turret"], notes: "y".repeat(900) });
+  doc.examples = [...doc.examples, ...Array(10).fill({ group: "G", label: "L", text: "T" })];
+  part(doc, "questions", "pricing_model").choices = ["Fixed price", "", "Per milestone"];
+  part(doc, "questions", "duration").choices = ["Forever"];                  // feeds the rules: not editable
+  const out = sanitize(doc);
+  assert.deepEqual(part(out, "next_steps", "simple").steps.length, 5);
+  assert.deepEqual(part(out, "next_steps", "simple").placeholders, ["quote_from"]);
+  assert.equal(out.next_steps.length, SEED.next_steps.length);
+  assert.deepEqual(part(out, "entities", "US", "id").codes, ["US", "ua", "toolon"]);
+  assert.equal(out.entities.length, SEED.entities.length);
+  const voice = part(out, "domains", "voice", "id");
+  assert.deepEqual([voice.ops, voice.important, voice.keywords, voice.notes.length], [false, null, ["dictaphone*", "turret"], 600]);
+  assert.equal(out.examples.length, 12);
+  assert.deepEqual(part(out, "questions", "pricing_model").choices, ["Fixed price", "Per milestone"]);
+  assert.equal("choices" in part(out, "questions", "duration"), false);
+  const errs = validateConfig(configFrom(out, 0, "draft"));
+  assert.ok(errs.some((e) => /Small, simple purchase.*step 2.*\{nonsense\}/.test(e)), errs.join("\n"));
+  // limits in the wrong order and too few examples are refused
+  const bad = sanitize(structuredClone(SEED));
+  bad.params.find((p) => p.key === "headMin").value = 80; bad.params.find((p) => p.key === "qualityGood").value = 95; bad.examples = bad.examples.slice(0, 2);
+  const e2 = validateConfig(configFrom(bad, 0, "draft"));
+  for (const re of [/headline, other routes/, /quality ratings/, /welcome examples/]) assert.ok(e2.some((e) => re.test(e)), `${re}: ${e2.join("; ")}`);
+});

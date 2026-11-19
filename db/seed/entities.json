@@ -1,0 +1,9 @@
+[
+  {"id":"EU","name":"EU banking entity (Germany)","country":"Germany","keywords":["frankfurt","germany","german","berlin","munich","hamburg","cologne","düsseldorf","stuttgart","europe"],"codes":["EU"]},
+  {"id":"UK","name":"UK banking entity (London)","country":"United Kingdom","keywords":["london","united kingdom","england","english","britain","british","edinburgh"],"codes":["UK"]},
+  {"id":"SG","name":"Singapore branch","country":"Singapore","keywords":["singapore"],"codes":[]},
+  {"id":"HK","name":"Hong Kong branch","country":"Hong Kong","keywords":["hong kong"],"codes":[]},
+  {"id":"US","name":"US entity (New York)","country":"United States","keywords":["new york","united states","america","american"],"codes":["US","USA"]},
+  {"id":"AU","name":"Australia branch","country":"Australia","keywords":["sydney","melbourne","australia"],"codes":[]},
+  {"id":"CA","name":"Canada branch","country":"Canada","keywords":["toronto","canada"],"codes":[]}
+]

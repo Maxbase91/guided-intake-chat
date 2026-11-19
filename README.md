@@ -67,7 +67,7 @@ Without a database everything still works: the page runs on its built-in default
 ### Admin page
 
 `/admin.html` is where procurement maintains thresholds, channel names, category flags, the routing rules and their reason
-texts, every review flag and category check (when it is raised, its text, how it is shown and who reviews it), question texts and the category guidance behind examples and suggestions, divisions and their vendor offices,
+texts, every review flag and category check (when it is raised, its text, how it is shown and who reviews it), the next steps per channel, word limits, answer-check limits and quality-score weights, answer buttons for questions the rules do not read, legal entities, operations domains (search words and guidance) and the welcome examples, question texts and the category guidance behind examples and suggestions, divisions and their vendor offices,
 which questions each division is asked, the lists behind the prohibited-service and country checks, category search
 words, and the reference data (Level 4 list, suppliers, framework contracts, catalogue) by CSV download and upload. It needs
 `ADMIN_CODE`. Changes are saved as a draft, checked against each rule's own test cases, and published as a new
