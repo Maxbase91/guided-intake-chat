@@ -70,6 +70,30 @@ test("an additional category's checks apply and a contract must cover every cate
   expect(Object.keys(st.view)).toEqual(["consulting", "legal"]);
 });
 
+test("'Also includes' is offered from the start: tick another category, then choose the main one", async ({ page }) => {
+  const errors = await openApp(page);
+  await say(page, S4);
+  expect(await page.evaluate(() => S.lastAsked)).toBe("l4_pick");
+  await expect(card(page)).toContainText("Tick “Also includes” on up to 2 of them, then choose the main one");
+  await expect(card(page).locator("[data-act=alsol4]")).toHaveCount(2);   // every offered category, before any choice
+  await card(page).locator("li").filter({ hasText: "Core banking implementation" }).locator("[data-act=alsol4]").click();
+  expect(await page.evaluate(() => [S.lastAsked, S.l4Extra.length])).toEqual(["l4_pick", 1]);   // still the category question
+  await pickCategory(page, "ERP and package implementation");
+  await expect(page.locator("#msgs")).toContainText("Thanks, I'll use ERP and package implementation (L4-1310). It also includes Core banking implementation; their checks apply too.");
+  await expect(page.locator("#side .xcat").first()).toContainText("Also includes Core banking implementation");
+  // ticking the one then chosen as main leaves no duplicate
+  expect(await page.evaluate(() => extraL4().map((e) => e.name))).toEqual(["Core banking implementation"]);
+  expect(errors).toEqual([]);
+});
+
+test("a ticked category that is then chosen as the main one is not also an additional one", async ({ page }) => {
+  await openApp(page);
+  await say(page, S4);
+  await card(page).locator("li").filter({ hasText: "Core banking implementation" }).locator("[data-act=alsol4]").click();
+  await pickCategory(page, "Core banking implementation");
+  expect(await page.evaluate(() => [S.f.l4, S.l4Extra])).toEqual(["L4-1311", []]);
+});
+
 test("with 0 additional categories allowed, the card and the summary offer none", async ({ page }) => {
   await openApp(page);
   await setThreshold(page, "l4Extra", 0);

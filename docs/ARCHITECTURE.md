@@ -203,7 +203,8 @@ the Level 4 list.
      rejected ones. Two answers that are no choice keep the first.
    - Checks on the first message wait until the choice is made, and the route news comes with the first question after
      it.
-   - Additional categories (`S.l4Extra`, at most `l4Extra`; `extraL4`, `catViews`, `toggleExtraL4`): `catViews(f)` is the
+   - Additional categories (`S.l4Extra`, at most `l4Extra`; `extraL4`, `catViews`, `toggleExtraL4`): `canAlso` shows the toggle on the open card and after the
+     choice. `catViews(f)` is the
      request seen as the main category and as each additional one. `cmMandatory`, `renewalsCalendar`, `requiredFor`
      (union of questions), the `tech_service` derivation, `classify` (strictest ICT and outsourcing result) and
      `reviewFlags` / `bankChecks` (`withExtraFlags`: a flag only an additional category raises, named after it) read all
