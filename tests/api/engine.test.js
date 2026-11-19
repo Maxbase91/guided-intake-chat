@@ -67,7 +67,6 @@ test("every review flag has a title, a level and a reviewer, and every flag rule
   for (const r of flagRules) {
     for (const o of r.outcomes.filter((x) => x.flag)) {
       assert.ok(o.title && ["i", "w", "b"].includes(o.level) && o.owner, `${r.id} ${o.key}: title, level and reviewer`);
-      assert.equal(r.mode, r.outcomes.some((x) => x.flag && x.level !== "i") ? "advise" : "inform", `${r.id}: mode follows the level`);
     }
     assert.ok(!r.outcomes.find((o) => o.key === r.rows.at(-1).then).flag, `${r.id}: the otherwise row raises no flag`);
     assert.ok(r.clause, `${r.id}: names the policy it rests on`);

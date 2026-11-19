@@ -125,6 +125,16 @@ texts fill; `reviewFlags()` runs each card through the engine. A flagged outcome
 whether an outcome raises a flag is fixed by the seed. The decision log records the cards that raised a flag. How it
 works and the Decision tree list the flags from the cards, so they follow what is published.
 
+**Every setting reaches the chat.** The route card shows the reason with "Based on" (the routing rules that decided,
+`basedOn()`, with their "Rests on" policy), then "Checks and reviews" (each flag's title, text, reviewer and policy) and
+the next steps. The request JSON carries `checks` and `based_on`; the service description lists each check with why it
+exists (the rule's "What it decides"), its reviewer and its policy. Each fact in `facts.json` names where it comes from
+(`source`, `from`: the questions that feed it), so the admin page shows what a rule reads and what a question decides.
+The rule "mode" was removed in November 2026: it changed nothing in the chat.
+
+**Preview.** "Try the draft in the chat" on the admin page puts the draft in this browser's local storage
+(`cfg-preview`) and opens `/?preview=1`: the page runs on the draft with a banner, and sends no decision log.
+
 **Texts, limits and lists.** The next steps per channel (`next_steps`, one text list per variant with fixed
 placeholders), the legal entities (`entities`: search words and case-sensitive short codes), the operations domains
 (`domains`: search words and guidance texts; the domain mentioned first wins) and the welcome examples (`examples`) are

@@ -77,7 +77,10 @@ The page opens on an overview and groups everything in five areas: **Routing** (
 category rules, routing rules), **Checks and reviews** (review flags, review lists, divisions and vendor offices, legal
 entities), **Conversation** (questions, guidance, domains, welcome examples, description and quality), **Reference
 data** and **History**. By default rules read as sentences with editable texts; "Show advanced settings" adds the full
-rule editor, the test cases and the rarely changed limits. The search box finds any setting by name.
+rule editor, the test cases and the rarely changed limits. The search box finds any setting by name. Each section says
+what it changes in the chat; each rule says what it reads and each question which rules it decides. **Try the draft in
+the chat** opens the chat on the unpublished draft in a new tab (nothing is stored), so a change can be seen before it
+is published.
 
 ## Deploy
 

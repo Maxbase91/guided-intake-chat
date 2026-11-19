@@ -95,3 +95,21 @@ test("submitting stores the decision log: rule rows and typed facts, nothing the
   await expect(lastAssistant(page)).toContainText("Only the record of which rules decided is stored");
   expect(errors).toEqual([]);
 });
+
+test("the route card shows the checks with who reviews them and what they rest on, and what the route is based on", async ({ page }) => {
+  const errors = await openApp(page);
+  await start(page, DINNER);
+  await answerUntilDone(page, []);
+  const card = page.locator(".m .card").filter({ has: page.locator(".rec-h") }).last();
+  await expect(card.locator(".based")).toContainText("Based on: R11 Who leads the sourcing (Procurement policy: who leads the sourcing, thresholds on the annual value (test data)); R19 Buying channel");
+  const checks = card.locator("#routeChecks");
+  await expect(checks).toContainText("Three quotes");
+  await expect(checks).toContainText("Reviewed by The business · Rests on Procurement policy: quotes for business-led demand (test data)");
+  await expect(checks).toContainText("Gifts and hospitality approval");
+  await expect(card.locator("#routeSteps li")).toHaveCount(3);
+  await expect(card.locator("#routeSteps")).toContainText("You ask at least 3 suppliers for a quote");
+  const got = await page.evaluate(() => payload().decision);
+  expect(got.checks.find((c) => c.rule === "R33")).toMatchObject({ title: "Gifts and hospitality approval", level: "i", reviewer: "Compliance", rests_on: "Gifts and entertainment policy; anti-bribery policy" });
+  expect(got.based_on.map((b) => b.id)).toEqual(["R11", "R19"]);
+  expect(errors).toEqual([]);
+});

@@ -74,7 +74,7 @@ test("the AI gets the project wording, the project lines and the kind of work", 
   }
   const got = await page.evaluate(() => ({ state: stateBlock(), system: chatSystem() }));
   expect(got.state).toContain('"lines":["Sponsor and stakeholders","Teams involved"]');
-  expect(got.state).toContain("Who sponsors this, and which teams will work with the provider or use the result?");
+  expect(got.state).toContain("Who sponsors this, and which teams will work with the consultants or take over the result?");   // the consulting guidance (admin page)
   expect(got.system).toContain("Kind of work: a project with set deliverables");
   expect(got.system).not.toContain("Kind of work: a service");
 });

@@ -9,9 +9,8 @@ const { SEED } = require("./seed");
 
 const text = (v, max, dflt = "") => (typeof v === "string" ? v.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").trim().slice(0, max) : dflt);
 const int = (v, min, max, dflt) => (Number.isInteger(v) && v >= min && v <= max ? v : dflt);
-const MODES = ["enforce", "advise", "inform"];
-const LEVELS = ["i", "w", "b"];
-const DOMAIN_TEXTS = ["bg", "aud", "fun", "ben", "kpi", "sl", "reg", "out", "qual", "personal", "important", "deps", "notes", "mh"];   // a review flag: information, review needed, procurement checks
+const LEVELS = ["i", "w", "b"];   // a review flag: information, review needed, procurement checks
+const DOMAIN_TEXTS = ["bg", "aud", "fun", "ben", "kpi", "sl", "reg", "out", "qual", "personal", "important", "deps", "notes", "mh"];
 const MAX = { rows: 30, conditions: 6, tests: 40, list: 20 };
 const FACTS = Object.fromEntries(SEED.facts.map((f) => [f.key, f]));
 
@@ -41,7 +40,7 @@ function rule(seedRule, r) {
   }));
   return {
     id: seedRule.id, name: text(r.name, 120, seedRule.name), step: seedRule.step, placeholders: [...(seedRule.placeholders || [])],
-    mode: MODES.includes(r.mode) ? r.mode : seedRule.mode, clause: text(r.clause, 300), decides: text(r.decides, 400, seedRule.decides),
+    clause: text(r.clause, 300), decides: text(r.decides, 400, seedRule.decides),
     // which outcomes exist, and which raise a flag, is fixed; a flag's title, level and reviewer can be changed
     outcomes: seedRule.outcomes.map((o) => {
       const x = sent.get(o.key) || {}, out = { ...o, label: text(x.label, 120, o.label) || o.label };
@@ -89,7 +88,9 @@ function sanitize(doc) {
     questions: SEED.questions.map((q) => {
       const x = questions.get(q.key) || {}, out = { key: q.key, label: text(x.label, 80) || q.label };
       if ("q" in q) out.q = text(x.q, 400) || q.q;
-      if ("ex" in q) out.ex = typeof x.ex === "string" ? text(x.ex, 400) : q.ex;
+      // an example can be added to any question; an empty one shows none
+      const ex = typeof x.ex === "string" ? text(x.ex, 400) : q.ex;
+      if (ex) out.ex = ex;
       if ("why" in q) out.why = typeof x.why === "string" ? text(x.why, 400) : q.why;
       // which divisions are asked: R required, C conditional (asked for new demand), - not asked
       // answer buttons: only for questions whose answer the code records and never reads
@@ -103,7 +104,7 @@ function sanitize(doc) {
       const texts = {};
       for (const [k, v] of Object.entries(sent)) if (catIds.has(k)) { const t = text(v, 600); if (t) texts[k] = t; }
       if ("_" in g.texts && !texts._) texts._ = g.texts._;
-      return { ...g, texts: Object.fromEntries(Object.keys(texts).sort((a, b) => (a === "_" ? -1 : b === "_" ? 1 : a.localeCompare(b))).map((k) => [k, texts[k]])) };
+      return { ...g, categories: [...g.categories], texts: Object.fromEntries(Object.keys(texts).sort((a, b) => (a === "_" ? -1 : b === "_" ? 1 : a.localeCompare(b))).map((k) => [k, texts[k]])) };
     }),
     ...reference(doc),
     divisions: SEED.divisions.map((d) => { const x = divisions.get(d.id) || {}; return { id: d.id, name: text(x.name, 80) || d.name, vendor_office: text(x.vendor_office, 100) || d.vendor_office }; }),

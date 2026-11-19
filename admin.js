@@ -121,9 +121,16 @@
       h("span", { class: `pill ${prob.length ? "bad" : "ok"}`, id: "probpill" }, prob.length ? `${prob.length} problem${prob.length > 1 ? "s" : ""}` : "All rules pass their tests"),
       h("span", { class: "muted" }, st.store === "memory" ? "No database: changes last until the server restarts." : `Draft last saved ${when(st.updated_at)} by ${st.updated_by}`),
       h("span", { style: "flex:1" }),
+      h("button", { class: "btn", id: "previewBtn", type: "button", title: "Opens the chat on this draft, in this browser only. Nothing is published or stored.", onclick: preview }, "Try the draft in the chat"),
       h("button", { class: "btn", id: "saveBtn", disabled: !S.unsaved || S.busy, onclick: save }, "Save draft"),
       h("button", { class: "btn", id: "discardBtn", disabled: !(st.dirty || S.unsaved) || S.busy, onclick: () => { if (confirm("Discard all changes since the published version?")) act(() => api("POST", { action: "discard", revision: S.st.revision, actor: S.actor }), "Draft reset to the published version"); } }, "Discard changes"),
       h("button", { class: "btn a", id: "publishBtn", disabled: S.unsaved || !st.dirty || prob.length > 0 || S.busy, title: S.unsaved ? "Save the draft first" : prob.length ? "Fix the problems first" : "", onclick: publish }, "Publish…"));
+  }
+  // the chat runs on this draft in a new tab, in this browser only (same site, local storage); nothing is published
+  function preview() {
+    try { localStorage.setItem("cfg-preview", JSON.stringify({ ...clone(S.doc), version: S.st.published_version, source: "preview", checksum: "000000000000", ref_checksum: "" })); }
+    catch (e) { S.error = "The draft is too large to preview in this browser."; render(); return; }
+    window.open("./?preview=1", "_blank", "noopener");
   }
   function publish() {
     const note = prompt(`Publish the draft as version ${S.st.published_version + 1}?\nNew conversations use it within a minute.\n\nWhat changed (shown in the version list):`, "");
@@ -247,6 +254,17 @@
           h("td", {}, h("button", { class: "btn s x", type: "button", "aria-label": `Delete test ${t.name}`, onclick: () => edit(() => { rule.tests.splice(i, 1); }) }, "✕")))))),
       h("p", {}, h("button", { class: "btn s", type: "button", onclick: () => edit(() => { rule.tests.push({ name: "New test", given: {}, expect: rule.outcomes[0].key }); }) }, "+ test case")));
   }
+  // the facts a rule reads, in plain words, and where each comes from
+  function reads(rule) {
+    const registry = registryOf(S.doc), keys = [...new Set(rule.rows.flatMap((r) => (r.when || []).map((c) => c.fact)))].filter((k) => registry[k]);
+    if (!keys.length) return null;
+    return h("div", { class: "reads", "data-reads": rule.id }, h("b", {}, "Reads: "), keys.map((k, i) => h("span", {}, i ? " · " : "", registry[k].label, registry[k].source ? h("span", { class: "muted" }, ` (${registry[k].source.charAt(0).toLowerCase() + registry[k].source.slice(1)})`) : null)));
+  }
+  // which rules read the answer to a question (through the facts it fills)
+  function usedBy(qkey) {
+    const facts = S.doc.facts.filter((f) => (f.from || []).includes(qkey) || f.key === qkey).map((f) => f.key);
+    return S.doc.rules.filter((r) => r.rows.some((row) => (row.when || []).some((c) => facts.includes(c.fact)))).map((r) => r.id);
+  }
   // a row's conditions as one sentence, from the fact labels, the comparison names and the thresholds
   function rowSummary(rule, row) {
     if (!(row.when || []).length) return "Otherwise";
@@ -272,8 +290,11 @@
     return h("div", { class: "card", id: "rule-" + rule.id, "data-rule": rule.id },
       h("div", { style: "display:flex;gap:10px;align-items:baseline;flex-wrap:wrap" }, h("h2", {}, `${rule.id}  ${rule.name}`), h("span", { class: "pill" }, rule.step), !same(rule, S.st.draft.rules.find((r) => r.id === rule.id)) ? h("span", { class: "pill warn" }, "changed") : null),
       h("p", { class: "hint" }, rule.decides),
-      h("details", {}, h("summary", {}, "Name, source and mode"), text("name", "Name", "min(520px,100%)"), text("decides", "What it decides", "100%"), text("clause", "Rests on (policy and clause)", "100%"),
-        h("label", { style: "display:block;margin:6px 0" }, h("span", { class: "muted" }, "Mode"), h("br"), select([["enforce", "Enforce: the outcome is binding"], ["advise", "Advise: a warning; the requester may continue with a reason"], ["inform", "Inform: shown only"]], rule.mode, (v) => edit(() => { rule.mode = v; })))),
+      reads(rule),
+      h("details", {}, h("summary", {}, "Name, purpose and policy"),
+        text("name", "Name — shown on the route card (\"Based on …\") and in the decision log", "min(520px,100%)"),
+        text("decides", "What it decides — shown in the record and the service description as why the check exists", "100%"),
+        text("clause", "Rests on (policy and clause) — shown on the route card and in the record next to the decision", "100%")),
       flagOutcomes(rule),
       h("p", { class: "hint", style: "margin-top:10px" }, "The rows are checked from top to bottom. The first row whose conditions all hold gives the outcome."),
       bad.length ? h("div", { class: "problems" }, h("b", {}, "This rule has problems"), h("ul", {}, bad.map((b) => h("li", {}, b.replace(rule.id + ": ", ""))))) : null,
@@ -325,13 +346,21 @@
       h("p", {}, h("input", { type: "text", id: "qFilter", placeholder: "Filter questions", "aria-label": "Filter questions", style: "width:min(360px,100%)", value: S.qFilter, oninput: (e) => { S.qFilter = e.target.value; render(); } }),
         " ", h("span", { class: "muted" }, `${list.length} of ${S.doc.questions.length}`)),
       h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Question"), h("th", {}, "Texts"))),
-        h("tbody", {}, list.map((q) => h("tr", { "data-q": q.key },
-          h("td", { style: "width:280px" }, h("input", { type: "text", id: `q-${q.key}-label`, "aria-label": `Label of ${q.key}`, style: "width:100%", class: changed("questions", q.key, "label"), value: q.label, oninput: (e) => editQuiet(() => { q.label = e.target.value; }) }), h("div", { class: "muted" }, q.key)),
-          h("td", {}, "q" in q ? area(q, "q", "Question") : h("div", { class: "muted" }, "Worded from the request (in the code)"), "ex" in q ? area(q, "ex", "Example") : null, "why" in q ? area(q, "why", "Why we ask") : null,
+        h("tbody", {}, list.filter((q) => "q" in q || f).map((q) => h("tr", { "data-q": q.key },
+          h("td", { style: "width:280px" }, h("input", { type: "text", id: `q-${q.key}-label`, "aria-label": `Label of ${q.key}`, style: "width:100%", class: changed("questions", q.key, "label"), value: q.label, oninput: (e) => editQuiet(() => { q.label = e.target.value; }) }), h("div", { class: "muted" }, q.key),
+            (() => { const ids = usedBy(q.key); return h("div", { class: "usedby", "data-usedby": q.key }, ids.length ? `Decides: ${ids.join(", ")}` : "Recorded in the request and the service description"); })()),
+          h("td", {}, "q" in q ? area(q, "q", "Question") : h("div", { class: "muted" }, "Worded from the request (in the code)"),
+            q.ex ? area(q, "ex", "Example (shown under the question)") : h("button", { type: "button", class: "link", style: "font-size:13px", onclick: () => edit(() => { q.ex = "For example: "; }) }, "+ Add an example"),
+            "why" in q ? area(q, "why", "Why we ask (the answer to \"why do you need that?\")") : null,
             q.choices ? h("label", { style: "display:block;margin:4px 0" }, h("span", { class: "muted" }, "Answer buttons, one per line (the answer is recorded as written; up to 6)"),
               h("textarea", { id: `q-${q.key}-choices`, rows: "3", class: changed("questions", q.key, "choices"), oninput: (e) => editQuiet(() => { q.choices = e.target.value.split("\n").map((x) => x.trim()).filter(Boolean); }) }, q.choices.join("\n"))) : null,
             q.applies ? h("div", { class: "checks", style: "margin-top:6px" }, h("span", { class: "muted" }, "Asked for:"), S.doc.divisions.map((d) => h("label", {}, `${d.name} `,
-              select([["R", "required"], ["C", "conditional"], ["-", "not asked"]], q.applies[d.id], (v) => edit(() => { q.applies[d.id] = v; }), { "aria-label": `${q.label}: ${d.name}`, id: `qa-${q.key}-${d.id}` })))) : null))))));
+              select([["R", "required"], ["C", "conditional"], ["-", "not asked"]], q.applies[d.id], (v) => edit(() => { q.applies[d.id] = v; }), { "aria-label": `${q.label}: ${d.name}`, id: `qa-${q.key}-${d.id}` })))) : null))))),
+      f ? null : h("details", { style: "margin-top:12px" }, h("summary", {}, `Asked in the chat's own words (${list.filter((q) => !("q" in q)).length}): only the label can be changed`),
+        h("p", { class: "hint" }, "The chat words these from the request, so their text stays in the code. The label is what the side panel and the record show."),
+        h("table", {}, h("tbody", {}, list.filter((q) => !("q" in q)).map((q) => h("tr", { "data-q": q.key },
+          h("td", { style: "width:280px" }, h("input", { type: "text", id: `q-${q.key}-label`, "aria-label": `Label of ${q.key}`, style: "width:100%", class: changed("questions", q.key, "label"), value: q.label, oninput: (e) => editQuiet(() => { q.label = e.target.value; }) })),
+          h("td", { class: "muted" }, q.key, " · ", (() => { const ids = usedBy(q.key); return ids.length ? `Decides: ${ids.join(", ")}` : "Recorded in the request"; })())))))));
   }
 
   // ---------- divisions, legal entities and the review lists the checks read
@@ -433,12 +462,15 @@
   function guidance() {
     const g = S.doc.guidance.find((x) => x.key === S.gKey) || S.doc.guidance[0];
     S.gKey = g.key;
-    const cats = [["_", "Any other category"], ...S.doc.categories.map((c) => [c.id, c.name])];
+    const used = g.categories || S.doc.categories.map((c) => c.id);
+    // "Any other category" only where the chat has a fallback text; otherwise it builds the line from the request
+    const cats = [...("_" in g.texts ? [["_", "Any other category"]] : []), ...S.doc.categories.filter((c) => used.includes(c.id)).map((c) => [c.id, c.name])];
     const base = S.st.draft.guidance.find((x) => x.key === g.key) || { texts: {} };
     return h("div", { class: "card" }, h("h2", {}, "Guidance"),
       h("p", { class: "hint" }, "Texts per category that the chat uses for examples and suggested answers. Every suggestion tells the requester where it comes from. An empty text means the chat builds the answer from the request instead (or uses \"Any other category\")."),
       h("p", {}, h("label", {}, h("span", { class: "muted" }, "Guidance "), select(S.doc.guidance.map((x) => [x.key, x.label]), g.key, (v) => { S.gKey = v; render(); }, { id: "gKey" }))),
-      h("p", { class: "hint" }, `${g.description} Source: ${g.source}, maintained by ${g.owner}.`),
+      h("p", { class: "hint" }, `${g.description} Used for ${used.length === S.doc.categories.length ? "every category" : `${used.length} categories`}. Source: ${g.source}, maintained by ${g.owner}.`),
+      "_" in g.texts ? null : h("p", { class: "muted" }, "Other categories: the chat builds this line from the request."),
       h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Category"), h("th", {}, "Text"))),
         h("tbody", {}, cats.map(([id, name]) => h("tr", {}, h("td", { style: "width:240px" }, h("b", {}, name), id === "_" ? h("div", { class: "muted" }, "used when a category has no text") : null),
           h("td", {}, h("textarea", { id: `g-${g.key}-${id}`, "aria-label": `${g.label}: ${name}`, rows: "2", class: (base.texts[id] || "") !== (g.texts[id] || "") ? "changed" : "",
@@ -482,8 +514,11 @@
         h("label", { style: "display:block;margin:6px 0" }, h("span", { class: "muted" }, "Name"), h("br"), h("input", { type: "text", id: `dm-${d.id}-name`, style: "width:min(420px,100%)", class: changed("domains", d.id, "name"), value: d.name, oninput: (e) => editQuiet(() => { d.name = e.target.value; }) })),
         h("label", { style: "display:block;margin:6px 0" }, h("span", { class: "muted" }, "Search words, separated by commas (whole words; end with * for longer words too)"), h("br"),
           h("input", { type: "text", id: `dm-${d.id}-keywords`, style: "width:100%", class: changed("domains", d.id, "keywords"), value: csv(d.keywords), oninput: (e) => editQuiet(() => { d.keywords = fromCsv(e.target.value); }) })),
-        DOMAIN_FIELDS.filter(([k]) => k in d).map(([k, label]) => h("label", { style: "display:block;margin:6px 0" }, h("span", { class: "muted" }, label),
-          h("textarea", { id: `dm-${d.id}-${k}`, rows: "2", class: changed("domains", d.id, k), oninput: (e) => editQuiet(() => { d[k] = k === "important" && !e.target.value.trim() ? null : e.target.value; }) }, d[k] || "")))));
+        DOMAIN_FIELDS.filter(([k]) => k in d).map(([k, label]) => (k === "important" || k === "personal") && !d[k]
+          ? h("p", { class: "muted", style: "margin:6px 0" }, k === "important" ? "Not usually a critical or important function. " : "Usually no personal data. ",
+              h("button", { type: "button", class: "link", id: `dm-${d.id}-${k}-add`, onclick: () => edit(() => { d[k] = k === "important" ? "work that large banks usually treat as supporting a critical or important function" : "names and contact details"; }) }, k === "important" ? "Mark it as one" : "Name the personal data"))
+          : h("label", { style: "display:block;margin:6px 0" }, h("span", { class: "muted" }, label),
+            h("textarea", { id: `dm-${d.id}-${k}`, rows: "2", class: changed("domains", d.id, k), oninput: (e) => editQuiet(() => { d[k] = k === "important" && !e.target.value.trim() ? null : e.target.value; }) }, d[k] || "")))));
   }
 
   // ---------- versions, change log, decision log (read from the server when the tab opens)
@@ -534,32 +569,32 @@
   const AREAS = [
     { key: "routing", label: "Routing", blurb: "Where a request goes: the catalogue, an existing contract, business-led or procurement-led demand, and what happens next.",
       sections: [
-        { key: "thresholds", label: "Thresholds", pick: PARAMS(["Routing"]), render: () => thresholds(["Routing"]) },
-        { key: "channels", label: "Channels and next steps", pick: (d) => [d.channels, d.next_steps], render: () => h("div", {}, channels(), nextsteps()) },
-        { key: "categories", label: "Category rules", pick: (d) => (d.categories || []).map((c) => [c.id, c.name, c.cm_mandatory, c.renewals_calendar]), render: categories },
-        { key: "rules", label: "Routing rules", pick: (d) => (d.rules || []).filter((r) => !isFlagRule(r)), render: () => rules(false) }] },
+        { key: "thresholds", label: "Thresholds", effect: "Which channel the route card recommends, which questions the chat asks for it, and the material spend review.", pick: PARAMS(["Routing"]), render: () => thresholds(["Routing"]) },
+        { key: "channels", label: "Channels and next steps", effect: "The channel names and working days on the route card and in the chat, the tight-timeline warning, and the next steps listed on the route card.", pick: (d) => [d.channels, d.next_steps], render: () => h("div", {}, channels(), nextsteps()) },
+        { key: "categories", label: "Category rules", effect: "Who leads new demand between the two thresholds, and whether a renewal goes through the renewals calendar \u2014 the route card and its reason.", pick: (d) => (d.categories || []).map((c) => [c.id, c.name, c.cm_mandatory, c.renewals_calendar]), render: categories },
+        { key: "rules", label: "Routing rules", effect: "The route the card recommends and the reason it gives (\"Why\"), with \"Based on\" naming the rule and its policy.", pick: (d) => (d.rules || []).filter((r) => !isFlagRule(r)), render: () => rules(false) }] },
     { key: "checks", label: "Checks and reviews", blurb: "The review flags a request raises, what they say and who reviews them, and the lists and offices they name.",
       sections: [
-        { key: "flags", label: "Review flags", pick: (d) => (d.rules || []).filter(isFlagRule), render: () => rules(true) },
-        { key: "lists", label: "Review lists", pick: (d) => d.lists, render: reviewLists },
-        { key: "divisions", label: "Divisions and vendor offices", pick: (d) => d.divisions, render: divisions },
-        { key: "entities", label: "Legal entities", pick: (d) => d.entities, render: entities }] },
+        { key: "flags", label: "Review flags", effect: "The \"Checks and reviews\" on the route card, in the record and in the service description: when each appears, what it says, how it is shown and who reviews it.", pick: (d) => (d.rules || []).filter(isFlagRule), render: () => rules(true) },
+        { key: "lists", label: "Review lists", effect: "Which services and countries raise the prohibited-service and country-review flags on the route card.", pick: (d) => d.lists, render: reviewLists },
+        { key: "divisions", label: "Divisions and vendor offices", effect: "The division question for new demand, the vendor office named in the flags and the record, and which ownership questions are asked.", pick: (d) => d.divisions, render: divisions },
+        { key: "entities", label: "Legal entities", effect: "How the chat recognises the legal entity, the entity answer buttons, the offshoring check and the data transfer check.", pick: (d) => d.entities, render: entities }] },
     { key: "conversation", label: "Conversation", blurb: "What the chat asks and suggests, the welcome screen, and how the description is checked.",
       sections: [
-        { key: "questions", label: "Questions", pick: (d) => d.questions, render: questions },
-        { key: "guidance", label: "Guidance by category", pick: (d) => d.guidance, render: guidance },
-        { key: "domains", label: "Operations domains", pick: (d) => d.domains, render: domains },
-        { key: "examples", label: "Welcome examples", pick: (d) => d.examples, render: examples },
-        { key: "quality", label: "Description and quality", pick: PARAMS(QUALITY_GROUPS),
+        { key: "questions", label: "Questions", effect: "The wording of the questions, examples, reasons and answer buttons in the chat, and the labels in the side panel and the record.", pick: (d) => d.questions, render: questions },
+        { key: "guidance", label: "Guidance by category", effect: "The examples and suggested answers the chat offers for each category (marked as built from category guidance).", pick: (d) => d.guidance, render: guidance },
+        { key: "domains", label: "Operations domains", effect: "How the chat recognises the kind of operations work, and the examples and suggested answers it offers for it; the record-keeping and critical-function flags.", pick: (d) => d.domains, render: domains },
+        { key: "examples", label: "Welcome examples", effect: "The example requests on the chat's welcome screen.", pick: (d) => d.examples, render: examples },
+        { key: "quality", label: "Description and quality", effect: "The length limits of the service description, the follow-up checks on implausible answers, and the quality score before submitting.", pick: PARAMS(QUALITY_GROUPS),
           render: () => h("div", {}, S.advanced ? null : h("div", { class: "card" }, h("p", { class: "hint", style: "margin:0" }, "The quality-score weights, the answer checks and the Level 4 match are advanced settings: switch on \"Show advanced settings\" at the top to see them.")),
             thresholds(QUALITY_GROUPS, S.advanced ? null : QUALITY_SIMPLE)) }] },
     { key: "reference", label: "Reference data", blurb: "The lists the rules look things up in: Level 4, suppliers, framework contracts, the catalogue and the category search words.",
       sections: [
-        { key: "l4", label: "Level 4", ref: "l4", render: () => reference("l4") },
-        { key: "suppliers", label: "Suppliers", ref: "suppliers", render: () => reference("suppliers") },
-        { key: "contracts", label: "Contracts", ref: "contracts", render: () => reference("contracts") },
-        { key: "catalogue", label: "Catalogue", ref: "catalogue", render: () => reference("catalogue") },
-        { key: "words", label: "Category search words", pick: (d) => (d.categories || []).map((c) => [c.id, c.keywords]), render: categoryWords }] },
+        { key: "l4", label: "Level 4", effect: "The Level 4 choices offered after the first message, and the category that decides the questions.", ref: "l4", render: () => reference("l4") },
+        { key: "suppliers", label: "Suppliers", effect: "The preferred suppliers suggested in the chat and the non-preferred supplier flag.", ref: "suppliers", render: () => reference("suppliers") },
+        { key: "contracts", label: "Contracts", effect: "Whether a request becomes a call-off on an existing contract, and the contract named on the route card.", ref: "contracts", render: () => reference("contracts") },
+        { key: "catalogue", label: "Catalogue", effect: "Whether a request becomes a catalogue order, and the items or shop named on the route card.", ref: "catalogue", render: () => reference("catalogue") },
+        { key: "words", label: "Category search words", effect: "Which category the chat proposes from the words of the request.", pick: (d) => (d.categories || []).map((c) => [c.id, c.keywords]), render: categoryWords }] },
     { key: "history", label: "History", blurb: "Published versions, the change log, and which rules decided submitted requests.",
       sections: [
         { key: "versions", label: "Versions and changes", render: versions },
@@ -657,7 +692,7 @@
     if (!S.st) { $app.append(login()); return; }
     const prob = problems(), area = areaOf(S.area), sec = area && (sectionOf(S.area, S.section) || area.sections[0]);
     if (sec) S.section = sec.key;
-    const body = area ? sec.render() : overview();
+    const body = area ? h("div", {}, sec.effect ? h("p", { class: "effect", "data-effect": `${area.key}/${sec.key}` }, h("b", {}, "What this changes in the chat: "), sec.effect) : null, sec.render()) : overview();
     const nav = (key, label, changedNow) => h("button", { class: "tab", type: "button", "aria-current": S.area === key ? "page" : null, "data-area": key, onclick: () => go({ area: key }) }, label, changedNow ? h("span", { class: "dot", title: "changed" }) : null);
     $app.append(
       h("header", { class: "top" }, h("h1", {}, "Rules and settings"), h("span", { class: "muted", style: "color:#d6deef" }, S.actor ? `Signed in as ${S.actor}` : ""), h("span", { class: "sp" }),

@@ -44,7 +44,8 @@ function cleanRule(rule, seedRule) {
   // a test case loses the facts the code no longer has; it is dropped when it expects a removed outcome or sets a removed value
   const tests = (rule.tests || []).filter((t) => outs.has(t.expect)).map((t) => ({ ...t, given: Object.fromEntries(Object.entries(t.given || {}).filter(([k, v]) => facts[k] && !(v && typeof v === "object" && !SEED.params.some((p) => p.key === v.param)))) }))
     .filter((t) => Object.entries(t.given).every(([k, v]) => typeof v !== "string" || known(k, v)));
-  return { ...rule, outcomes: (rule.outcomes || []).filter((o) => outs.has(o.key)), rows, tests };
+  const { mode, ...rest } = rule;   // "mode" changed nothing in the chat and was removed in November 2026
+  return { ...rest, outcomes: (rule.outcomes || []).filter((o) => outs.has(o.key)), rows, tests };
 }
 
 // a document saved before a part existed gets that part from the seed
@@ -61,6 +62,10 @@ const withDefaults = (doc) => {
   out.next_steps = out.next_steps.filter((n) => n && SEED.next_steps.some((x) => x.key === n.key)).map((n) => { const seed = SEED.next_steps.find((x) => x.key === n.key); return { ...n, label: seed.label, placeholders: [...seed.placeholders] }; });
   out.channels = out.channels.map((c) => { const seed = SEED.channels.find((x) => x.key === (c && c.key)); return seed ? Object.fromEntries(Object.entries(c).filter(([k]) => k in seed)) : c; });
   out.facts = structuredClone(SEED.facts);   // the facts are what the code works out: always the seed's
+  // guidance saved before each part named its categories (November 2026) gets the texts added since for the categories
+  // it had none for, once; afterwards the saved texts are kept as they are
+  out.guidance = out.guidance.map((g) => { const seed = SEED.guidance.find((x) => x.key === (g && g.key)); if (!seed) return g;
+    return g.categories ? { ...g, categories: [...seed.categories] } : { ...g, categories: [...seed.categories], texts: { ...seed.texts, ...(g.texts || {}) } }; });
   // a question saved before its answer buttons were editable keeps the seed's buttons
   out.questions = out.questions.map((q) => { const seed = SEED.questions.find((x) => x.key === (q && q.key)); return seed && seed.choices && !Array.isArray(q.choices) ? { ...q, choices: [...seed.choices] } : q; });
   return out;

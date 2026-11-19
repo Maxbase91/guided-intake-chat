@@ -56,6 +56,8 @@
 - **Simple view by default:** rules read as sentences with editable texts; "Show advanced settings" adds the rule
   editor, test cases and rarely changed limits.
 - **Search** in the header finds any setting and opens it; every problem links to where it is fixed.
+- Each section starts with **What this changes in the chat**; nothing on the page is documentation only.
+- **Try the draft in the chat** opens the chat on the draft with an amber banner.
 - On a phone the sections scroll sideways inside their row; the page itself never does.
 
 ## 3. Components

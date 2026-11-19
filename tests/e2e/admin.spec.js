@@ -300,7 +300,8 @@ test("a review flag is a rule card: its title, level, reviewer and text are edit
   await expect(status(page)).toContainText("Published: version 8");
   await openApp(page, { kind: "admin" });
   const got = await page.evaluate((t) => withExampleState(t, () => S.det.controls.find((c) => /hospitality/i.test(c[1]))), DINNER);
-  expect(got).toEqual(["w", "Client hospitality approval", "Client hospitality: Compliance approves the guest list and the cost per guest.", "Compliance desk", false]);
+  expect(got.slice(0, 5)).toEqual(["w", "Client hospitality approval", "Client hospitality: Compliance approves the guest list and the cost per guest.", "Compliance desk", false]);
+  expect(got[5]).toBe("Gifts and entertainment policy; anti-bribery policy");   // what it rests on travels with the flag
   expect(errors).toEqual([]);
 });
 
@@ -416,5 +417,54 @@ test("the admin page fits a phone without sideways scrolling", async ({ page }) 
     await open(page, where);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), where).toBeLessThanOrEqual(0);
   }
+  expect(errors).toEqual([]);
+});
+
+test("what a rule rests on reaches the route card once published, and the draft can be tried in the chat first", async ({ page, context }) => {
+  const errors = await signIn(page);
+  await open(page, "checks/flags");
+  await page.locator("#rule-R23 details summary", { hasText: "Name, purpose and policy" }).click();
+  await page.locator("#rule-R23").getByLabel(/Rests on/).fill("Purchasing standard 4.2: three quotes");
+  await page.click("#saveBtn");
+  // the chat on the draft, before publishing: a new tab with a banner; nothing is stored
+  const [tab] = await Promise.all([context.waitForEvent("page"), page.click("#previewBtn")]);
+  await tab.waitForLoadState();
+  await expect(tab.locator(".preview-bar")).toBeVisible();
+  const draft = await tab.evaluate(() => withExampleState("Translation of our annual report, around 12k.", () => [CFG.source, S.det.controls.find((c) => c[1] === "Three quotes")[5]]));
+  expect(draft).toEqual(["preview", "Purchasing standard 4.2: three quotes"]);
+  expect(await tab.evaluate(() => sendDecisions())).toBe(false);
+  await tab.close();
+  accept(page, "Quotes rest on the purchasing standard");
+  await page.click("#publishBtn");
+  await expect(status(page)).toContainText("Published: version 10");
+  await openApp(page, { kind: "admin" });
+  expect(await page.evaluate(() => withExampleState("Translation of our annual report, around 12k.", () => [CFG.source, S.det.controls.find((c) => c[1] === "Three quotes")[5]])))
+    .toEqual(["database", "Purchasing standard 4.2: three quotes"]);
+  expect(errors).toEqual([]);
+});
+
+test("every section says what it changes in the chat; rules say what they read; questions say what they decide; no empty guidance", async ({ page }) => {
+  const errors = await signIn(page);
+  for (const where of ["routing/thresholds", "routing/channels", "routing/rules", "checks/flags", "checks/lists", "conversation/questions", "conversation/guidance", "conversation/domains", "reference/contracts"]) {
+    await open(page, where);
+    await expect(page.locator(`[data-effect="${where}"]`)).toContainText("What this changes in the chat:");
+  }
+  await open(page, "checks/flags");
+  await expect(page.locator("[data-reads=R26]")).toContainText("The provider will see personal or client data");
+  await expect(page.locator("[data-reads=R26]")).toContainText("from the question on data and system access");
+  await expect(page.locator("[data-rule] .reads")).toHaveCount(26);
+  await open(page, "conversation/questions");
+  await expect(page.locator("[data-usedby=personal_data]")).toContainText("Decides: R26, R30");
+  await expect(page.locator("[data-usedby=evaluation_priority]")).toContainText("Recorded");
+  await expect(page.locator("#q-tech_service-ex")).toHaveCount(0);            // no empty example box
+  await open(page, "conversation/guidance");
+  for (const key of ["deliverables_example", "audience_question", "project_kpis", "qualifications_question", "out_of_scope"]) {
+    await page.selectOption("#gKey", key);
+    const boxes = page.locator('textarea[id^="g-"]');
+    const values = await boxes.evaluateAll((els) => els.map((e) => e.value.trim()));
+    expect(values.filter((v) => !v), key).toEqual([]);
+  }
+  await open(page, "routing/rules");
+  await expect(page.locator("text=Mode")).toHaveCount(0);
   expect(errors).toEqual([]);
 });

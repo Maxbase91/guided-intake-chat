@@ -339,3 +339,23 @@ test("a version published before the small purchase was removed is cleaned when 
   assert.equal("short_days" in doc.channels.find((c) => c.key === "business"), false);
   assert.deepEqual(validateConfig(configFrom(old, 2, "database")), []);
 });
+
+test("a stored version loses the rule mode, gets the guidance texts added since (once), and the facts say where they come from", () => {
+  const { SEED, withDefaults } = require(path.join(ROOT, "api", "_lib", "seed.js"));
+  const { sanitize } = require(path.join(ROOT, "api", "_lib", "validate.js"));
+  const old = structuredClone(SEED);
+  old.rules.forEach((r) => { r.mode = "enforce"; });
+  const aq = old.guidance.find((g) => g.key === "audience_question");
+  delete aq.categories; delete aq.texts.consulting; aq.texts.legal = "Our own legal wording";
+  const doc = withDefaults(old), g = doc.guidance.find((x) => x.key === "audience_question");
+  assert.ok(doc.rules.every((r) => !("mode" in r)));
+  assert.equal(g.texts.consulting, SEED.guidance.find((x) => x.key === "audience_question").texts.consulting);   // filled once
+  assert.equal(g.texts.legal, "Our own legal wording");                                                        // saved texts kept
+  assert.deepEqual(g.categories, ["consulting", "legal", "marketing", "training", "it-services", "audit-tax"]);
+  // saved after the change (it names its categories): an emptied text stays empty
+  const later = sanitize(doc), lg = later.guidance.find((x) => x.key === "audience_question");
+  delete lg.texts.consulting;
+  assert.equal(withDefaults(later).guidance.find((x) => x.key === "audience_question").texts.consulting, undefined);
+  assert.ok(later.rules.every((r) => !("mode" in r)));
+  assert.ok(doc.facts.every((f) => f.source && Array.isArray(f.from)));
+});
