@@ -1,6 +1,6 @@
 // Small purchases (October 2026): "Flowers for a colleague's farewell, about 80 euros" asked 14 service-description questions.
-// Now: punch-out shops in the catalogue, and a short form for small, simple purchases up to €5,000 that asks only the essentials
-// (business-led demand; the low-value channel itself is gone).
+// Now: punch-out shops in the catalogue. The short form for small purchases was removed in November 2026 (owner decision):
+// anything not in the catalogue or under a contract is business-led or procurement-led demand, whatever the amount.
 const { test, expect } = require("@playwright/test");
 const { execFileSync } = require("child_process");
 const fs = require("fs");
@@ -52,35 +52,29 @@ test("'I want to buy flowers' asks the order value first, and a big flower contr
   expect(await page.evaluate(() => [S.det.route, S.det.lead.annual])).toEqual(["business", 30000]);   // 60k over 2 years is 30k a year: the division leads
 });
 
-test("a magician at €600 is a small purchase with four questions; a yes on data moves it to the full business-led questions", async ({ page }) => {
+test("a magician at €600 is business-led demand like any other amount: the full questions and three quotes (no short form since November 2026)", async ({ page }) => {
   await openApp(page);
   await start(page, "A magician for the kids' Christmas party, about 600 euros");
-  expect(await page.evaluate(() => [S.det.route, S.f.purpose])).toEqual(["simple", "the kids' Christmas party"]);
-  await expect(lastAssistant(page)).toContainText("small purchase");
-  const asked = await answerAll(page, { needed_by: "12 December 2026", location: "our Frankfurt office", supplier: "No preference", personal_data: "No access" });
-  expect(asked).toEqual(["needed_by", "location", "supplier", "personal_data"]);
-  const got = await page.evaluate(() => ({ route: S.det.route, controls: S.det.controls.map((c) => c[1]), steps: S.det.steps.join(" "), why: S.det.why }));
-  expect(got.route).toBe("simple");
-  expect(got.controls).toEqual(["One quote", "No splitting"]);
-  expect(got.steps).toMatch(/one quote.*purchase order.*corporate card/i);
-  expect(got.why).toMatch(/small, simple purchase/);
-  await expect(page.locator(".rec-h h2")).toHaveText("Business-led demand");
-  await expect(page.locator(".sd .sd-h")).toContainText("Purchase request");
-  // the provider would see client data: the standard path with its checks
-  await page.evaluate(() => { S.f.personal_data = true; refresh(); });
-  expect(await page.evaluate(() => S.det.route)).toBe("business");
+  const got = await page.evaluate(() => ({ route: S.det.route, req: S.req, controls: S.det.controls.map((c) => c[1]), steps: S.det.steps.join(" "), why: S.det.why }));
+  expect(got.route).toBe("business");
+  expect(got.req).toEqual(expect.arrayContaining(["background", "scope_in", "acceptance_pack", "needed_by"]));   // the business-led questions
+  expect(got.controls).toEqual(expect.arrayContaining(["Three quotes", "No splitting"]));
+  expect(got.controls).not.toContain("One quote");
+  expect(got.steps).toMatch(/at least 3 suppliers/);
+  expect(got.why).toMatch(/your division leads the sourcing/);
+  expect(JSON.stringify(got)).not.toMatch(/small, simple|short form|corporate card/i);
 });
 
-test("the small-purchase limit, software, a guessed category and amounts per unit", async ({ page }) => {
+test("small amounts, software, a guessed category and amounts per unit are business-led", async ({ page }) => {
   await openApp(page);
   const route = async (text) => { await page.click("#newBtn"); await start(page, text); return page.evaluate(() => ({ route: S.det.route, value: S.f.value, cat: S.f.category, controls: S.det.controls.map((c) => c[1]), last: (S.msgs.filter((m) => m.role === "assistant").pop() || {}).text || "" })); };
   // (a photographer would be a call-off: the creative framework covers photography)
-  expect((await route("An interpreter for our team offsite in Lisbon, about 4,900 euros")).route).toBe("simple");
+  expect((await route("An interpreter for our team offsite in Lisbon, about 4,900 euros")).route).toBe("business");
   expect((await route("An interpreter for our two-day client conference, about 5,100 euros")).route).toBe("business");
-  expect((await route("A diagramming add-on licence for my team, about 300 euros")).route).not.toBe("simple");   // software always gets the ICT and data checks
+  expect((await route("A diagramming add-on licence for my team, about 300 euros")).route).toBe("catalogue");   // the software shop covers it
   const guess = await route("Something nice for a retiring colleague, about 100 euros");
-  expect(guess.route).toBe("simple");
-  expect(guess.controls).toEqual(["One quote", "No splitting"]);   // no consulting checks for a guessed category
+  expect(guess.route).toBe("business");
+  expect(guess.controls).not.toContain("Auditor independence check");   // no consulting checks for a guessed category
   expect(guess.last).not.toMatch(/low for management consulting/);
   expect((await route("Christmas presents for our top 200 private banking clients, around 80 EUR each")).value).toBe(16000);
   expect(await page.evaluate(() => [monthsOf("Under 3 months"), monthsOf("3–6 months")])).toEqual([2, 6]);

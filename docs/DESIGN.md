@@ -8,7 +8,7 @@
 ## 1. Principles
 
 1. **One question at a time, with an example.** Every question shows what a good answer looks like ("For example: …").
-2. **Ask only what this request needs.** The route and the kind of work decide the questions. A small purchase gets 2–4
+2. **Ask only what this request needs.** The route and the kind of work decide the questions. A catalogue order gets 2–4
    questions, an RFP about 20.
 3. **Accept in one tap.** Where a standard answer exists, the chat suggests one tailored to the request. "Use this
    suggestion" accepts it, or the requester edits it in words.

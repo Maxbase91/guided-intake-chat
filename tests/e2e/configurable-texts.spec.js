@@ -21,7 +21,6 @@ const OLD_NEXT_STEPS = `(route, cat, ctr) => { const f=S.f;
 const REQUESTS = [
   ["catalogue", "We need 15 laptops for new joiners in Frankfurt, needed by 1 December."],
   ["catalogue", "Flowers for a colleague's farewell, about 80 euros"],
-  ["simple", "Repair of the coffee machine in our Munich office, about 800 euros."],
   ["contract", "More support from Lakeshore Advisory for our operations team."],
   ["contract", "Two Java developers as contractors for 9 months."],
   ["business", "An agency for a client dinner for 40 people, around 30k."],

@@ -65,7 +65,7 @@ test("every route asks the category first; the route news comes with the questio
   await openApp(page);
   const cases = [
     ["Flowers for a colleague's farewell, about 80 euros", /florist shop of Petal & Stem Florists/],
-    ["A magician for our team event, about 600 euros", /small purchase/],
+    ["A magician for our team event, about 600 euros", /What business problem does this solve/],   // business-led: the full questions
     ["We need 2 Java developers for 6 months, about 200k", /framework/i],
     ["A new HR system to replace our payroll tool", /Roughly what will this cost in total/],
   ];

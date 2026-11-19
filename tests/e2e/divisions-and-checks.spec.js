@@ -49,12 +49,12 @@ test("new demand asks the division, then the questions that division's vendor of
   expect(errors).toEqual([]);
 });
 
-test("catalogue orders, existing contracts and small purchases are not asked for the division", async ({ page }) => {
+test("catalogue orders and existing contracts are not asked for the division; a €600 request is new demand and is", async ({ page }) => {
   await openApp(page);
   const req = (t) => page.evaluate((x) => withExampleState(x, () => [S.det.route, S.req.filter((k) => ["division", "demand_owner", "sponsor", "spend_type"].includes(k))]), t);
   expect(await req("We need 15 laptops for new joiners in Frankfurt.")).toEqual(["catalogue", []]);
   expect(await req("Two Java developers as contractors for 9 months.")).toEqual(["contract", []]);
-  expect(await req("A magician for the kids' Christmas party, about 600 euros")).toEqual(["simple", []]);
+  expect(await req("A magician for the kids' Christmas party, about 600 euros")).toEqual(["business", ["division", "demand_owner", "sponsor", "spend_type"]]);
   expect((await req(DINNER))[1]).toEqual(["division", "demand_owner", "sponsor", "spend_type"]);
 });
 

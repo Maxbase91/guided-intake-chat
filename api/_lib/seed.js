@@ -28,17 +28,39 @@ const SEED = {
   catalogue: require("../../db/seed/catalogue.json"),
 };
 
+// A rule saved by an earlier version may name an outcome, a fact or a value the code no longer has (the small, simple
+// purchase was removed in November 2026). Such rows and test cases are dropped, and such values leave a list, so an
+// older published version still runs on what the code knows. Seed rules pass through unchanged.
+function cleanRule(rule, seedRule) {
+  const facts = Object.fromEntries(SEED.facts.map((f) => [f.key, f])), outs = new Set(seedRule.outcomes.map((o) => o.key));
+  const known = (fact, v) => !facts[fact].values || facts[fact].values.includes(v);
+  const cond = (c) => {
+    if (!facts[c.fact]) return null;
+    if (c.op === "in" && Array.isArray(c.value)) { const v = c.value.filter((x) => known(c.fact, x)); return v.length ? { ...c, value: v } : null; }
+    if (c.value && typeof c.value === "object" && !Array.isArray(c.value) && "param" in c.value) return SEED.params.some((p) => p.key === c.value.param) ? c : null;
+    return ["is", "is_not"].includes(c.op) && !known(c.fact, c.value) ? null : c;
+  };
+  const rows = (rule.rows || []).filter((r) => outs.has(r.then)).map((r) => { const when = (r.when || []).map(cond); return when.includes(null) ? null : { ...r, when }; }).filter(Boolean);
+  // a test case loses the facts the code no longer has; it is dropped when it expects a removed outcome or sets a removed value
+  const tests = (rule.tests || []).filter((t) => outs.has(t.expect)).map((t) => ({ ...t, given: Object.fromEntries(Object.entries(t.given || {}).filter(([k, v]) => facts[k] && !(v && typeof v === "object" && !SEED.params.some((p) => p.key === v.param)))) }))
+    .filter((t) => Object.entries(t.given).every(([k, v]) => typeof v !== "string" || known(k, v)));
+  return { ...rule, outcomes: (rule.outcomes || []).filter((o) => outs.has(o.key)), rows, tests };
+}
+
 // a document saved before a part existed gets that part from the seed
 const withDefaults = (doc) => {
   const out = Object.fromEntries(PARTS.map((k) => [k, Array.isArray(doc && doc[k]) ? doc[k] : structuredClone(SEED[k])]));
   // the placeholders a rule fills are set by the code, so they always come from the seed
-  out.rules = out.rules.map((r) => { const seed = SEED.rules.find((x) => x.id === (r && r.id)); return seed ? { ...r, placeholders: [...(seed.placeholders || [])] } : r; });
+  out.rules = out.rules.map((r) => { const seed = SEED.rules.find((x) => x.id === (r && r.id)); return seed ? { ...cleanRule(r, seed), placeholders: [...(seed.placeholders || [])] } : r; });
   // a rule added to the code after the document was saved comes from the seed (R07 and R08 for versions 1 and 2)
   SEED.rules.forEach((r) => { if (!out.rules.some((x) => x && x.id === r.id)) out.rules.push(structuredClone(r)); });
   // likewise a question, a fact or a threshold added later; a step list's placeholders come from the code
   for (const part of ["questions", "facts", "params"]) SEED[part].forEach((q) => { if (!out[part].some((x) => x && x.key === q.key)) out[part].push(structuredClone(q)); });
-  out.params = out.params.map((p) => { const seed = SEED.params.find((x) => x.key === (p && p.key)); return seed ? { ...seed, value: p.value } : p; });
-  out.next_steps = out.next_steps.map((n) => { const seed = SEED.next_steps.find((x) => x.key === (n && n.key)); return seed ? { ...n, label: seed.label, placeholders: [...seed.placeholders] } : n; });
+  // a threshold, a next-step list or a channel field the code no longer has is dropped
+  out.params = out.params.filter((p) => p && SEED.params.some((x) => x.key === p.key)).map((p) => ({ ...SEED.params.find((x) => x.key === p.key), value: p.value }));
+  out.next_steps = out.next_steps.filter((n) => n && SEED.next_steps.some((x) => x.key === n.key)).map((n) => { const seed = SEED.next_steps.find((x) => x.key === n.key); return { ...n, label: seed.label, placeholders: [...seed.placeholders] }; });
+  out.channels = out.channels.map((c) => { const seed = SEED.channels.find((x) => x.key === (c && c.key)); return seed ? Object.fromEntries(Object.entries(c).filter(([k]) => k in seed)) : c; });
+  out.facts = structuredClone(SEED.facts);   // the facts are what the code works out: always the seed's
   // a question saved before its answer buttons were editable keeps the seed's buttons
   out.questions = out.questions.map((q) => { const seed = SEED.questions.find((x) => x.key === (q && q.key)); return seed && seed.choices && !Array.isArray(q.choices) ? { ...q, choices: [...seed.choices] } : q; });
   return out;
@@ -148,4 +170,4 @@ function validateReference(cfg) {
   return errors;
 }
 
-module.exports = { PARTS, REF_PARTS, refChecksumOf, validateReference, SEED, withDefaults, bodyOf, canon, checksumOf, configFrom, buildConfig, validateConfig };
+module.exports = { PARTS, REF_PARTS, cleanRule, refChecksumOf, validateReference, SEED, withDefaults, bodyOf, canon, checksumOf, configFrom, buildConfig, validateConfig };

@@ -40,7 +40,7 @@ suppliers, frameworks and catalogue (§7).
 
 | # | Section | Contents |
 |---|---|---|
-| 1 | Configuration | `CONFIG`: provider mode, access code, `?ai=` test override, currency, `thresholds` (`simpleMax`, `catalogueNoQtyMax`, `formMin`, `leadMin`, `materialityMin`, `qualityMin`, `answerTip`) |
+| 1 | Configuration | `CONFIG`: provider mode, access code, `?ai=` test override, currency, `thresholds` (`catalogueNoQtyMax`, `formMin`, `leadMin`, `materialityMin`, `qualityMin`, `answerTip`) |
 | 2 | Reference data | `CATEGORIES` (20 buying categories with type and keywords), `L4`, `CONTRACTS`, `PREFERRED_L4`, `CATALOGUE` (from the data block), legal entities, rule sets (EBA/GL/2019/02, EBA/GL/2026/09) |
 | 3 | Routes | `CHANNELS`, `FACTS` (every question: label, wording, example, choices), `requiredFor(route, f)`, `STAGES`, kind-of-work rules (`kindOf`, `isOngoing`) |
 | 4 | State | One global `S`: messages, facts `S.f`, derived facts, route `S.det`, open questions `S.missing`, suggestions, quality, description `S.sd` |
@@ -89,7 +89,7 @@ A change of category, value or supplier therefore re-routes on the spot.
 | C. Documents | New demand or call-off, once all details are in | Conversation, facts, category, ICT and outsourcing results, route, up to 5 Level 4 candidates | Description fields (hard word limits), the Level 4 re-check (new demand), up to 2 quality remarks |
 | D. Document change | "Make it shorter" once a description exists | The current description and the request | The updated description |
 
-There is no AI call for catalogue orders and small, simple purchases: the purchase request is built from the answers.
+There is no AI call for catalogue orders: the purchase request is built from the answers.
 
 **Rules as data.** Thresholds, channels, category flags and the routing rules live in `db/seed/*.json` and reach the
 page as its built-in configuration: the `config-defaults` JSON block, written by `scripts/build_defaults.js`.
@@ -133,9 +133,10 @@ matchers with `kwAlt()`. Word limits, answer-check limits and the quality-score 
 limits, Answer checks, Quality score). Answer buttons are editable only for questions whose answer the code records
 and never reads; the others feed the rules and stay code.
 
-**Routes and channels.** `determine()` returns a route, which is the question profile: `catalogue`, `contract`, `simple`,
-`business` or `procurement`. The buying channel shown to the requester is one of four (`CHANNELS`): a small, simple
-purchase (`simple`) is business-led demand with the short form (`channelOf`, `chan`).
+**Routes and channels.** `determine()` returns a route, which is also the buying channel: `catalogue`, `contract`,
+`business` or `procurement` (`CHANNELS`). The short form for small purchases (route `simple`) was removed in November
+2026; `withDefaults()` drops its rows, threshold and next steps from versions published before, and the page treats a
+stray `simple` outcome as business-led.
 
 Typical new-demand conversation: about 15 requests and 40k input tokens. The prompt size doesn't depend on the size of
 the Level 4 list.

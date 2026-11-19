@@ -50,19 +50,19 @@ test("a changed guidance text changes the suggestion; a changed question text ch
   expect(errors).toEqual([]);
 });
 
-test("the reasons for catalogue, contract and a small purchase are rule texts with placeholders", async ({ page, request }) => {
+test("the reasons for catalogue, contract and business-led demand are rule texts with placeholders", async ({ page, request }) => {
   const cfg = await published(request, (c) => {
     const rule = (id) => c.rules.find((r) => r.id === id);
     rule("R01").rows[0].text = "Order {items} from the catalogue.";
     rule("R02").rows[0].text = "Ask {supplier} under the {contract}.";
-    rule("R19").rows[2].text = "Small purchase of {amount}: one quote is enough.";
+    rule("R11").rows[5].text = "Business-led at {amount}: ask three suppliers.";
   });
   await page.route("**/api/config", (r) => r.fulfill({ json: cfg }));
   await openApp(page);
   const why = (t) => page.evaluate((x) => withExampleState(x, () => S.det.why), t);
   expect(await why("We need 15 laptops for new joiners in Frankfurt.")).toBe("Order Standard laptop 14\" from the catalogue.");
   expect(await why("Two Java developers as contractors for 9 months.")).toMatch(/^Ask .+ under the .+\.$/);
-  expect(await why("A magician for the kids' Christmas party, about 600 euros")).toBe("Small purchase of €600: one quote is enough.");
+  expect(await why("A magician for the kids' Christmas party, about 600 euros")).toBe("Business-led at €600: ask three suppliers.");
   // the built-in texts are the ones the code had
   const builtin = await page.evaluate(() => { applyConfig(DEFAULTS); return withExampleState("We need 15 laptops for new joiners in Frankfurt.", () => S.det.why); });
   expect(builtin).toBe("Standard laptop 14\" is in the catalogue, so you can order directly at the agreed price.");

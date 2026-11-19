@@ -12,14 +12,15 @@ const lead = (page, facts, text = "translation of our annual report") => page.ev
   return { route: d.route, channel: d.channel, row: L.row, status: L.status, annual: L.annual, form: L.form, why: d.why, controls: d.controls.map((c) => c[1]) };
 }, [facts, text]);
 
-test("there are four buying channels; a small purchase is business-led demand with the short form", async ({ page }) => {
+test("there are four buying channels and four routes; €800 is business-led demand like any other amount", async ({ page }) => {
   const errors = await openApp(page);
-  const got = await page.evaluate(() => ({ keys: Object.keys(CHANNELS), names: Object.values(CHANNELS).map((c) => c.name), simple: [channelOf("simple"), chan("simple").name] }));
+  const got = await page.evaluate(() => ({ keys: Object.keys(CHANNELS), names: Object.values(CHANNELS).map((c) => c.name), routes: ROUTES }));
   expect(got.keys).toEqual(["catalogue", "contract", "business", "procurement"]);
   expect(got.names).toEqual(["Catalogue order", "Existing contract", "Business-led demand", "Procurement-led demand"]);
-  expect(got.simple).toEqual(["business", "Business-led demand"]);
+  expect(got.routes).toEqual(got.keys);
   const small = await lead(page, { value: 800 });
-  expect([small.route, small.channel]).toEqual(["simple", "business"]);
+  expect([small.route, small.channel, small.row]).toEqual(["business", "business", "division"]);
+  expect(small.controls).toEqual(expect.arrayContaining(["Three quotes", "No splitting"]));
   expect(errors).toEqual([]);
 });
 

@@ -101,7 +101,6 @@ cannot be changed by requesters:
 
 | Setting | Value |
 |---|---|
-| Small, simple purchase (short form) up to | €5,000 |
 | Catalogue order without a quantity up to | €50,000 |
 | Sourcing request form from (annual value) | €100,000 |
 | Procurement leads from (annual value) | €500,000 |

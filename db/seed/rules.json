@@ -89,18 +89,16 @@
     "mode": "enforce",
     "clause": "",
     "decides": "Which buying channel is recommended. It combines the results of R01, R02 and R11 and takes no decision of its own.",
-    "placeholders": ["amount"],
+    "placeholders": [],
     "outcomes": [
       {"key":"catalogue","label":"Catalogue order","channel":"catalogue"},
       {"key":"contract","label":"Existing contract","channel":"contract"},
-      {"key":"simple","label":"Business-led demand, short form for a small purchase","channel":"business"},
       {"key":"business","label":"Business-led demand","channel":"business"},
       {"key":"procurement","label":"Procurement-led demand","channel":"procurement"}
     ],
     "rows": [
       {"when":[{"fact":"r01","op":"in","value":["covered_item","covered_shop"]}],"then":"catalogue"},
       {"when":[{"fact":"r02","op":"is","value":"use_contract"}],"then":"contract"},
-      {"when":[{"fact":"r11","op":"is","value":"division"},{"fact":"simple_eligible","op":"is","value":true},{"fact":"total_value","op":"lte","value":{"param":"simpleMax"}}],"then":"simple","text":"At {amount} it is a small, simple purchase and no catalogue item or framework covers it, so you buy it directly: a purchase order with one quote, or your corporate card where the card policy allows."},
       {"when":[{"fact":"r11","op":"is","value":"division"}],"then":"business"},
       {"when":[],"then":"procurement"}
     ],
@@ -108,11 +106,9 @@
       {"name":"Catalogue item","given":{"r01":"covered_item","r02":"not_covered"},"expect":"catalogue"},
       {"name":"Catalogue wins over a contract","given":{"r01":"covered_shop","r02":"use_contract"},"expect":"catalogue"},
       {"name":"Existing contract","given":{"r01":"not_covered","r02":"use_contract"},"expect":"contract"},
-      {"name":"Small, simple purchase","given":{"r01":"not_covered","r02":"not_covered","r11":"division","simple_eligible":true,"total_value":{"param":"simpleMax","plus":-1}},"expect":"simple"},
-      {"name":"Small but not simple","given":{"r01":"not_covered","r02":"not_covered","r11":"division","simple_eligible":false,"total_value":{"param":"simpleMax","plus":-1}},"expect":"business"},
-      {"name":"Division leads","given":{"r01":"not_covered","r02":"not_covered","r11":"division","simple_eligible":true,"total_value":{"param":"simpleMax","plus":1}},"expect":"business"},
-      {"name":"Category Manager decides","given":{"r01":"not_covered","r02":"not_covered","r11":"cm_decides","simple_eligible":true,"total_value":{"param":"formMin","plus":1}},"expect":"procurement"},
-      {"name":"Value not known","given":{"r01":"not_covered","r02":"not_covered","r11":"pending_value","simple_eligible":true},"expect":"procurement"}
+      {"name":"Division leads","given":{"r01":"not_covered","r02":"not_covered","r11":"division"},"expect":"business"},
+      {"name":"Category Manager decides","given":{"r01":"not_covered","r02":"not_covered","r11":"cm_decides","total_value":{"param":"formMin","plus":1}},"expect":"procurement"},
+      {"name":"Value not known","given":{"r01":"not_covered","r02":"not_covered","r11":"pending_value"},"expect":"procurement"}
     ]
   },
   {
@@ -229,21 +225,18 @@
     "step": "Process controls",
     "mode": "inform",
     "clause": "Procurement policy: quotes for business-led demand (test data)",
-    "decides": "How many quotes the business collects when it buys on its own.",
+    "decides": "How many quotes the business collects when it leads the buying itself.",
     "placeholders": [],
     "outcomes": [
       {"key":"flag","label":"Flag raised","flag":true,"level":"i","title":"Three quotes","owner":"The business"},
-      {"key":"one_quote","label":"One quote","flag":true,"level":"i","title":"One quote","owner":"The business"},
       {"key":"none","label":"No flag"}
     ],
     "rows": [
       {"when":[{"fact":"route","op":"is","value":"business"}],"then":"flag","text":"The business collects at least three comparable quotes; procurement reviews the choice."},
-      {"when":[{"fact":"route","op":"is","value":"simple"}],"then":"one_quote","text":"One written quote or a published price is enough; keep it with the order."},
       {"when":[],"then":"none"}
     ],
     "tests": [
       {"name":"Business-led","given":{"route":"business"},"expect":"flag"},
-      {"name":"Small, simple purchase","given":{"route":"simple"},"expect":"one_quote"},
       {"name":"Procurement-led","given":{"route":"procurement"},"expect":"none"}
     ]
   },
@@ -254,19 +247,17 @@
     "mode": "inform",
     "clause": "Procurement policy: no splitting of demand (test data)",
     "decides": "Reminds the requester that one need must not be split to stay under a threshold.",
-    "placeholders": ["form_threshold","simple_max"],
+    "placeholders": ["form_threshold"],
     "outcomes": [
       {"key":"flag","label":"Flag raised","flag":true,"level":"i","title":"No splitting","owner":"The business"},
       {"key":"none","label":"No flag"}
     ],
     "rows": [
       {"when":[{"fact":"route","op":"is","value":"business"}],"then":"flag","text":"One need must not be split into several requests to stay under {form_threshold}."},
-      {"when":[{"fact":"route","op":"is","value":"simple"}],"then":"flag","text":"One need must not be split into several orders to stay under {simple_max}."},
       {"when":[],"then":"none"}
     ],
     "tests": [
       {"name":"Business-led","given":{"route":"business"},"expect":"flag"},
-      {"name":"Small, simple purchase","given":{"route":"simple"},"expect":"flag"},
       {"name":"Procurement-led","given":{"route":"procurement"},"expect":"none"}
     ]
   },
@@ -616,8 +607,7 @@
     ],
     "tests": [
       {"name":"On site","given":{"route":"procurement","goods":false,"on_site":true},"expect":"flag"},
-      {"name":"Goods delivered","given":{"route":"procurement","goods":true,"on_site":true},"expect":"none"},
-      {"name":"Small purchase","given":{"route":"simple","goods":false,"on_site":true},"expect":"none"}
+      {"name":"Goods delivered","given":{"route":"procurement","goods":true,"on_site":true},"expect":"none"}
     ]
   },
   {

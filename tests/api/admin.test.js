@@ -271,8 +271,8 @@ test("next steps, entities, domains, examples and answer buttons: only known ite
   const { sanitize } = require(path.join(ROOT, "api", "_lib", "validate.js"));
   const { SEED, validateConfig, configFrom } = require(path.join(ROOT, "api", "_lib", "seed.js"));
   const doc = structuredClone(SEED), part = (d, k, key, id = "key") => d[k].find((x) => x[id] === key);
-  part(doc, "next_steps", "simple").steps = ["Get one quote{quote_from}.", "Pay {nonsense}.", ...Array(6).fill("x")];
-  part(doc, "next_steps", "simple").placeholders = ["nonsense"];             // placeholders come from the seed
+  part(doc, "next_steps", "business").steps = ["Ask 3 suppliers{preferred}.", "Pay {nonsense}.", ...Array(6).fill("x")];
+  part(doc, "next_steps", "business").placeholders = ["nonsense"];             // placeholders come from the seed
   doc.next_steps.push({ key: "secret", label: "?", steps: ["?"] });
   part(doc, "entities", "US", "id").codes = ["US", "u$a!", "toolongcode", "x"];
   doc.entities.push({ id: "XX", name: "New entity", keywords: ["x"] });
@@ -281,8 +281,8 @@ test("next steps, entities, domains, examples and answer buttons: only known ite
   part(doc, "questions", "pricing_model").choices = ["Fixed price", "", "Per milestone"];
   part(doc, "questions", "duration").choices = ["Forever"];                  // feeds the rules: not editable
   const out = sanitize(doc);
-  assert.deepEqual(part(out, "next_steps", "simple").steps.length, 5);
-  assert.deepEqual(part(out, "next_steps", "simple").placeholders, ["quote_from"]);
+  assert.deepEqual(part(out, "next_steps", "business").steps.length, 5);
+  assert.deepEqual(part(out, "next_steps", "business").placeholders, ["preferred"]);
   assert.equal(out.next_steps.length, SEED.next_steps.length);
   assert.deepEqual(part(out, "entities", "US", "id").codes, ["US", "ua", "toolon"]);
   assert.equal(out.entities.length, SEED.entities.length);
@@ -292,7 +292,7 @@ test("next steps, entities, domains, examples and answer buttons: only known ite
   assert.deepEqual(part(out, "questions", "pricing_model").choices, ["Fixed price", "Per milestone"]);
   assert.equal("choices" in part(out, "questions", "duration"), false);
   const errs = validateConfig(configFrom(out, 0, "draft"));
-  assert.ok(errs.some((e) => /Small, simple purchase.*step 2.*\{nonsense\}/.test(e)), errs.join("\n"));
+  assert.ok(errs.some((e) => /Business-led demand.*step 2.*\{nonsense\}/.test(e)), errs.join("\n"));
   // limits in the wrong order and too few examples are refused
   const bad = sanitize(structuredClone(SEED));
   bad.params.find((p) => p.key === "headMin").value = 80; bad.params.find((p) => p.key === "qualityGood").value = 95; bad.examples = bad.examples.slice(0, 2);
@@ -313,4 +313,29 @@ test("the admin state carries the published configuration without the reference 
   assert.deepEqual(after.changed_ref, ["contracts"]);
   assert.equal(param(after.published, "leadMin").value, 500000);   // the published version is unchanged until a publish
   assert.equal(param(after.draft, "leadMin").value, 400000);
+});
+
+test("a version published before the small purchase was removed is cleaned when it is read, and still passes the publish check", () => {
+  const { SEED, withDefaults, validateConfig, configFrom } = require(path.join(ROOT, "api", "_lib", "seed.js"));
+  const old = structuredClone(SEED), r19 = old.rules.find((r) => r.id === "R19"), r23 = old.rules.find((r) => r.id === "R23");
+  r19.outcomes.splice(2, 0, { key: "simple", label: "Business-led demand, short form for a small purchase", channel: "business" });
+  r19.rows.splice(2, 0, { when: [{ fact: "r11", op: "is", value: "division" }, { fact: "simple_eligible", op: "is", value: true }, { fact: "total_value", op: "lte", value: { param: "simpleMax" } }], then: "simple" });
+  r19.tests.push({ name: "Small, simple purchase", given: { r11: "division", simple_eligible: true, total_value: { param: "simpleMax", plus: -1 } }, expect: "simple" });
+  r19.tests.push({ name: "Small but not simple", given: { r11: "division", simple_eligible: false }, expect: "business" });
+  r23.outcomes.push({ key: "one_quote", label: "One quote", flag: true, level: "i", title: "One quote", owner: "The business" });
+  r23.rows.splice(1, 0, { when: [{ fact: "route", op: "is", value: "simple" }], then: "one_quote" });
+  old.rules.find((r) => r.id === "R39").rows[0].when[0].value = ["simple", "contract", "business", "procurement"];
+  old.params.push({ key: "simpleMax", value: 5000, unit: "EUR", label: "Small, simple purchase up to" });
+  old.next_steps.push({ key: "simple", label: "Small, simple purchase", placeholders: ["quote_from"], steps: ["Get one quote."] });
+  old.channels.find((c) => c.key === "business").short_days = "1–3";
+  old.facts.push({ key: "simple_eligible", label: "Simple purchase", type: "bool" });
+  const doc = withDefaults(old), R = (id) => doc.rules.find((r) => r.id === id);
+  assert.deepEqual(R("R19").rows.map((r) => r.then), ["catalogue", "contract", "business", "procurement"]);
+  assert.deepEqual(R("R19").tests.find((t) => t.name === "Small but not simple").given, { r11: "division" });   // the removed fact leaves the test case
+  assert.ok(!R("R19").tests.some((t) => t.expect === "simple"));
+  assert.deepEqual(R("R23").outcomes.map((o) => o.key), ["flag", "none"]);
+  assert.deepEqual(R("R39").rows[0].when[0].value, ["contract", "business", "procurement"]);
+  assert.ok(!doc.params.some((p) => p.key === "simpleMax") && !doc.next_steps.some((n) => n.key === "simple") && !doc.facts.some((f) => f.key === "simple_eligible"));
+  assert.equal("short_days" in doc.channels.find((c) => c.key === "business"), false);
+  assert.deepEqual(validateConfig(configFrom(old, 2, "database")), []);
 });

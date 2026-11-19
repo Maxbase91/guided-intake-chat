@@ -27,7 +27,7 @@ The AI holds the conversation and writes the text. **It never decides the route,
 
 | User | Needs |
 |---|---|
-| Requester (any colleague) | A fast, plain-language way to ask for something; no procurement vocabulary; small purchases done in minutes |
+| Requester (any colleague) | A fast, plain-language way to ask for something; no procurement vocabulary; catalogue orders done in minutes |
 | Buyer (procurement) | Complete, consistent requests; the route and reason; what is still open |
 | Risk, ICT and outsourcing reviewers | Early flags (data access, DORA ICT service, outsourcing, critical or important function) with the reasons behind them |
 | Procurement owner (admin) | Thresholds, taxonomy, suppliers, frameworks and catalogue under control, not editable by requesters |
@@ -43,14 +43,14 @@ The AI holds the conversation and writes the text. **It never decides the route,
 | **Existing contract** | An active framework covers the request's Level 4. External workers go through the staffing framework | Scope, when, how long, value, data |
 | **Procurement-led demand** | A market data renewal (through the renewals calendar, no sourcing request form); or an annual value of €500,000 or more; or €100,000 or more in a category the Category Manager must handle. From €100,000 to under €500,000 in any other category the Category Manager decides whether procurement leads, and the request counts as procurement-led until then. An unknown value counts as procurement-led until a figure is given | Full service description (RFP) |
 | **Business-led demand** | An annual value under €100,000: the division leads, no sourcing request form | Short service description (three quotes) |
-| **Business-led demand**, small purchase | Value ≤ €5,000; not software or external workers; no technology service; no access to our data or systems; not an ongoing service over 12 months | The short form: what, how many (goods), value, what it is for, when, where, supplier, data access (services) |
 
 There are four buying channels: catalogue order, existing contract, business-led demand and procurement-led demand.
 The thresholds apply to the **annual value**: the total divided by the years of the term. Without a term of more than a
-year the stated figure counts as annual. One need must not be split to stay under a threshold.
+year the stated figure counts as annual. One need must not be split to stay under a threshold. There is no short form
+for small amounts (removed in November 2026, owner decision): below the catalogue, every request is business-led or
+procurement-led demand.
 
 The thresholds are set in the code by procurement (`CONFIG.thresholds`):
-- small, simple purchase (short form) €5,000;
 - catalogue order without a quantity €50,000;
 - sourcing request form from €100,000 a year;
 - procurement leads from €500,000 a year;
@@ -117,7 +117,7 @@ Requesters cannot change them.
 | Route | Output |
 |---|---|
 | New demand | **Executive service description**: headline, executive description, summary table. It never contains amounts, dates, places, suppliers, the route or risk answers |
-| Catalogue, small purchase | **Purchase request**: short summary, no AI call |
+| Catalogue order | **Purchase request**: short summary, no AI call |
 | Existing contract | Short description |
 | All | **Captured for procurement** record, route card with reason, reviews and next steps, quality check ("Still to clarify"), JSON payload on submit |
 
@@ -162,7 +162,7 @@ They are still built from the answers (no AI) and travel in the JSON payload.
 
 | Area | Requirement | Today |
 |---|---|---|
-| Cost | Run on free AI tiers for testing | About 15 AI requests and 40k input tokens per full new-demand conversation. Small purchases need about 3 requests |
+| Cost | Run on free AI tiers for testing | About 15 AI requests and 40k input tokens per full new-demand conversation. Catalogue orders need about 3 requests |
 | Resilience | Several providers, automatic fallback, offline rules | Gemini → Groq → Mistral → OpenRouter; rules-only fallback |
 | Latency | A turn should feel conversational | 2–20 s per AI turn depending on the provider. Replies type out; the rules answer instantly |
 | Privacy | No real data in a prototype on free tiers | Access code; keys only on the server. **Dummy data only** |
@@ -176,7 +176,7 @@ They are still built from the answers (no AI) and travel in the JSON payload.
 | Right Level 4, rules only (60 realistic requests) | 73% (category 87%) |
 | Right Level 4 with AI (32 live requests) | 78% |
 | Right entry among the AI's candidates | 88–93% |
-| Questions for a small purchase | 2 (catalogue shop) to 4 (short form) |
+| Questions for a catalogue order | 2 (shop) to 4 (items) |
 | Tokens per new-demand conversation | ~40k input |
 
 ## 7. Known gaps and risks

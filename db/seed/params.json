@@ -1,5 +1,4 @@
 [
-  {"key":"simpleMax","value":5000,"unit":"EUR","label":"Small, simple purchase up to","description":"Business-led demand with the short form: one quote or a corporate card, and a purchase request instead of a service description.","group":"Routing"},
   {"key":"catalogueNoQtyMax","value":50000,"unit":"EUR","label":"Catalogue order without a quantity up to","description":"The most a catalogue order can be when no quantity is given.","group":"Routing"},
   {"key":"formMin","value":100000,"unit":"EUR a year","label":"Sourcing request form from","description":"Below it the division leads with three quotes. From it the Category Manager decides, or procurement leads in mandatory categories.","group":"Routing"},
   {"key":"leadMin","value":500000,"unit":"EUR a year","label":"Procurement leads from","description":"Procurement leads the sourcing with an RFP.","group":"Routing"},
