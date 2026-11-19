@@ -89,6 +89,13 @@ Requesters cannot change them.
   - The candidates come from the rules (closest entries across the whole list, so a wrong category can be put right)
     and, with AI, from the model's pick and up to 2 alternatives out of about 20 candidates.
   - The requester can still change it at the check step or by searching in the summary.
+  - **Additional categories.** After choosing the main category, the requester can add up to 2 more ("Also includes" on
+    the card, or ✎ in the summary). The main one decides the route, the questions and the guidance. For the Category
+    Manager and renewals rules, the review flags and the ICT and outsourcing checks the request is also seen as each
+    additional category, and the strictest result counts. A framework contract must cover every category; a request with
+    several categories is never a catalogue order. The record and the request list all of them.
+  - The counts (2–3 shown), the 75% bar, the low-confidence cut-off (57%) and the number of additional categories are
+    settings on the admin page (Routing › Category matching and rules). The word weightings stay in the code.
 - **ICT service (DORA):** whether technology is involved, and the DORA service type proposed from the description (SaaS,
   licensing, infrastructure…).
 - **Outsourcing (group standard EBA/GL/2019/02):**

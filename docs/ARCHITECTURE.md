@@ -195,13 +195,20 @@ the Level 4 list.
      entries across the whole list.
    - A rules alternative's % is damped by √(its score ÷ the best score), so a far weaker entry can't look like a 78%
      match.
-   - Every candidate at `CONFIG.thresholds.l4Match` (75%) or more is shown, up to 3, and at least 2. The area's
+   - Every candidate at `CONFIG.thresholds.l4Match` (75%) or more is shown, up to `l4Max` (3), and at least `l4Min`
+     (2). `l4Low` (57%) is the low-confidence cut-off, turned into the word score `L4_WEAK` by `applyConfig`. The area's
      "(other)" entry is added when nothing else shares a word.
    - Answers: a button, "the second one", a code or a name. "None of these" asks for a few words, rebuilds the
      candidates from them (with AI, the model picks again from a shortlist for those words), and leaves out the
      rejected ones. Two answers that are no choice keep the first.
    - Checks on the first message wait until the choice is made, and the route news comes with the first question after
      it.
+   - Additional categories (`S.l4Extra`, at most `l4Extra`; `extraL4`, `catViews`, `toggleExtraL4`): `catViews(f)` is the
+     request seen as the main category and as each additional one. `cmMandatory`, `renewalsCalendar`, `requiredFor`
+     (union of questions), the `tech_service` derivation, `classify` (strictest ICT and outsourcing result) and
+     `reviewFlags` / `bankChecks` (`withExtraFlags`: a flag only an additional category raises, named after it) read all
+     of them. `contractCovers` and `contractFor` need every category covered; `catalogueMatches` is empty with any.
+     The payload carries `l4_extra`; the decision log keeps its typed facts only.
 
 **Recognition benchmark** (realistic test data, 60 requests written without seeing the descriptions):
 

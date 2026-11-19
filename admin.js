@@ -144,7 +144,7 @@
   function thresholds(groups, only) {
     const shown = (p) => groups.includes(p.group || "Other") && (!only || only(p));
     return h("div", {}, groups.filter((g) => S.doc.params.some((p) => (p.group || "Other") === g && shown(p))).map((g, i) => h("div", { class: "card", "data-group": g }, h("h2", {}, g),
-      i === 0 ? h("p", { class: "hint" }, "Amounts are in euros. The rules and checks read these values by name, so a change here changes everything that uses them.") : null,
+      i === 0 && S.doc.params.some((p) => (p.group || "Other") === g && /EUR/.test(p.unit || "")) ? h("p", { class: "hint" }, "Amounts are in euros. The rules and checks read these values by name, so a change here changes everything that uses them.") : null,
       h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Setting"), h("th", {}, "Value"), h("th", {}, "Unit"), h("th", {}, "Effect"))),
         h("tbody", {}, S.doc.params.filter((p) => (p.group || "Other") === g && shown(p)).map((p) => h("tr", {},
           h("td", {}, h("label", { for: "p-" + p.key }, h("b", {}, p.label))),
@@ -398,7 +398,7 @@
   // ---------- reference data: download as CSV, edit in a spreadsheet, upload, check, publish
   // columns as the import script reads them; lists inside a cell are separated by ";"
   const REF = {
-    l4: { label: "Level 4 list", key: "code", cols: ["code", "name", "l1", "l2", "l3", "theme", "desc", "kw"], lists: ["kw"], nums: [], hint: "theme is the buying category id (see Routing › Category rules); kw are search words." },
+    l4: { label: "Level 4 list", key: "code", cols: ["code", "name", "l1", "l2", "l3", "theme", "desc", "kw"], lists: ["kw"], nums: [], hint: "theme is the buying category id (see Routing › Category matching and rules); kw are search words." },
     suppliers: { label: "Suppliers", key: "name", cols: ["supplier", "preferred_l4"], field: { supplier: "name" }, lists: ["preferred_l4"], nums: [], hint: "preferred_l4: the Level 4 codes the supplier is preferred for." },
     contracts: { label: "Framework contracts", key: "id", cols: ["id", "supplier", "title", "l4", "expires", "remaining"], lists: ["l4"], nums: ["remaining"], hint: "l4: the Level 4 codes it covers; expires: YYYY-MM-DD; remaining: the value left, in euro." },
     catalogue: { label: "Catalogue", key: "id", cols: ["id", "kind", "name", "supplier", "l4", "price", "max_order", "unit", "kw"], lists: ["kw"], nums: ["price", "max_order"], hint: "kind: item (a fixed price) or shop (a supplier's shop for a whole Level 4, with a maximum order value)." },
@@ -565,13 +565,15 @@
   // section edits: it drives the "changed" markers, the overview and the links from problems.
   const PARAMS = (groups, only) => (d) => (d.params || []).filter((p) => groups.includes(p.group || "Other") && (!only || only(p)));
   const QUALITY_SIMPLE = (p) => (p.group || "Other") === "Text limits" || p.key === "qualityMin";
-  const QUALITY_GROUPS = ["Text limits", "Quality score", "Answer checks", "Category matching"];
+  const QUALITY_GROUPS = ["Text limits", "Quality score", "Answer checks"];
+  // where a setting is edited: routing thresholds, category matching (with the category rules), or description and quality
+  const paramPlace = (p) => (p.group || "Other") === "Routing" ? { area: "routing", section: "thresholds" } : p.group === "Category matching" ? { area: "routing", section: "categories" } : { area: "conversation", section: "quality", advanced: !QUALITY_SIMPLE(p) };
   const AREAS = [
     { key: "routing", label: "Routing", blurb: "Where a request goes: the catalogue, an existing contract, business-led or procurement-led demand, and what happens next.",
       sections: [
         { key: "thresholds", label: "Thresholds", effect: "Which channel the route card recommends, which questions the chat asks for it, and the material spend review.", pick: PARAMS(["Routing"]), render: () => thresholds(["Routing"]) },
         { key: "channels", label: "Channels and next steps", effect: "The channel names and working days on the route card and in the chat, the tight-timeline warning, and the next steps listed on the route card.", pick: (d) => [d.channels, d.next_steps], render: () => h("div", {}, channels(), nextsteps()) },
-        { key: "categories", label: "Category rules", effect: "Who leads new demand between the two thresholds, and whether a renewal goes through the renewals calendar \u2014 the route card and its reason.", pick: (d) => (d.categories || []).map((c) => [c.id, c.name, c.cm_mandatory, c.renewals_calendar]), render: categories },
+        { key: "categories", label: "Category matching and rules", effect: "Which Level 4 categories the chat offers after the first message and whether a request may include more than one; who leads new demand between the two thresholds, and whether a renewal goes through the renewals calendar \u2014 the category card, the route card and its reason. The matching scores each category's name, search words and description against the request's words (the subject counts most); the AI adds its own pick; every category at the match below is offered, within the fewest and most shown.", pick: (d) => [PARAMS(["Category matching"])(d), (d.categories || []).map((c) => [c.id, c.name, c.cm_mandatory, c.renewals_calendar])], render: () => h("div", {}, thresholds(["Category matching"]), categories()) },
         { key: "rules", label: "Routing rules", effect: "The route the card recommends and the reason it gives (\"Why\"), with \"Based on\" naming the rule and its policy.", pick: (d) => (d.rules || []).filter((r) => !isFlagRule(r)), render: () => rules(false) }] },
     { key: "checks", label: "Checks and reviews", blurb: "The review flags a request raises, what they say and who reviews them, and the lists and offices they name.",
       sections: [
@@ -615,7 +617,8 @@
     const m = /^(R\d\d)\b/.exec(text);
     if (m) return { area: ROUTING.includes(m[1]) ? "routing" : "checks", section: ROUTING.includes(m[1]) ? "rules" : "flags", focus: "rule-" + m[1] };
     const param = S.doc.params.find((p) => text.startsWith(p.label + ":"));
-    if (param) return (param.group || "Other") === "Routing" ? { area: "routing", section: "thresholds", focus: "p-" + param.key } : { area: "conversation", section: "quality", focus: "p-" + param.key, advanced: !QUALITY_SIMPLE(param) };
+    if (param) return { ...paramPlace(param), focus: "p-" + param.key };
+    if (/^(Level 4 candidates shown|Level 4 matching|additional categories):/.test(text)) return { area: "routing", section: "categories" };
     const by = [[/^(The sourcing request form threshold|threshold)/, "routing", "thresholds"], [/^(Channel|next steps)/i, "routing", "channels"], [/^Division/, "checks", "divisions"], [/^legal entity/, "checks", "entities"],
       [/, entry \d+: needs a name/, "checks", "lists"], [/^operations domain/, "conversation", "domains"], [/^welcome examples/, "conversation", "examples"], [/^(headline|executive description)/, "conversation", "quality"],
       [/^(typical day rate|quality)/, "conversation", "quality", true], [/^Level 4/, "reference", "l4"], [/^Supplier/, "reference", "suppliers"], [/^Contract/, "reference", "contracts"], [/^Catalogue/, "reference", "catalogue"]];
@@ -645,7 +648,7 @@
   // ---------- search: every setting by its name and texts
   function searchIndex() {
     const out = [], add = (area, section, label, text, focus, extra) => out.push({ area, section, label, hay: `${label} ${text || ""}`.toLowerCase(), focus, ...extra });
-    S.doc.params.forEach((p) => (p.group || "Other") === "Routing" ? add("routing", "thresholds", p.label, p.description, "p-" + p.key) : add("conversation", "quality", p.label, `${p.group} ${p.description}`, "p-" + p.key, { advanced: !QUALITY_SIMPLE(p) }));
+    S.doc.params.forEach((p) => { const w = paramPlace(p); add(w.area, w.section, p.label, `${p.group} ${p.description}`, "p-" + p.key, w.advanced ? { advanced: true } : undefined); });
     S.doc.channels.forEach((c) => add("routing", "channels", `Channel: ${c.name}`, c.key, `c-${c.key}-name`));
     S.doc.next_steps.forEach((n) => add("routing", "channels", `Next steps: ${n.label}`, n.steps.join(" "), `ns-${n.key}-0`));
     S.doc.categories.forEach((c) => { add("routing", "categories", `Category: ${c.name}`, c.id, `cat-${c.id}-name`); add("reference", "words", `Search words: ${c.name}`, (c.keywords || []).join(" "), `cat-${c.id}-kw`); });

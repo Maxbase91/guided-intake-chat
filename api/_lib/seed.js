@@ -127,6 +127,9 @@ function validateTexts(cfg, P) {
   order("checkDayTypicalMin", "checkDayTypicalMax", "typical day rate");
   if (!(P.qualityStrong > P.qualityGood && P.qualityGood > P.qualityFair)) errors.push("quality ratings: Strong must start above Good, and Good above Fair");
   if (P.qualityFloor > 100 || P.qualityStrong > 100 || P.qualityMin > 100) errors.push("quality score: limits are out of 100");
+  if (!(Number.isInteger(P.l4Min) && Number.isInteger(P.l4Max) && P.l4Min >= 1 && P.l4Min <= P.l4Max && P.l4Max <= 5)) errors.push("Level 4 candidates shown: whole numbers, at least 1, at most 5, and the fewest not above the most");
+  if (!(P.l4Low >= 35 && P.l4Low <= 95) || !(P.l4Match >= 35 && P.l4Match <= 95)) errors.push("Level 4 matching: the match percentages must be between 35 and 95");
+  if (!(Number.isInteger(P.l4Extra) && P.l4Extra >= 0 && P.l4Extra <= 3)) errors.push("additional categories: a whole number from 0 to 3");
   for (const n of SEED.next_steps) {
     const have = cfg.next_steps.find((x) => x.key === n.key);
     if (!have || !(have.steps || []).length) { errors.push(`next steps, ${n.label}: no steps`); continue; }

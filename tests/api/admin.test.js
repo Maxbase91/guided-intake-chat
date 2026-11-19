@@ -359,3 +359,20 @@ test("a stored version loses the rule mode, gets the guidance texts added since 
   assert.ok(later.rules.every((r) => !("mode" in r)));
   assert.ok(doc.facts.every((f) => f.source && Array.isArray(f.from)));
 });
+
+test("Level 4 matching settings: a version from before them gets the defaults; out-of-range values are refused", () => {
+  const { SEED, validateConfig, configFrom } = require(path.join(ROOT, "api", "_lib", "seed.js"));
+  const old = structuredClone(SEED);
+  old.params = old.params.filter((p) => !["l4Max", "l4Min", "l4Low", "l4Extra"].includes(p.key));
+  const cfg = configFrom(old, 3, "database");
+  assert.deepEqual(validateConfig(cfg), []);
+  assert.deepEqual(["l4Max", "l4Min", "l4Low", "l4Extra"].map((k) => param(cfg, k).value), [3, 2, 57, 2]);
+  const bad = (set) => { const c = structuredClone(cfg); Object.entries(set).forEach(([k, v]) => { param(c, k).value = v; }); return validateConfig(c); };
+  assert.ok(bad({ l4Min: 4, l4Max: 3 }).some((e) => /^Level 4 candidates shown/.test(e)));
+  assert.ok(bad({ l4Max: 6 }).some((e) => /^Level 4 candidates shown/.test(e)));
+  assert.ok(bad({ l4Min: 1.5 }).some((e) => /^Level 4 candidates shown/.test(e)));
+  assert.ok(bad({ l4Low: 20 }).some((e) => /^Level 4 matching/.test(e)));
+  assert.ok(bad({ l4Match: 99 }).some((e) => /^Level 4 matching/.test(e)));
+  assert.ok(bad({ l4Extra: 4 }).some((e) => /^additional categories/.test(e)));
+  assert.deepEqual(bad({ l4Min: 1, l4Max: 5, l4Extra: 0, l4Low: 40 }), []);
+});

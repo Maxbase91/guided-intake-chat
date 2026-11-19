@@ -468,3 +468,17 @@ test("every section says what it changes in the chat; rules say what they read; 
   await expect(page.locator("text=Mode")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test("the Level 4 matching settings sit with the category rules, each saying what it changes, and search finds them", async ({ page }) => {
+  const errors = await signIn(page);
+  await open(page, "routing/categories");
+  const box = page.locator('[data-group="Category matching"]');
+  for (const k of ["l4Match", "l4Max", "l4Min", "l4Low", "l4Extra"]) await expect(box.locator("#p-" + k)).toBeVisible();
+  await expect(box).toContainText("Also includes");
+  await expect(page.locator(".effect")).toContainText("Which Level 4 categories the chat offers");
+  await page.fill("#search", "additional categories");
+  await page.locator(".result", { hasText: "Additional categories a request may have" }).click();
+  await expect(page.locator('[data-section="routing/categories"]')).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("#p-l4Extra")).toBeFocused();
+  expect(errors).toEqual([]);
+});

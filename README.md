@@ -5,7 +5,7 @@ plain words, and the chat:
 - finds the buying channel with fixed rules: catalogue order, existing contract, business-led demand (three quotes) or
   procurement-led demand (an RFP);
 - asks only what that route needs, one question at a time;
-- lets the requester choose the Level 4 category from 2–3 candidates, then classifies the request (ICT service under
+- lets the requester choose the Level 4 category from 2–3 candidates (and add up to 2 more the request also covers), then classifies the request (ICT service under
   DORA, outsourcing under EBA/GL/2019/02);
 - hands procurement a service description, or a short purchase request, plus a record of everything captured.
 
@@ -66,7 +66,7 @@ Without a database everything still works: the page runs on its built-in default
 
 ### Admin page
 
-`/admin.html` is where procurement maintains thresholds, channel names, category flags, the routing rules and their reason
+`/admin.html` is where procurement maintains thresholds, channel names, category matching (how many Level 4 categories the chat offers, from which match, and how many more a request may include), category flags, the routing rules and their reason
 texts, every review flag and category check (when it is raised, its text, how it is shown and who reviews it), the next steps per channel, word limits, answer-check limits and quality-score weights, answer buttons for questions the rules do not read, legal entities, operations domains (search words and guidance) and the welcome examples, question texts and the category guidance behind examples and suggestions, divisions and their vendor offices,
 which questions each division is asked, the lists behind the prohibited-service and country checks, category search
 words, and the reference data (Level 4 list, suppliers, framework contracts, catalogue) by CSV download and upload. It needs
@@ -74,7 +74,7 @@ words, and the reference data (Level 4 list, suppliers, framework contracts, cat
 version; earlier versions are kept and can be published again. The change log shows who changed what.
 
 The page opens on an overview and groups everything in five areas: **Routing** (thresholds, channels and next steps,
-category rules, routing rules), **Checks and reviews** (review flags, review lists, divisions and vendor offices, legal
+category matching and rules, routing rules), **Checks and reviews** (review flags, review lists, divisions and vendor offices, legal
 entities), **Conversation** (questions, guidance, domains, welcome examples, description and quality), **Reference
 data** and **History**. By default rules read as sentences with editable texts; "Show advanced settings" adds the full
 rule editor, the test cases and the rarely changed limits. The search box finds any setting by name. Each section says
@@ -110,3 +110,5 @@ cannot be changed by requesters:
 | Material spend review | €1,000,000 |
 | Quality minimum | 75 |
 | Level 4 candidates shown from | 75% match (2–3 shown, the requester chooses) |
+| Low-confidence match below | 57% |
+| Additional categories a request may have | 2 |
