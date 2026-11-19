@@ -5344,7 +5344,7 @@ function specModel(withCurrent){
     table(["Rule","Decides","Rows","Test cases","Mode"], Object.values(RULES).map(r=>[`${r.id} ${r.name}`, r.decides, String(r.rows.length), String((r.tests||[]).length), r.mode])),
     p(`**Checks for everything but a catalogue order** (rules R07 and R08, from lists on the admin page): a service the bank does not buy from third parties (${(LISTS.prohibited_services||[]).length} entries), and a country that needs a vendor office review (${(LISTS.review_countries||[]).length} entries, found in the request, the work location, the data location or the supplier). A hit is a review flag naming the division's vendor office; the lists in this version are test data.`),
     table(["Rule","Flag","Shown as","Reviewed or approved by","Rests on"], flagRulesAll().flatMap(r=>r.outcomes.filter(o=>o.flag).map(o=>[`${r.id} ${r.step}`, o.title, LEVEL_NAMES[o.level]||o.level, o.owner||"–", r.clause||"–"]))));
-  B.push(h(3,"Next steps on the route card"), p("Texts per channel, maintained on the admin page (Next steps); placeholders such as {supplier} are filled from the request."),
+  B.push(h(3,"Next steps on the route card"), p("Texts per channel, maintained on the admin page (Routing › Channels and next steps); placeholders such as {supplier} are filled from the request."),
     table(["Channel","Steps"], DEFAULTS.next_steps.map(n=>[n.label, (NEXT_STEPS[n.key]||[]).map((x,i)=>`${i+1}. ${x}`).join(" ")])));
 
   const catNames=fn=>CATEGORIES.filter(fn).map(c=>c.name).join(", "), lineNames=b=>b.map(([L])=>L).join(" / ");

@@ -9,16 +9,22 @@
 // its own test cases, checked here with the same engine the page runs.
 const { adminOk, sleep, WRONG_CODE_DELAY_MS, limitFrom, clientIp, overLimit, tooMany, jsonBody, fail } = require("./_lib/http");
 const { getStore, forgetPublished, LOCK_WINDOW_MIN } = require("./_lib/store");
-const { validateConfig, configFrom } = require("./_lib/seed");
+const { validateConfig, configFrom, PARTS, REF_PARTS, bodyOf, canon } = require("./_lib/seed");
 const { sanitize, text } = require("./_lib/validate");
 const Engine = require("../engine.js");
 
 const MAX_BYTES = 3 * 1024 * 1024, MAX_FAILURES = 5;   // a draft with the reference data is a few hundred KB
 const actorOf = (b) => text(b && b.actor, 60) || "admin";
 
+// the published configuration without the reference lists (for "not yet published" per area), and which reference lists differ
+const sameDoc = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b));
+async function publishedView(store, draftDoc) {
+  const pub = await store.getPublished(), draft = bodyOf(draftDoc);
+  return { published: Object.fromEntries(PARTS.filter((k) => !REF_PARTS.includes(k)).map((k) => [k, pub[k]])), changed_ref: REF_PARTS.filter((k) => !sameDoc(draft[k], pub[k])) };
+}
 async function state(store) {
   const draft = await store.getDraft();
-  return { draft: draft.doc, revision: draft.revision, base_version: draft.base_version, published_version: draft.published_version, dirty: draft.dirty,
+  return { ...(await publishedView(store, draft.doc)), draft: draft.doc, revision: draft.revision, base_version: draft.base_version, published_version: draft.published_version, dirty: draft.dirty,
     updated_at: draft.updated_at, updated_by: draft.updated_by, problems: validateConfig(configFrom(draft.doc, 0, "draft")),
     versions: await store.listVersions(20), store: store.kind,
     ops: Object.fromEntries(Object.entries(Engine.OPS).map(([k, o]) => [k, { label: o.label, types: o.types, value: o.value }])) };

@@ -48,6 +48,16 @@
 - a **Summary** button opens the side panel as an overlay, which closes with its Close button, Escape or a tap outside;
 - the step bar collapses to numbered circles when there are more than four stages, and never scrolls sideways.
 
+**Admin page (Rules and settings):** organised by task, not by data type.
+- An **overview** on sign-in: one card per area with what it covers, whether it has changes not yet published, its
+  problems and links to its sections; then common tasks as direct links.
+- **Five areas** in the top navigation (Routing, Checks and reviews, Conversation, Reference data, History), each with
+  a row of sections. An amber dot marks an area or section with changes not yet published.
+- **Simple view by default:** rules read as sentences with editable texts; "Show advanced settings" adds the rule
+  editor, test cases and rarely changed limits.
+- **Search** in the header finds any setting and opens it; every problem links to where it is fixed.
+- On a phone the sections scroll sideways inside their row; the page itself never does.
+
 ## 3. Components
 
 | Component | Behaviour |

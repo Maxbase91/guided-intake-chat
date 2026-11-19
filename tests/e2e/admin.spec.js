@@ -21,6 +21,13 @@ async function signIn(page, { url = ADMIN, code = "admin-test", name = "Test Adm
 // the publish and confirm dialogs: accept, with a note for the version list
 const accept = (page, note = "") => page.once("dialog", (d) => d.accept(note));
 const status = (page) => page.locator("#statusbar");
+// the page has areas, each with sections: open("routing/thresholds"); advanced: true switches on the full rule editor
+async function open(page, where, { advanced = false } = {}) {
+  const [area, section] = where.split("/");
+  await page.click(`[data-area=${area}]`);
+  if (section) await page.click(`[data-section="${where}"]`);
+  if (advanced && !(await page.isChecked("#advanced"))) await page.check("#advanced");
+}
 
 test.describe.configure({ mode: "serial" });
 
@@ -41,6 +48,7 @@ test("a lower threshold is saved as a draft, published, and new conversations de
   await expect(status(page)).toContainText("All rules pass their tests");
   await expect(page.locator("#publishBtn")).toBeDisabled();
 
+  await open(page, "routing/thresholds");
   await page.fill("#p-formMin", "20000");
   await expect(status(page)).toContainText("Unsaved changes");
   await expect(page.locator("#publishBtn")).toBeDisabled();   // save first
@@ -68,7 +76,7 @@ test("a lower threshold is saved as a draft, published, and new conversations de
 
 test("a category flag changes who leads", async ({ page }) => {
   const errors = await signIn(page);
-  await page.click("[data-tab=categories]");
+  await open(page, "routing/categories");
   await page.check("#cat-marketing-cm_mandatory");
   await page.click("#saveBtn");
   accept(page, "Marketing is a mandatory category");
@@ -81,7 +89,7 @@ test("a category flag changes who leads", async ({ page }) => {
 
 test("a rule that fails its own test cases shows why and cannot be published", async ({ page }) => {
   const errors = await signIn(page);
-  await page.click("[data-tab=rules]");
+  await open(page, "routing/rules", { advanced: true });
   const r11 = page.locator("[data-rule=R11]");
   await expect(r11.locator(".row")).toHaveCount(6);
   await expect(r11.locator("summary").filter({ hasText: "Test cases" })).toContainText("9 of 9 pass");
@@ -118,7 +126,7 @@ test("a rule that fails its own test cases shows why and cannot be published", a
 
 test("versions are kept, the change log says who changed what, and an earlier version can be published again", async ({ page }) => {
   const errors = await signIn(page, { name: "Second Admin" });
-  await page.click("[data-tab=versions]");
+  await open(page, "history/versions");
   const cards = page.locator(".card");
   await expect(cards.first()).toContainText("Marketing is a mandatory category");
   await expect(cards.first()).toContainText("Sourcing request form from 20k");
@@ -144,7 +152,7 @@ test("a submitted request shows in the decision log with the version it ran on, 
   await answerUntilDone(page, []);
   await Promise.all([page.waitForResponse((r) => r.url().endsWith("/api/decisions")), page.click("[data-act=submit]")]);
   errors.push(...(await signIn(page)));
-  await page.click("[data-tab=decisions]");
+  await open(page, "history/decisions");
   const cards = page.locator(".card");
   await expect(cards.first()).toContainText("R11");
   await expect(cards.first()).toContainText("The Category Manager decides");
@@ -158,12 +166,12 @@ test("a submitted request shows in the decision log with the version it ran on, 
 test("the admin page loads no inline script and builds its content as text", async ({ page }) => {
   await signIn(page);
   expect(await page.evaluate(() => [...document.scripts].filter((s) => !s.src).length)).toBe(0);
-  await page.click("[data-tab=channels]");
+  await open(page, "routing/channels");
   await page.fill("#c-business-name", '<img src=x onerror="window.__xss=1">');
   await page.click("#saveBtn");
   await expect(status(page)).toContainText("Draft differs");
   await page.reload();
-  await page.click("[data-tab=channels]");
+  await open(page, "routing/channels");
   await expect(page.locator("#c-business-name")).toHaveValue('<img src=x onerror="window.__xss=1">');
   expect(await page.evaluate(() => [window.__xss, document.querySelectorAll("main img").length])).toEqual([undefined, 0]);
   accept(page);
@@ -173,10 +181,10 @@ test("the admin page loads no inline script and builds its content as text", asy
 
 test("guidance and question texts are edited on the admin page, and new conversations use them", async ({ page }) => {
   const errors = await signIn(page);
-  await page.click("[data-tab=guidance]");
+  await open(page, "conversation/guidance");
   await page.selectOption("#gKey", "audience");
   await page.fill("#g-audience-marketing", "our top 40 corporate clients and their relationship managers");
-  await page.click("[data-tab=questions]");
+  await open(page, "conversation/questions");
   await page.fill("#qFilter", "background");
   await expect(page.locator("[data-q=item]")).toHaveCount(0);
   await page.fill("#q-background-q", "Which client problem does this event solve, and what if it slips?");
@@ -184,7 +192,7 @@ test("guidance and question texts are edited on the admin page, and new conversa
   accept(page, "Guidance for client events");
   await page.click("#publishBtn");
   await expect(status(page)).toContainText("Published: version 4");
-  await page.click("[data-tab=versions]");
+  await open(page, "history/versions");
   await expect(page.locator(".card").nth(1)).toContainText("guidance: audience");
   await expect(page.locator(".card").nth(1)).toContainText("texts.marketing:");
   await openApp(page, { kind: "admin" });
@@ -194,14 +202,15 @@ test("guidance and question texts are edited on the admin page, and new conversa
 
 test("divisions, review lists and which division is asked what are edited on the admin page", async ({ page }) => {
   const errors = await signIn(page);
-  await page.click("[data-tab=lists]");
+  await open(page, "checks/lists");
   const list = page.locator("[data-list=prohibited_services]");
   await list.getByRole("button", { name: "+ entry" }).click();
   await expect(status(page)).toContainText("problem");           // an entry without search words cannot be published
   await list.locator("tbody tr").last().locator('input[aria-label="Name"]').fill("fortune telling");
   await list.locator("tbody tr").last().locator('input[aria-label^="Search words"]').fill("astrolog*, fortune tell*");
+  await open(page, "checks/divisions");
   await page.fill("#d-private-office", "Private banking sourcing desk");
-  await page.click("[data-tab=questions]");
+  await open(page, "conversation/questions");
   await page.fill("#qFilter", "spend");
   await page.selectOption("#qa-spend_type-private", "R");
   await page.click("#saveBtn");
@@ -221,7 +230,7 @@ test("divisions, review lists and which division is asked what are edited on the
 
 test("reference data: a contracts CSV is downloaded, edited, uploaded and published, and a request then uses the new contract", async ({ page }) => {
   const errors = await signIn(page);
-  await page.click("[data-tab=reference]");
+  await open(page, "reference/contracts");
   const card = page.locator("[data-ref=contracts]");
   await expect(card).toContainText("40 entries");
   const [dl] = await Promise.all([page.waitForEvent("download"), card.getByRole("button", { name: "Download CSV" }).click()]);
@@ -250,7 +259,7 @@ test("reference data: a contracts CSV is downloaded, edited, uploaded and publis
   accept(page, "Events framework added");
   await page.click("#publishBtn");
   await expect(status(page)).toContainText("Published: version 6");
-  await page.click("[data-tab=versions]");
+  await open(page, "history/versions");
   await expect(page.locator(".card").nth(1)).toContainText("contracts: CTR-9001");
 
   await openApp(page, { kind: "admin" });
@@ -261,7 +270,7 @@ test("reference data: a contracts CSV is downloaded, edited, uploaded and publis
 
 test("category search words are edited on the admin page and change which category a request lands in", async ({ page }) => {
   const errors = await signIn(page);
-  await page.click("[data-tab=categories]");
+  await open(page, "reference/words");
   const kw = page.locator("#cat-marketing-kw");
   await kw.fill((await kw.inputValue()) + ", gala dinner*");
   await page.click("#saveBtn");
@@ -277,7 +286,7 @@ test("category search words are edited on the admin page and change which catego
 
 test("a review flag is a rule card: its title, level, reviewer and text are edited, and new conversations show them", async ({ page }) => {
   const errors = await signIn(page);
-  await page.click("[data-tab=rules]");
+  await open(page, "checks/flags");
   await page.selectOption("#ruleStep", "Category checks");
   await expect(page.locator("[data-rule]")).toHaveCount(6);       // R31 to R36
   await page.fill("#fl-R33-clients-title", "Client hospitality approval");
@@ -297,21 +306,22 @@ test("a review flag is a rule card: its title, level, reviewer and text are edit
 
 test("next steps, a word limit, answer buttons, an entity, a domain and a welcome example are edited and published", async ({ page }) => {
   const errors = await signIn(page);
-  await page.click("[data-tab=nextsteps]");
+  await open(page, "routing/channels");
   await page.fill("#ns-procurement-1", "A buyer contacts you within 1 working day to plan the RFP.");
   await page.fill("#ns-business-0", "You ask at least 3 suppliers for a quote{preferred}{nonsense}.");
   await page.click("#saveBtn");
   await expect(page.locator(".problems")).toContainText("{nonsense}");      // a placeholder this step does not fill is refused
   await page.fill("#ns-business-0", "You ask at least 4 suppliers for a quote{preferred}, using the service description.");
-  await page.click("[data-tab=thresholds]");
+  await open(page, "conversation/quality");
   await page.fill("#p-headMax", "60");
-  await page.click("[data-tab=questions]");
+  await open(page, "conversation/questions");
   await page.fill("#qFilter", "pay");
   await page.fill("#q-pricing_model-choices", "Fixed price\nPer milestone\nNot sure");
-  await page.click("[data-tab=lists]");
+  await open(page, "checks/entities");
   await page.fill("#en-EU-keywords", (await page.inputValue("#en-EU-keywords")) + ", lisbon");
-  await page.click("[data-tab=texts]");
+  await open(page, "conversation/examples");
   await page.fill("#ex-0", "A new HR system to replace our payroll tool, about 700k.");
+  await open(page, "conversation/domains");
   await page.selectOption("#dKey", "voice");
   await page.fill("#dm-voice-keywords", (await page.inputValue("#dm-voice-keywords")) + ", dictaphone");
   await page.click("#saveBtn");
@@ -328,5 +338,83 @@ test("next steps, a word limit, answer buttons, an entity, a domain and a welcom
   expect(got).toEqual({ proc: "A buyer contacts you within 1 working day to plan the RFP.", biz: ["You ask at least 4 suppliers for a quote, ideally including Coho Creative and Polyglot Language Partners, using the service description.", 60],
     choices: ["Fixed price", "Per milestone", "Not sure"], lisbon: "EU", voice: "voice", first: "A new HR system to replace our payroll tool, about 700k." });
   await expect(page.locator("[data-try]").first()).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("the overview shows five areas, which have changes and problems, and its links open the right place", async ({ page }) => {
+  const errors = await signIn(page);
+  await expect(page.locator("[data-overview]")).toHaveCount(5);
+  await expect(page.locator("[data-overview=routing]")).toContainText("No changes");
+  await page.getByRole("button", { name: "Change the next steps" }).click();
+  await expect(page.locator('[data-section="routing/channels"]')).toHaveAttribute("aria-current", "page");
+  await page.fill("#ns-procurement-0", "Submit. A sourcing project is created.");
+  await expect(page.locator('[data-section="routing/channels"] .dot')).toHaveCount(1);   // unsaved: marked at once
+  await page.click("#saveBtn");
+  await open(page, "overview");
+  await expect(page.locator("[data-overview=routing]")).toContainText("1 section changed, not yet published");
+  await expect(page.locator("[data-overview=checks]")).toContainText("No changes");
+  // a problem names its place and links to it
+  await open(page, "checks/divisions");
+  await page.fill("#d-corporate-office", "");
+  await open(page, "overview");
+  await expect(page.locator("[data-overview=checks]")).toContainText("1 problem");
+  await page.locator("#problems").getByRole("button", { name: "Go to Checks and reviews › Divisions and vendor offices" }).click();
+  await expect(page.locator('[data-section="checks/divisions"]')).toHaveAttribute("aria-current", "page");
+  accept(page);
+  await page.click("#discardBtn");
+  await expect(status(page)).toContainText("No changes");
+  expect(errors).toEqual([]);
+});
+
+test("simple view: a rule as sentences with its texts; advanced view: the full editor and the test cases; the switch is remembered", async ({ page }) => {
+  const errors = await signIn(page);
+  await open(page, "routing/rules");
+  const r11 = page.locator("[data-rule=R11]");
+  await expect(r11.locator('[data-row="3"]')).toContainText("When annual value (EUR) is at least Procurement leads from (500,000)");
+  await expect(r11.locator('[data-row="6"]')).toContainText("Otherwise");
+  await expect(r11.locator('select[aria-label="fact"]')).toHaveCount(0);
+  await expect(r11.locator("[data-tests=R11]")).toContainText("All 9 test cases pass");
+  await expect(r11.getByLabel("Reason text of row 3")).toBeVisible();
+  // the rarely changed limits only with advanced settings
+  await open(page, "conversation/quality");
+  await expect(page.locator("#p-headMax")).toBeVisible();
+  await expect(page.locator("#p-qualityWarn")).toHaveCount(0);
+  await page.check("#advanced");
+  await expect(page.locator("#p-qualityWarn")).toBeVisible();
+  await page.reload();
+  await expect(page.locator("#advanced")).toBeChecked();
+  await expect(page.locator('[data-section="conversation/quality"]')).toHaveAttribute("aria-current", "page");   // the address keeps the place
+  await open(page, "routing/rules");
+  await expect(page.locator('[data-rule=R11] [data-row="3"] select[aria-label="fact"]')).toHaveValue("annual_value");
+  await expect(page.locator("[data-rule=R11] details summary", { hasText: "Test cases" })).toHaveText("Test cases: 9 of 9 pass");   // collapsed while all pass
+  expect(errors).toEqual([]);
+});
+
+test("search finds a setting by its name or text and opens it, switching on advanced settings when needed", async ({ page }) => {
+  const errors = await signIn(page);
+  await page.fill("#search", "day rate tolerance");
+  await expect(page.locator(".result")).toHaveCount(0);
+  await page.fill("#search", "differ day rate");
+  await page.locator(".result", { hasText: "External workers: total may differ" }).click();
+  await expect(page.locator('[data-section="conversation/quality"]')).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("#advanced")).toBeChecked();
+  await expect(page.locator("#p-checkRateTolerance")).toBeFocused();
+  await page.fill("#search", "R33");
+  await page.locator(".result").first().click();
+  await expect(page.locator('[data-section="checks/flags"]')).toHaveAttribute("aria-current", "page");
+  await expect(page.locator("#rule-R33")).toBeInViewport();
+  await page.fill("#search", "dictaphone");                     // a search word added in version 9
+  await page.locator(".result", { hasText: "Domain:" }).click();
+  await expect(page.locator("#dm-voice-name")).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
+test("the admin page fits a phone without sideways scrolling", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const errors = await signIn(page);
+  for (const where of ["overview", "checks/flags", "conversation/questions", "reference/contracts"]) {
+    await open(page, where);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), where).toBeLessThanOrEqual(0);
+  }
   expect(errors).toEqual([]);
 });

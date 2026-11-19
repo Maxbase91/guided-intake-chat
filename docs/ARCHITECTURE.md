@@ -284,12 +284,18 @@ environment or a local `.env`. See [ADR 0001](adr/0001-rules-and-configuration-i
 
 ### `api/admin.js` and the admin page
 
-`admin.html` + `admin.js` are the admin page: thresholds, channel names, category flags and the decision tables. It
-loads `engine.js`, so the rule rows and their test cases are checked in the browser as they are edited.
+`admin.html` + `admin.js` are the admin page. It opens on an overview and groups the configuration in five areas
+(`AREAS` in `admin.js`): Routing, Checks and reviews, Conversation, Reference data, History. Each section names the
+slice of the configuration it edits (`pick`), which drives the "changed" markers (against the saved draft and against
+the published version that `GET /api/admin` returns without the reference lists), the overview and the links from
+problems. The simple view shows each rule row as a sentence (`rowSummary`) with its text; "Show advanced settings"
+adds the row editor, the test cases and the rarely changed limits. A search box finds any setting by name or text.
+The place is kept in the address (`#checks/flags`). It loads `engine.js`, so the rule rows and their test cases are
+checked in the browser as they are edited.
 
 | Request | Purpose |
 |---|---|
-| `GET /api/admin` | The draft, its revision, the published version, the problems the draft has, the last 20 versions |
+| `GET /api/admin` | The draft, its revision, the published version (without the reference lists) and which reference lists differ, the problems the draft has, the last 20 versions |
 | `GET /api/admin?view=audit` / `decisions` / `version&v=n` | The change log, the decision log with counts, one published version |
 | `POST {action:"save", doc, revision, actor}` | Saves the draft. `sanitize()` (`api/_lib/validate.js`) rebuilds the document from known items and fields only |
 | `POST {action:"publish", revision, note, actor}` | Publishes the draft as the next version, if it is valid and every rule passes its own test cases (422 with the problems otherwise) |

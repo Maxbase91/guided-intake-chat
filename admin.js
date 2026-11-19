@@ -1,13 +1,15 @@
 /*! guided-intake-chat | (c) 2026 Maximilian Ziermann. All rights reserved.
     Authorship fingerprint MZ-ff2381bf5d621e7b | See LICENSE and NOTICE. */
-/* The admin page: thresholds, channels, category flags and the decision tables, edited as a draft and published as a
-   new version. Everything is built with DOM nodes and textContent, never innerHTML, so nothing typed here or read from
+/* The admin page: the configuration in five areas (routing, checks and reviews, conversation, reference data, history),
+   edited as a draft and published as a new version. A simple view shows each rule as sentences and texts; "Show
+   advanced settings" adds the full rule editor, the test cases and the rarely changed limits. Everything is built with DOM nodes and textContent, never innerHTML, so nothing typed here or read from
    the database can become markup. The rules are checked in the browser with the same engine the page and the server run. */
 (function () {
   "use strict";
   const $app = document.getElementById("app");
-  const S = { code: sessionStorage.getItem("adm") || "", actor: localStorage.getItem("adm-name") || "", st: null, doc: null, tab: "thresholds", unsaved: false, extra: {}, busy: false, qFilter: "", ruleStep: "", gKey: "", dKey: "", refFilter: {}, refNote: {} };
-  const TABS = [["thresholds", "Thresholds"], ["channels", "Channels"], ["categories", "Categories"], ["rules", "Rules"], ["questions", "Questions"], ["guidance", "Guidance"], ["nextsteps", "Next steps"], ["lists", "Divisions and lists"], ["texts", "Domains and examples"], ["reference", "Reference data"], ["versions", "Versions and changes"], ["decisions", "Decision log"]];
+  const stored = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const S = { code: sessionStorage.getItem("adm") || "", actor: stored("adm-name") || "", st: null, doc: null, area: "overview", section: "", advanced: stored("adm-advanced") === "1", search: "",
+    unsaved: false, extra: {}, busy: false, qFilter: "", ruleStep: "", gKey: "", dKey: "", refFilter: {}, refNote: {} };
 
   // ---------- small helpers
   function h(tag, attrs, ...kids) {
@@ -20,13 +22,15 @@
       else if (k === "checked" || k === "disabled" || k === "selected") el[k] = !!v;
       else el.setAttribute(k, v === true ? "" : v);
     }
-    for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+    for (const kid of kids.flat(Infinity)) if (kid !== null && kid !== undefined && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
     return el;
   }
   const num = (v) => new Intl.NumberFormat("en-GB").format(v);
   const when = (t) => (t ? new Date(t).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "–");
   const clone = (x) => JSON.parse(JSON.stringify(x));
-  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  // key order does not matter: a document read back from the database has its keys in another order
+  const canon = (v) => Array.isArray(v) ? v.map(canon) : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v;
+  const same = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b));
   const paramsOf = (doc) => Object.fromEntries(doc.params.map((p) => [p.key, p.value]));
   const registryOf = (doc) => Object.fromEntries(doc.facts.map((f) => [f.key, f]));
   const paramLabel = (doc, key) => { const p = doc.params.find((x) => x.key === key); return p ? `${p.label} (${num(p.value)})` : key; };
@@ -47,7 +51,7 @@
   function take(st) { S.st = st; S.doc = clone(st.draft); S.unsaved = false; }
   async function act(fn, done) {
     if (S.busy) return; S.busy = true; render();
-    try { const out = await fn(); if (out) take(out); if (done) toast(done); }
+    try { const out = await fn(); if (out) take(out); if (done) toast(done); delete S.extra.audit; }
     catch (e) {
       if (e.status === 401) { S.code = ""; sessionStorage.removeItem("adm"); S.st = null; }
       S.error = e.problems ? `${e.message} ${e.problems.join("; ")}` : e.message;
@@ -74,7 +78,13 @@
   }
   function edit(fn) { fn(); S.unsaved = !same(S.doc, S.st.draft); S.error = ""; render(); }
   // an edit inside a text field: keep typing without a re-render, refresh the status bar only
-  function editQuiet(fn) { fn(); S.unsaved = !same(S.doc, S.st.draft); S.error = ""; const bar = document.getElementById("statusbar"); if (bar) bar.replaceWith(statusBar()); }
+  function editQuiet(fn) { fn(); S.unsaved = !same(S.doc, S.st.draft); S.error = ""; const bar = document.getElementById("statusbar"); if (bar) bar.replaceWith(statusBar()); refreshMarks(); }
+  // the "changed" dots in the area and section navigation, updated while typing (no re-render)
+  function refreshMarks() {
+    const mark = (el, on) => { const dot = el.querySelector(".dot"); if (on && !dot) el.append(h("span", { class: "dot", title: "changed" })); if (!on && dot) dot.remove(); };
+    document.querySelectorAll("[data-area]").forEach((el) => { const a = AREAS.find((x) => x.key === el.dataset.area); if (a) mark(el, a.sections.some(isChanged)); });
+    document.querySelectorAll("[data-section]").forEach((el) => { const [a, k] = el.dataset.section.split("/"); const sec = sectionOf(a, k); if (sec) mark(el, isChanged(sec)); });
+  }
 
   // A field's "change" fires when it loses focus, which is also the moment a button is pressed. Re-rendering then would
   // replace the button under the pointer and swallow the click, so the re-render waits until the mouse is released.
@@ -92,6 +102,7 @@
       e.preventDefault(); S.code = code.value; S.actor = name.value.trim(); S.error = "";
       try { take(await api("GET")); sessionStorage.setItem("adm", S.code); localStorage.setItem("adm-name", S.actor); }
       catch (x) { S.error = x.message; S.st = null; }
+      S.extra = {};
       render();
     };
     return h("form", { class: "login", onsubmit: go },
@@ -123,12 +134,12 @@
   // ---------- tabs
   const changed = (part, key, field) => { const id = ["categories", "rules", "divisions", "entities", "domains"].includes(part) ? "id" : "key"; const a = (S.st.draft[part] || []).find((x) => x[id] === key), b = S.doc[part].find((x) => x[id] === key); return a && b && !same(a[field], b[field]) ? "changed" : ""; };
 
-  function thresholds() {
-    const groups = [...new Set(S.doc.params.map((p) => p.group || "Other"))];
-    return h("div", {}, groups.map((g, i) => h("div", { class: "card", "data-group": g }, h("h2", {}, g),
+  function thresholds(groups, only) {
+    const shown = (p) => groups.includes(p.group || "Other") && (!only || only(p));
+    return h("div", {}, groups.filter((g) => S.doc.params.some((p) => (p.group || "Other") === g && shown(p))).map((g, i) => h("div", { class: "card", "data-group": g }, h("h2", {}, g),
       i === 0 ? h("p", { class: "hint" }, "Amounts are in euros. The rules and checks read these values by name, so a change here changes everything that uses them.") : null,
       h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Setting"), h("th", {}, "Value"), h("th", {}, "Unit"), h("th", {}, "Effect"))),
-        h("tbody", {}, S.doc.params.filter((p) => (p.group || "Other") === g).map((p) => h("tr", {},
+        h("tbody", {}, S.doc.params.filter((p) => (p.group || "Other") === g && shown(p)).map((p) => h("tr", {},
           h("td", {}, h("label", { for: "p-" + p.key }, h("b", {}, p.label))),
           h("td", {}, h("input", { type: "number", id: "p-" + p.key, min: "0", step: "any", class: changed("params", p.key, "value"), value: p.value, oninput: (e) => editQuiet(() => { p.value = e.target.value === "" ? NaN : Number(e.target.value); }), onchange: later })),
           h("td", { class: "muted" }, p.unit), h("td", { class: "muted" }, p.description))))))));
@@ -145,13 +156,17 @@
 
   function categories() {
     const box = (c, f, label) => h("input", { type: "checkbox", id: `cat-${c.id}-${f}`, "aria-label": `${c.name}: ${label}`, checked: c[f], onchange: (e) => edit(() => { c[f] = e.target.checked; }) });
-    return h("div", { class: "card" }, h("h2", {}, "Categories"), h("p", { class: "hint" }, "Two flags per category are read by the who-leads rule. Mandatory: between the two thresholds procurement leads instead of the Category Manager deciding. Renewals calendar: a renewal in this category goes to procurement without a sourcing request form."),
+    return h("div", { class: "card" }, h("h2", {}, "Category rules"), h("p", { class: "hint" }, "Two flags per category are read by the who-leads rule. Mandatory: between the two thresholds procurement leads instead of the Category Manager deciding. Renewals calendar: a renewal in this category goes to procurement without a sourcing request form."),
       h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Category"), h("th", {}, "Category Manager mandatory"), h("th", {}, "Renewals calendar"))),
-        h("tbody", {}, S.doc.categories.map((c) => [h("tr", { class: changed("categories", c.id, "cm_mandatory") || changed("categories", c.id, "renewals_calendar") },
-          h("td", {}, h("input", { type: "text", "aria-label": `Name of ${c.id}`, style: "width:300px", class: changed("categories", c.id, "name"), value: c.name, oninput: (e) => editQuiet(() => { c.name = e.target.value; }) }), " ", h("span", { class: "muted" }, c.id)),
-          h("td", {}, box(c, "cm_mandatory", "Category Manager mandatory")), h("td", {}, box(c, "renewals_calendar", "renewals calendar"))),
-          h("tr", {}, h("td", { colspan: "3", style: "padding-top:0" }, h("label", { class: "muted" }, "Search words that point to this category, separated by commas (a trailing * matches longer words) ",
-            h("input", { type: "text", id: `cat-${c.id}-kw`, "aria-label": `Search words for ${c.name}`, style: "width:100%", class: changed("categories", c.id, "keywords"), value: (c.keywords || []).join(", "), oninput: (e) => editQuiet(() => { c.keywords = e.target.value.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean); }) }))))]).flat())));
+        h("tbody", {}, S.doc.categories.map((c) => h("tr", { class: changed("categories", c.id, "cm_mandatory") || changed("categories", c.id, "renewals_calendar") },
+          h("td", {}, h("input", { type: "text", id: `cat-${c.id}-name`, "aria-label": `Name of ${c.id}`, style: "width:300px", class: changed("categories", c.id, "name"), value: c.name, oninput: (e) => editQuiet(() => { c.name = e.target.value; }) }), " ", h("span", { class: "muted" }, c.id)),
+          h("td", {}, box(c, "cm_mandatory", "Category Manager mandatory")), h("td", {}, box(c, "renewals_calendar", "renewals calendar")))))));
+  }
+  function categoryWords() {
+    return h("div", { class: "card" }, h("h2", {}, "Category search words"), h("p", { class: "hint" }, "Words in a request that point to a buying category, separated by commas. Whole words; a trailing * matches longer words too (\"freelance*\" finds freelancers)."),
+      h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Category"), h("th", {}, "Search words"))),
+        h("tbody", {}, S.doc.categories.map((c) => h("tr", {}, h("td", { style: "width:220px" }, h("b", {}, c.name)),
+          h("td", {}, h("input", { type: "text", id: `cat-${c.id}-kw`, "aria-label": `Search words for ${c.name}`, style: "width:100%", class: changed("categories", c.id, "keywords"), value: (c.keywords || []).join(", "), oninput: (e) => editQuiet(() => { c.keywords = e.target.value.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean); }) })))))));
   }
 
   // ---------- rules: a decision table as sentences
@@ -232,6 +247,25 @@
           h("td", {}, h("button", { class: "btn s x", type: "button", "aria-label": `Delete test ${t.name}`, onclick: () => edit(() => { rule.tests.splice(i, 1); }) }, "✕")))))),
       h("p", {}, h("button", { class: "btn s", type: "button", onclick: () => edit(() => { rule.tests.push({ name: "New test", given: {}, expect: rule.outcomes[0].key }); }) }, "+ test case")));
   }
+  // a row's conditions as one sentence, from the fact labels, the comparison names and the thresholds
+  function rowSummary(rule, row) {
+    if (!(row.when || []).length) return "Otherwise";
+    const registry = registryOf(S.doc), val = (c, f) => {
+      const v = c.value;
+      if (v && typeof v === "object" && !Array.isArray(v)) return paramLabel(S.doc, v.param);
+      if (Array.isArray(v)) return v.join(" or ");
+      if (typeof v === "boolean") return v ? "yes" : "no";
+      return f && f.type === "number" && typeof v === "number" ? num(v) : String(v);
+    };
+    return "When " + row.when.map((c) => { const f = registry[c.fact], op = Engine.OPS[c.op]; return `${f ? f.label.charAt(0).toLowerCase() + f.label.slice(1) : c.fact} ${op ? op.label : c.op}${op && op.value ? " " + val(c, f) : ""}`; }).join(", and ");
+  }
+  function simpleRow(rule, i) {
+    const row = rule.rows[i], out = rule.outcomes.find((o) => o.key === row.then) || { label: row.then };
+    return h("div", { class: "row" + (i === rule.rows.length - 1 ? " else" : ""), "data-row": String(i + 1) },
+      h("div", { class: "line" }, h("span", { class: "rownum" }, `${i + 1}.`), h("span", {}, rowSummary(rule, row)), h("span", { class: "muted" }, "→"), h("b", {}, out.flag ? out.title || out.label : out.label)),
+      "text" in row || (rule.placeholders || []).length ? h("div", {}, h("div", { class: "muted", style: "margin-top:4px" }, `What the requester is told.${(rule.placeholders || []).length ? " Placeholders: " + rule.placeholders.map((x) => `{${x}}`).join(" ") : ""}`),
+        h("textarea", { "aria-label": `Reason text of row ${i + 1}`, oninput: (e) => editQuiet(() => { if (e.target.value) row.text = e.target.value; else delete row.text; }) }, row.text || "")) : null);
+  }
   function ruleCard(rule) {
     const text = (f, label, w) => h("label", { style: "display:block;margin:6px 0" }, h("span", { class: "muted" }, label), h("br"), h("input", { type: "text", style: `width:${w}`, class: changed("rules", rule.id, f), value: rule[f] || "", oninput: (e) => editQuiet(() => { rule[f] = e.target.value; }) }));
     const bad = Engine.validateRule(rule, registryOf(S.doc), paramsOf(S.doc));
@@ -243,9 +277,15 @@
       flagOutcomes(rule),
       h("p", { class: "hint", style: "margin-top:10px" }, "The rows are checked from top to bottom. The first row whose conditions all hold gives the outcome."),
       bad.length ? h("div", { class: "problems" }, h("b", {}, "This rule has problems"), h("ul", {}, bad.map((b) => h("li", {}, b.replace(rule.id + ": ", ""))))) : null,
-      rule.rows.map((_, i) => ruleRow(rule, i)),
-      h("p", {}, h("button", { class: "btn s", type: "button", onclick: () => edit(() => { const f = S.doc.facts[0]; rule.rows.splice(rule.rows.length - 1, 0, { when: [{ fact: f.key, op: "is", value: defaultValue(f, "is") }], then: rule.outcomes[0].key }); }) }, "+ row above \"otherwise\"")),
-      tests(rule));
+      S.advanced ? [rule.rows.map((_, i) => ruleRow(rule, i)),
+        h("p", {}, h("button", { class: "btn s", type: "button", onclick: () => edit(() => { const f = S.doc.facts[0]; rule.rows.splice(rule.rows.length - 1, 0, { when: [{ fact: f.key, op: "is", value: defaultValue(f, "is") }], then: rule.outcomes[0].key }); }) }, "+ row above \"otherwise\"")),
+        tests(rule)]
+        : [rule.rows.map((_, i) => simpleRow(rule, i)), testSummary(rule)]);
+  }
+  // simple view: the tests still run; only their result is shown
+  function testSummary(rule) {
+    const results = Engine.runTests(rule, paramsOf(S.doc)), ok = results.filter((r) => r.ok).length;
+    return h("p", { class: ok === results.length ? "pass" : "fail", "data-tests": rule.id }, ok === results.length ? `✓ All ${results.length} test cases pass` : `✗ ${results.length - ok} of ${results.length} test cases fail: switch on advanced settings to see them`);
   }
   // the flag an outcome raises: its title, how it is shown, and who reviews it
   const LEVELS = [["i", "Information (blue)"], ["w", "Review needed (amber)"], ["b", "Procurement checks first (red)"]];
@@ -260,12 +300,18 @@
           h("td", {}, select(LEVELS, o.level, (v) => edit(() => { o.level = v; }), { id: `fl-${rule.id}-${o.key}-level`, "aria-label": `Level of ${rule.id} ${o.label}` })),
           h("td", {}, h("input", { type: "text", id: `fl-${rule.id}-${o.key}-owner`, "aria-label": `Reviewer of ${rule.id} ${o.label}`, style: "width:240px", value: o.owner || "", oninput: (e) => editQuiet(() => { o.owner = e.target.value; }) })))))));
   }
-  // many rules: pick a step to see only its cards
-  function rules() {
-    const steps = [...new Set(S.doc.rules.map((r) => r.step))], list = S.doc.rules.filter((r) => !S.ruleStep || r.step === S.ruleStep);
-    return h("div", {}, h("div", { class: "card" }, h("p", { class: "hint", style: "margin:0 0 8px" }, "Routing rules decide the channel; the other cards raise the review flags the requester and the reviewers see. Each card runs on its own."),
-      h("div", { class: "checks" }, h("label", {}, "Show ", select([["", `All steps (${S.doc.rules.length} rules)`], ...steps.map((st) => [st, `${st} (${S.doc.rules.filter((r) => r.step === st).length})`])], S.ruleStep, (v) => { S.ruleStep = v; render(); }, { id: "ruleStep", "aria-label": "Show the rules of one step" })),
-        h("span", { class: "muted" }, "Jump to: "), list.map((r) => h("a", { href: `#rule-${r.id}`, style: "font-size:13px" }, r.id)))),
+  // the routing rules, or the review flags (many cards: pick a step to see only its cards)
+  const ROUTING = ["R01", "R02", "R11", "R19"], isFlagRule = (r) => !ROUTING.includes(r.id);
+  function rules(flags) {
+    const all = S.doc.rules.filter((r) => isFlagRule(r) === flags), steps = [...new Set(all.map((r) => r.step))];
+    if (S.ruleStep && !steps.includes(S.ruleStep)) S.ruleStep = "";
+    const list = all.filter((r) => !S.ruleStep || r.step === S.ruleStep);
+    const jump = (id) => h("button", { class: "btn s", type: "button", onclick: () => { const el = document.getElementById("rule-" + id); if (el) el.scrollIntoView({ block: "start" }); } }, id);
+    return h("div", {}, h("div", { class: "card" }, h("p", { class: "hint", style: "margin:0 0 8px" }, flags
+        ? "Each card raises one review flag: when it applies, what the requester and the reviewers are told, how it is shown and who reviews it."
+        : "These rules decide the buying channel, in order: the catalogue, an existing contract, who leads new demand, then the channel."),
+      h("div", { class: "checks" }, flags ? h("label", {}, "Show ", select([["", `All (${all.length} rules)`], ...steps.map((st) => [st, `${st} (${all.filter((r) => r.step === st).length})`])], S.ruleStep, (v) => { S.ruleStep = v; render(); }, { id: "ruleStep", "aria-label": "Show the rules of one step" })) : null,
+        h("span", { class: "muted" }, "Jump to: "), list.map((r) => jump(r.id)))),
       list.map(ruleCard));
   }
 
@@ -288,23 +334,29 @@
               select([["R", "required"], ["C", "conditional"], ["-", "not asked"]], q.applies[d.id], (v) => edit(() => { q.applies[d.id] = v; }), { "aria-label": `${q.label}: ${d.name}`, id: `qa-${q.key}-${d.id}` })))) : null))))));
   }
 
-  // ---------- divisions and the review lists the checks read
-  function lists() {
-    const words = (it) => it.keywords.join(", ");
+  // ---------- divisions, legal entities and the review lists the checks read
+  function divisions() {
     return h("div", {},
-      h("div", { class: "card" }, h("h2", {}, "Divisions"), h("p", { class: "hint" }, "New demand asks which division it is for. The division decides which vendor office reviews the request (named in the record and in the review flags) and, in the Questions tab, which ownership questions are asked."),
+      h("div", { class: "card" }, h("h2", {}, "Divisions and vendor offices"), h("p", { class: "hint" }, "New demand asks which division it is for. The division decides which vendor office reviews the request (named in the record and in the review flags) and, under Conversation › Questions, which ownership questions are asked."),
         h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Division"), h("th", {}, "Vendor office"))),
           h("tbody", {}, S.doc.divisions.map((d) => h("tr", {},
             h("td", {}, h("input", { type: "text", id: `d-${d.id}-name`, "aria-label": `Name of ${d.id}`, style: "width:320px", class: changed("divisions", d.id, "name"), value: d.name, oninput: (e) => editQuiet(() => { d.name = e.target.value; }) }), " ", h("span", { class: "muted" }, d.id)),
-            h("td", {}, h("input", { type: "text", id: `d-${d.id}-office`, "aria-label": `Vendor office of ${d.id}`, style: "width:380px", class: changed("divisions", d.id, "vendor_office"), value: d.vendor_office, oninput: (e) => editQuiet(() => { d.vendor_office = e.target.value; }) }))))))),
+            h("td", {}, h("input", { type: "text", id: `d-${d.id}-office`, "aria-label": `Vendor office of ${d.id}`, style: "width:380px", class: changed("divisions", d.id, "vendor_office"), value: d.vendor_office, oninput: (e) => editQuiet(() => { d.vendor_office = e.target.value; }) }))))))));
+  }
+  function entities() {
+    return h("div", {},
       h("div", { class: "card", "data-entities": "" }, h("h2", {}, "Legal entities"), h("p", { class: "hint" }, "The entity that receives the service and signs the contract. It is recognised from the search words (any case) or the short codes (capitals only, so \"US\" is not \"us\"). EU is the entity the data transfer check reads."),
         h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Entity"), h("th", {}, "Country"), h("th", {}, "Search words"), h("th", {}, "Short codes"))),
           h("tbody", {}, S.doc.entities.map((e) => h("tr", {},
             h("td", {}, h("input", { type: "text", id: `en-${e.id}-name`, "aria-label": `Name of ${e.id}`, style: "width:240px", class: changed("entities", e.id, "name"), value: e.name, oninput: (ev) => editQuiet(() => { e.name = ev.target.value; }) }), " ", h("span", { class: "muted" }, e.id)),
             h("td", {}, h("input", { type: "text", "aria-label": `Country of ${e.id}`, style: "width:140px", value: e.country, oninput: (ev) => editQuiet(() => { e.country = ev.target.value; }) })),
             h("td", {}, h("input", { type: "text", id: `en-${e.id}-keywords`, "aria-label": `Search words for ${e.id}`, style: "width:100%", value: e.keywords.join(", "), oninput: (ev) => editQuiet(() => { e.keywords = ev.target.value.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean); }) })),
-            h("td", {}, h("input", { type: "text", "aria-label": `Short codes for ${e.id}`, style: "width:90px", value: e.codes.join(", "), oninput: (ev) => editQuiet(() => { e.codes = ev.target.value.split(",").map((x) => x.trim()).filter(Boolean); }) }))))))),
-      S.doc.lists.map((l) => h("div", { class: "card", "data-list": l.key }, h("h2", {}, l.label), h("p", { class: "hint" }, `${l.description} Maintained by ${l.owner}.`),
+            h("td", {}, h("input", { type: "text", "aria-label": `Short codes for ${e.id}`, style: "width:90px", value: e.codes.join(", "), oninput: (ev) => editQuiet(() => { e.codes = ev.target.value.split(",").map((x) => x.trim()).filter(Boolean); }) }))))))));
+  }
+  function reviewLists() {
+    const words = (it) => it.keywords.join(", ");
+    return h("div", {},
+      S.doc.lists.map((l) => h("div", { class: "card", id: `list-${l.key}`, "data-list": l.key }, h("h2", {}, l.label), h("p", { class: "hint" }, `${l.description} Maintained by ${l.owner}.`),
         h("p", { class: "hint" }, "Search words are matched as whole words in what the requester writes; end a word with * to match longer words too (\"lobbyist*\" finds lobbyists)."),
         h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Name shown in the flag"), h("th", {}, "Search words, separated by commas"), h("th", {}))),
           h("tbody", {}, l.items.map((it, i) => h("tr", {},
@@ -317,7 +369,7 @@
   // ---------- reference data: download as CSV, edit in a spreadsheet, upload, check, publish
   // columns as the import script reads them; lists inside a cell are separated by ";"
   const REF = {
-    l4: { label: "Level 4 list", key: "code", cols: ["code", "name", "l1", "l2", "l3", "theme", "desc", "kw"], lists: ["kw"], nums: [], hint: "theme is the buying category id (see Categories); kw are search words." },
+    l4: { label: "Level 4 list", key: "code", cols: ["code", "name", "l1", "l2", "l3", "theme", "desc", "kw"], lists: ["kw"], nums: [], hint: "theme is the buying category id (see Routing › Category rules); kw are search words." },
     suppliers: { label: "Suppliers", key: "name", cols: ["supplier", "preferred_l4"], field: { supplier: "name" }, lists: ["preferred_l4"], nums: [], hint: "preferred_l4: the Level 4 codes the supplier is preferred for." },
     contracts: { label: "Framework contracts", key: "id", cols: ["id", "supplier", "title", "l4", "expires", "remaining"], lists: ["l4"], nums: ["remaining"], hint: "l4: the Level 4 codes it covers; expires: YYYY-MM-DD; remaining: the value left, in euro." },
     catalogue: { label: "Catalogue", key: "id", cols: ["id", "kind", "name", "supplier", "l4", "price", "max_order", "unit", "kw"], lists: ["kw"], nums: ["price", "max_order"], hint: "kind: item (a fixed price) or shop (a supplier's shop for a whole Level 4, with a maximum order value)." },
@@ -354,10 +406,10 @@
     const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
     const a = h("a", { href: url, download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  function reference() {
-    return h("div", {}, h("div", { class: "card" }, h("h2", {}, "Reference data"),
-      h("p", { class: "hint" }, "The lists the rules read: the Level 4 list, suppliers, framework contracts and the catalogue. Download a list as CSV, change it in a spreadsheet, and upload it: the upload replaces the whole list in the draft. Save the draft to have it checked (every Level 4 in a known category, every link to an existing entry), then publish. The lists shipped with the prototype are example data.")),
-      Object.entries(REF).map(([part, r]) => {
+  function reference(only) {
+    return h("div", {}, h("div", { class: "card" },
+      h("p", { class: "hint", style: "margin:0" }, "Download the list as CSV, change it in a spreadsheet, and upload it: the upload replaces the whole list in the draft. Save the draft to have it checked (every Level 4 in a known category, every link to an existing entry), then publish. The lists shipped with the prototype are example data.")),
+      Object.entries(REF).filter(([part]) => part === only).map(([part, r]) => {
         const list = S.doc[part], f = (S.refFilter[part] || "").toLowerCase(), base = S.st.draft[part] || [];
         const shown = (f ? list.filter((e) => JSON.stringify(e).toLowerCase().includes(f)) : list).slice(0, 8);
         const file = h("input", { type: "file", accept: ".csv,text/csv", id: `ref-${part}-file`, "aria-label": `Upload ${r.label} as CSV`, style: "display:none", onchange: (e) => {
@@ -408,10 +460,7 @@
   const DOMAIN_FIELDS = [["bg", "Example background (why now)"], ["aud", "Target audience"], ["fun", "Supported functions"], ["ben", "Key benefits"], ["kpi", "Success measures"], ["sl", "Service levels"],
     ["reg", "Regulatory and governance benefits"], ["out", "Out of scope"], ["mh", "Must-haves"], ["qual", "Supplier qualifications"], ["deps", "What we provide"], ["personal", "Personal data usually involved"],
     ["important", "Why it may support a critical or important function (empty: usually not)"], ["notes", "Notes for the buyer"]];
-  function texts() {
-    const d = S.doc.domains.find((x) => x.id === S.dKey) || S.doc.domains[0];
-    S.dKey = d.id;
-    const csv = (list) => list.join(", "), fromCsv = (v) => v.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+  function examples() {
     return h("div", {},
       h("div", { class: "card", "data-examples": "" }, h("h2", {}, "Welcome examples"), h("p", { class: "hint" }, "The example requests on the welcome screen, in groups. At least 3, up to 12."),
         h("table", {}, h("thead", {}, h("tr", {}, h("th", {}, "Group"), h("th", {}, "Label"), h("th", {}, "Request"), h("th", {}))),
@@ -420,7 +469,13 @@
             h("td", {}, h("input", { type: "text", "aria-label": `Label of example ${i + 1}`, style: "width:150px", value: x.label, oninput: (e) => editQuiet(() => { x.label = e.target.value; }) })),
             h("td", {}, h("input", { type: "text", id: `ex-${i}`, "aria-label": `Request of example ${i + 1}`, style: "width:100%", value: x.text, oninput: (e) => editQuiet(() => { x.text = e.target.value; }) })),
             h("td", {}, h("button", { class: "btn s x", type: "button", "aria-label": `Remove example ${i + 1}`, disabled: S.doc.examples.length <= 3, onclick: () => edit(() => { S.doc.examples.splice(i, 1); }) }, "✕")))))),
-        S.doc.examples.length < 12 ? h("p", {}, h("button", { class: "btn s", type: "button", onclick: () => edit(() => { S.doc.examples.push({ group: "New demand", label: "New example", text: "Describe a request here." }); }) }, "+ example")) : null),
+        S.doc.examples.length < 12 ? h("p", {}, h("button", { class: "btn s", type: "button", onclick: () => edit(() => { S.doc.examples.push({ group: "New demand", label: "New example", text: "Describe a request here." }); }) }, "+ example")) : null));
+  }
+  function domains() {
+    const d = S.doc.domains.find((x) => x.id === S.dKey) || S.doc.domains[0];
+    S.dKey = d.id;
+    const csv = (list) => list.join(", "), fromCsv = (v) => v.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+    return h("div", {},
       h("div", { class: "card", "data-domain": d.id }, h("h2", {}, "Operations and service domains"),
         h("p", { class: "hint" }, "A domain is recognised from its search words (the one mentioned first wins) and gives the examples and suggested answers for that kind of work. The flags for record keeping and critical functions read the domain too."),
         h("p", {}, h("label", {}, h("span", { class: "muted" }, "Domain "), select(S.doc.domains.map((x) => [x.id, x.name]), d.id, (v) => { S.dKey = v; render(); }, { id: "dKey" }))),
@@ -471,27 +526,158 @@
             h("td", { class: "muted" }, Object.entries(x.facts || {}).filter(([, v]) => v !== null).map(([k, v]) => `${k}=${typeof v === "number" ? num(v) : v}`).join(" · "))))))) : null);
   }
 
+  // ---------- areas: what someone is trying to do, each with a few sections. `pick` is the part of the configuration a
+  // section edits: it drives the "changed" markers, the overview and the links from problems.
+  const PARAMS = (groups, only) => (d) => (d.params || []).filter((p) => groups.includes(p.group || "Other") && (!only || only(p)));
+  const QUALITY_SIMPLE = (p) => (p.group || "Other") === "Text limits" || p.key === "qualityMin";
+  const QUALITY_GROUPS = ["Text limits", "Quality score", "Answer checks", "Category matching"];
+  const AREAS = [
+    { key: "routing", label: "Routing", blurb: "Where a request goes: the catalogue, an existing contract, business-led or procurement-led demand, and what happens next.",
+      sections: [
+        { key: "thresholds", label: "Thresholds", pick: PARAMS(["Routing"]), render: () => thresholds(["Routing"]) },
+        { key: "channels", label: "Channels and next steps", pick: (d) => [d.channels, d.next_steps], render: () => h("div", {}, channels(), nextsteps()) },
+        { key: "categories", label: "Category rules", pick: (d) => (d.categories || []).map((c) => [c.id, c.name, c.cm_mandatory, c.renewals_calendar]), render: categories },
+        { key: "rules", label: "Routing rules", pick: (d) => (d.rules || []).filter((r) => !isFlagRule(r)), render: () => rules(false) }] },
+    { key: "checks", label: "Checks and reviews", blurb: "The review flags a request raises, what they say and who reviews them, and the lists and offices they name.",
+      sections: [
+        { key: "flags", label: "Review flags", pick: (d) => (d.rules || []).filter(isFlagRule), render: () => rules(true) },
+        { key: "lists", label: "Review lists", pick: (d) => d.lists, render: reviewLists },
+        { key: "divisions", label: "Divisions and vendor offices", pick: (d) => d.divisions, render: divisions },
+        { key: "entities", label: "Legal entities", pick: (d) => d.entities, render: entities }] },
+    { key: "conversation", label: "Conversation", blurb: "What the chat asks and suggests, the welcome screen, and how the description is checked.",
+      sections: [
+        { key: "questions", label: "Questions", pick: (d) => d.questions, render: questions },
+        { key: "guidance", label: "Guidance by category", pick: (d) => d.guidance, render: guidance },
+        { key: "domains", label: "Operations domains", pick: (d) => d.domains, render: domains },
+        { key: "examples", label: "Welcome examples", pick: (d) => d.examples, render: examples },
+        { key: "quality", label: "Description and quality", pick: PARAMS(QUALITY_GROUPS),
+          render: () => h("div", {}, S.advanced ? null : h("div", { class: "card" }, h("p", { class: "hint", style: "margin:0" }, "The quality-score weights, the answer checks and the Level 4 match are advanced settings: switch on \"Show advanced settings\" at the top to see them.")),
+            thresholds(QUALITY_GROUPS, S.advanced ? null : QUALITY_SIMPLE)) }] },
+    { key: "reference", label: "Reference data", blurb: "The lists the rules look things up in: Level 4, suppliers, framework contracts, the catalogue and the category search words.",
+      sections: [
+        { key: "l4", label: "Level 4", ref: "l4", render: () => reference("l4") },
+        { key: "suppliers", label: "Suppliers", ref: "suppliers", render: () => reference("suppliers") },
+        { key: "contracts", label: "Contracts", ref: "contracts", render: () => reference("contracts") },
+        { key: "catalogue", label: "Catalogue", ref: "catalogue", render: () => reference("catalogue") },
+        { key: "words", label: "Category search words", pick: (d) => (d.categories || []).map((c) => [c.id, c.keywords]), render: categoryWords }] },
+    { key: "history", label: "History", blurb: "Published versions, the change log, and which rules decided submitted requests.",
+      sections: [
+        { key: "versions", label: "Versions and changes", render: versions },
+        { key: "decisions", label: "Decision log", render: decisions }] },
+  ];
+  const areaOf = (k) => AREAS.find((a) => a.key === k);
+  const sectionOf = (a, k) => (areaOf(a) || { sections: [] }).sections.find((x) => x.key === k);
+  // a section differs from what was saved (unsaved) or from what is published (not yet published)
+  function sectionState(sec) {
+    if (sec.ref) return { unsaved: !same(S.doc[sec.ref], S.st.draft[sec.ref]), unpublished: (S.st.changed_ref || []).includes(sec.ref) };
+    if (!sec.pick) return { unsaved: false, unpublished: false };
+    return { unsaved: !same(sec.pick(S.doc), sec.pick(S.st.draft)), unpublished: !!S.st.published && !same(sec.pick(S.st.draft), sec.pick(S.st.published)) };
+  }
+  const isChanged = (sec) => { const x = sectionState(sec); return x.unsaved || x.unpublished; };
+
+  // where a problem can be fixed
+  function problemPlace(text) {
+    const m = /^(R\d\d)\b/.exec(text);
+    if (m) return { area: ROUTING.includes(m[1]) ? "routing" : "checks", section: ROUTING.includes(m[1]) ? "rules" : "flags", focus: "rule-" + m[1] };
+    const param = S.doc.params.find((p) => text.startsWith(p.label + ":"));
+    if (param) return (param.group || "Other") === "Routing" ? { area: "routing", section: "thresholds", focus: "p-" + param.key } : { area: "conversation", section: "quality", focus: "p-" + param.key, advanced: !QUALITY_SIMPLE(param) };
+    const by = [[/^(The sourcing request form threshold|threshold)/, "routing", "thresholds"], [/^(Channel|next steps)/i, "routing", "channels"], [/^Division/, "checks", "divisions"], [/^legal entity/, "checks", "entities"],
+      [/, entry \d+: needs a name/, "checks", "lists"], [/^operations domain/, "conversation", "domains"], [/^welcome examples/, "conversation", "examples"], [/^(headline|executive description)/, "conversation", "quality"],
+      [/^(typical day rate|quality)/, "conversation", "quality", true], [/^Level 4/, "reference", "l4"], [/^Supplier/, "reference", "suppliers"], [/^Contract/, "reference", "contracts"], [/^Catalogue/, "reference", "catalogue"]];
+    const hit = by.find(([re]) => re.test(text));
+    return hit ? { area: hit[1], section: hit[2], advanced: !!hit[3] } : null;
+  }
+
+  // go to a section, optionally to one setting in it
+  function go(place) {
+    if (!place) return;
+    S.area = place.area; S.section = place.section || (areaOf(place.area) && areaOf(place.area).sections.length ? areaOf(place.area).sections[0].key : "");
+    if (place.advanced && !S.advanced) setAdvanced(true);
+    Object.assign(S, place.state || {});
+    S.search = "";
+    if (S.area === "history") { delete S.extra.audit; delete S.extra.decisions; }
+    try { history.replaceState(null, "", "#" + S.area + (S.section ? "/" + S.section : "")); } catch (e) { /* not allowed */ }
+    render(); window.scrollTo(0, 0);
+    if (place.focus) setTimeout(() => { const el = document.getElementById(place.focus); if (el) { el.scrollIntoView({ block: "center" }); el.classList.add("flash"); if (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) el.focus(); } }, 0);
+  }
+  function setAdvanced(on) { S.advanced = on; try { localStorage.setItem("adm-advanced", on ? "1" : "0"); } catch (e) { /* private window */ } }
+  function fromHash() {
+    const [a, sec] = String(location.hash || "").replace(/^#/, "").split("/");
+    if (a === "overview" || !areaOf(a)) { S.area = "overview"; S.section = ""; return; }
+    S.area = a; S.section = sectionOf(a, sec) ? sec : areaOf(a).sections[0].key;
+  }
+
+  // ---------- search: every setting by its name and texts
+  function searchIndex() {
+    const out = [], add = (area, section, label, text, focus, extra) => out.push({ area, section, label, hay: `${label} ${text || ""}`.toLowerCase(), focus, ...extra });
+    S.doc.params.forEach((p) => (p.group || "Other") === "Routing" ? add("routing", "thresholds", p.label, p.description, "p-" + p.key) : add("conversation", "quality", p.label, `${p.group} ${p.description}`, "p-" + p.key, { advanced: !QUALITY_SIMPLE(p) }));
+    S.doc.channels.forEach((c) => add("routing", "channels", `Channel: ${c.name}`, c.key, `c-${c.key}-name`));
+    S.doc.next_steps.forEach((n) => add("routing", "channels", `Next steps: ${n.label}`, n.steps.join(" "), `ns-${n.key}-0`));
+    S.doc.categories.forEach((c) => { add("routing", "categories", `Category: ${c.name}`, c.id, `cat-${c.id}-name`); add("reference", "words", `Search words: ${c.name}`, (c.keywords || []).join(" "), `cat-${c.id}-kw`); });
+    S.doc.rules.forEach((r) => add(isFlagRule(r) ? "checks" : "routing", isFlagRule(r) ? "flags" : "rules", `${r.id} ${r.name}`, [r.decides, r.step, ...r.outcomes.map((o) => [o.label, o.title, o.owner].join(" ")), ...r.rows.map((x) => x.text || "")].join(" "), "rule-" + r.id, { state: { ruleStep: "" } }));
+    S.doc.lists.forEach((l) => add("checks", "lists", l.label, l.items.map((i) => `${i.name} ${i.keywords.join(" ")}`).join(" "), "list-" + l.key));
+    S.doc.divisions.forEach((d) => add("checks", "divisions", `Division: ${d.name}`, d.vendor_office, `d-${d.id}-name`));
+    S.doc.entities.forEach((e) => add("checks", "entities", `Legal entity: ${e.name}`, `${e.id} ${e.country} ${e.keywords.join(" ")} ${e.codes.join(" ")}`, `en-${e.id}-name`));
+    S.doc.questions.forEach((q) => add("conversation", "questions", `Question: ${q.label}`, `${q.key} ${q.q || ""} ${q.ex || ""} ${(q.choices || []).join(" ")}`, `q-${q.key}-label`, { state: { qFilter: "" } }));
+    S.doc.guidance.forEach((g) => add("conversation", "guidance", `Guidance: ${g.label}`, g.description, "gKey", { state: { gKey: g.key } }));
+    S.doc.domains.forEach((d) => add("conversation", "domains", `Domain: ${d.name}`, d.keywords.join(" "), `dm-${d.id}-name`, { state: { dKey: d.id } }));
+    S.doc.examples.forEach((x, i) => add("conversation", "examples", `Welcome example: ${x.label}`, x.text, `ex-${i}`));
+    Object.entries(REF).forEach(([k, r]) => add("reference", k, r.label, "csv upload download", `ref-${k}-download`));
+    return out;
+  }
+  function searchResults() {
+    const words = S.search.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return null;
+    const hits = searchIndex().filter((x) => words.every((w) => x.hay.includes(w))).sort((a, b) => Number(b.label.toLowerCase().includes(words[0])) - Number(a.label.toLowerCase().includes(words[0]))).slice(0, 10);
+    return h("div", { class: "results", id: "results", role: "listbox" }, hits.length ? hits.map((x) => h("button", { type: "button", class: "result", role: "option", onclick: () => go(x) },
+      h("b", {}, x.label), h("span", { class: "muted" }, ` ${areaOf(x.area).label} › ${sectionOf(x.area, x.section).label}${x.advanced ? " (advanced)" : ""}`))) : h("div", { class: "muted", style: "padding:8px" }, "Nothing found."));
+  }
+
+  // ---------- overview: one card per area, then common tasks
+  function overview() {
+    const prob = problems().map(problemPlace), latest = S.st.versions[0];
+    const TASKS = [["Change a threshold", { area: "routing", section: "thresholds" }], ["Change what a review flag says or who reviews it", { area: "checks", section: "flags" }], ["Update a review list", { area: "checks", section: "lists" }],
+      ["Change the next steps", { area: "routing", section: "channels" }], ["Change a question or its answer buttons", { area: "conversation", section: "questions" }], ["Upload new framework contracts", { area: "reference", section: "contracts" }]];
+    return h("div", {},
+      h("p", { class: "hint" }, latest ? `Live: version ${latest.version}, published ${when(latest.published_at)} by ${latest.actor}${latest.note ? ` (${latest.note})` : ""}.` : "Nothing has been published yet: the page runs on the built-in configuration."),
+      h("div", { class: "areas" }, AREAS.map((a) => {
+        const changedSecs = a.sections.filter(isChanged), np = prob.filter((x) => x && x.area === a.key).length;
+        return h("div", { class: "card area", "data-overview": a.key }, h("h2", {}, h("button", { type: "button", class: "link", onclick: () => go({ area: a.key }) }, a.label)), h("p", { class: "hint" }, a.blurb),
+          a.key === "history" ? null : h("p", {}, changedSecs.length ? h("span", { class: "pill warn" }, `${changedSecs.length} section${changedSecs.length > 1 ? "s" : ""} changed, not yet published`) : h("span", { class: "pill" }, "No changes"),
+            np ? h("span", { class: "pill bad", style: "margin-left:6px" }, `${np} problem${np > 1 ? "s" : ""}`) : null),
+          h("div", { class: "secs" }, a.sections.map((x) => h("button", { type: "button", class: "btn s", onclick: () => go({ area: a.key, section: x.key }) }, x.label, isChanged(x) ? h("span", { class: "dot", title: "changed" }) : null))));
+      })),
+      h("div", { class: "card" }, h("h2", {}, "Common tasks"), h("ul", { class: "tasks" }, TASKS.map(([label, place]) => h("li", {}, h("button", { type: "button", class: "link", onclick: () => go(place) }, label))))));
+  }
+
   // ---------- page
   function render() {
     const y = window.scrollY, active = document.activeElement && document.activeElement.id;
     $app.replaceChildren();
     if (!S.st) { $app.append(login()); return; }
-    const prob = problems();
-    const body = { thresholds, channels, categories, rules, questions, guidance, nextsteps, lists, texts, reference, versions, decisions }[S.tab]();
+    const prob = problems(), area = areaOf(S.area), sec = area && (sectionOf(S.area, S.section) || area.sections[0]);
+    if (sec) S.section = sec.key;
+    const body = area ? sec.render() : overview();
+    const nav = (key, label, changedNow) => h("button", { class: "tab", type: "button", "aria-current": S.area === key ? "page" : null, "data-area": key, onclick: () => go({ area: key }) }, label, changedNow ? h("span", { class: "dot", title: "changed" }) : null);
     $app.append(
       h("header", { class: "top" }, h("h1", {}, "Rules and settings"), h("span", { class: "muted", style: "color:#d6deef" }, S.actor ? `Signed in as ${S.actor}` : ""), h("span", { class: "sp" }),
+        h("div", { class: "search" }, h("input", { type: "search", id: "search", placeholder: "Find a setting", "aria-label": "Find a setting", value: S.search, oninput: (e) => { S.search = e.target.value; const old = document.getElementById("results"); const r = searchResults(); if (old) old.remove(); if (r) e.target.parentNode.append(r); } }), S.search ? searchResults() : null),
+        h("label", { class: "adv" }, h("input", { type: "checkbox", id: "advanced", checked: S.advanced, onchange: (e) => { setAdvanced(e.target.checked); render(); } }), " Show advanced settings"),
         h("a", { href: "./" }, "Open the intake"), h("button", { class: "btn s", type: "button", onclick: () => { if (S.unsaved && !confirm("Leave without saving?")) return; S.code = ""; sessionStorage.removeItem("adm"); S.st = null; S.extra = {}; render(); } }, "Sign out")),
       h("main", { class: "wrap" }, statusBar(),
         S.error ? h("div", { class: "problems", role: "alert" }, S.error) : null,
-        prob.length ? h("div", { class: "problems", id: "problems" }, h("b", {}, "Fix these before publishing"), h("ul", {}, prob.slice(0, 12).map((p) => h("li", {}, p)))) : null,
-        h("nav", { class: "tabs", role: "tablist" }, TABS.map(([k, l]) => h("button", { class: "tab", role: "tab", type: "button", "aria-selected": String(S.tab === k), "data-tab": k, onclick: () => { S.tab = k; if (k === "versions") delete S.extra.audit; if (k === "decisions") delete S.extra.decisions; render(); } }, l))),
+        prob.length ? h("div", { class: "problems", id: "problems" }, h("b", {}, "Fix these before publishing"), h("ul", {}, prob.slice(0, 12).map((p) => { const place = problemPlace(p); return h("li", {}, p, place ? [" ", h("button", { type: "button", class: "link", onclick: () => go(place) }, `Go to ${areaOf(place.area).label} › ${sectionOf(place.area, place.section).label}`)] : null); }))) : null,
+        h("nav", { class: "tabs areas-nav", "aria-label": "Areas" }, nav("overview", "Overview"), AREAS.map((a) => nav(a.key, a.label, a.sections.some(isChanged)))),
+        area ? h("nav", { class: "sections", "aria-label": `${area.label} sections` }, area.sections.map((x) => h("button", { class: "sec", type: "button", "aria-current": x.key === sec.key ? "page" : null, "data-section": `${area.key}/${x.key}`, onclick: () => go({ area: area.key, section: x.key }) }, x.label, isChanged(x) ? h("span", { class: "dot", title: "changed" }) : null))) : null,
         body));
     window.scrollTo(0, y);
-    if (active) { const el = document.getElementById(active); if (el) el.focus(); }
+    if (active) { const el = document.getElementById(active); if (el) { el.focus(); if (el.id === "search" && el.setSelectionRange) el.setSelectionRange(el.value.length, el.value.length); } }
   }
+  window.addEventListener("hashchange", () => { if (S.st) { fromHash(); render(); } });
   window.addEventListener("beforeunload", (e) => { if (S.unsaved) { e.preventDefault(); e.returnValue = ""; } });
 
   (async () => {
+    fromHash();
     if (S.code) { try { take(await api("GET")); } catch (e) { S.code = ""; sessionStorage.removeItem("adm"); } }
     render();
   })();

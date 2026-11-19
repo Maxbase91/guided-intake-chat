@@ -299,3 +299,18 @@ test("next steps, entities, domains, examples and answer buttons: only known ite
   const e2 = validateConfig(configFrom(bad, 0, "draft"));
   for (const re of [/headline, other routes/, /quality ratings/, /welcome examples/]) assert.ok(e2.some((e) => re.test(e)), `${re}: ${e2.join("; ")}`);
 });
+
+test("the admin state carries the published configuration without the reference lists, and which reference lists differ", async () => {
+  process.env.ADMIN_CODE = "admin-secret";
+  const { admin } = loadAll();
+  const start = (await call(admin, { headers: H })).body;
+  assert.deepEqual(Object.keys(start.published).sort(), ["categories", "channels", "divisions", "domains", "entities", "examples", "facts", "guidance", "lists", "next_steps", "params", "questions", "rules"]);
+  assert.deepEqual(start.changed_ref, []);
+  const doc = structuredClone(start.draft);
+  doc.contracts = doc.contracts.slice(1);
+  param(doc, "leadMin").value = 400000;
+  const after = (await call(admin, { method: "POST", headers: H, body: { action: "save", doc, revision: start.revision } })).body;
+  assert.deepEqual(after.changed_ref, ["contracts"]);
+  assert.equal(param(after.published, "leadMin").value, 500000);   // the published version is unchanged until a publish
+  assert.equal(param(after.draft, "leadMin").value, 400000);
+});

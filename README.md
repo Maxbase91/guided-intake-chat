@@ -73,6 +73,12 @@ words, and the reference data (Level 4 list, suppliers, framework contracts, cat
 `ADMIN_CODE`. Changes are saved as a draft, checked against each rule's own test cases, and published as a new
 version; earlier versions are kept and can be published again. The change log shows who changed what.
 
+The page opens on an overview and groups everything in five areas: **Routing** (thresholds, channels and next steps,
+category rules, routing rules), **Checks and reviews** (review flags, review lists, divisions and vendor offices, legal
+entities), **Conversation** (questions, guidance, domains, welcome examples, description and quality), **Reference
+data** and **History**. By default rules read as sentences with editable texts; "Show advanced settings" adds the full
+rule editor, the test cases and the rarely changed limits. The search box finds any setting by name.
+
 ## Deploy
 
 **Set up Vercel:**

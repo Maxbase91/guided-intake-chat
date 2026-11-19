@@ -57,7 +57,24 @@ input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid v
 code{background:#eef0f5;border-radius:4px;padding:0 4px;font-size:13px}
 details summary{cursor:pointer;font-weight:600;color:var(--navy)}
 .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;border-radius:10px;padding:9px 16px;box-shadow:0 6px 24px rgba(15,33,71,.25)}
-@media (max-width:700px){.wrap{padding:12px}td,th{padding:5px}}
+/* areas, sections, overview, search */
+.tab[aria-current=page]{background:var(--card);border-color:var(--line);color:var(--navy)}
+.sections{display:flex;gap:6px;overflow-x:auto;margin:-6px 0 14px;padding-bottom:2px}
+.sec{flex:none;border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;cursor:pointer;font-size:13.5px;color:var(--ink2)}
+.sec[aria-current=page]{background:var(--navy);border-color:var(--navy);color:#fff}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--amber);margin-left:6px;vertical-align:middle}
+.areas{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:14px}
+.areas .card{margin:0}.area h2 .link{font-size:17px;font-weight:700}
+.secs{display:flex;gap:6px;flex-wrap:wrap}
+.link{background:none;border:0;padding:0;color:var(--navy3);text-decoration:underline;cursor:pointer;font:inherit}
+.tasks{margin:0;padding-left:18px;columns:2}.tasks li{margin:4px 0}
+.search{position:relative}.search input{width:min(260px,52vw);border:0;border-radius:7px;padding:6px 10px}
+.results{position:absolute;right:0;top:calc(100% + 6px);width:min(440px,92vw);background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(15,33,71,.2);max-height:60vh;overflow:auto;z-index:10}
+.result{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid #edf0f5;padding:8px 12px;cursor:pointer}
+.result:hover,.result:focus{background:var(--bg)}
+.adv{font-size:13.5px;color:#d6deef;white-space:nowrap}
+.flash{animation:flash 1.6s ease-out}@keyframes flash{0%{box-shadow:0 0 0 4px var(--amber)}100%{box-shadow:0 0 0 0 transparent}}
+@media (max-width:700px){.wrap{padding:12px}td,th{padding:5px}.tasks{columns:1}.areas{grid-template-columns:1fr}.card{overflow-x:auto}}
 </style>
 </head>
 <body>
